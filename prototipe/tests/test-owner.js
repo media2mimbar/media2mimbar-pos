@@ -1,0 +1,18 @@
+const { chromium } = require(require('child_process').execSync('npm root -g').toString().trim()+'/playwright');
+(async()=>{ const b=await chromium.launch(); const ctx=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:1.5}); const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
+ await p.goto('file://'+process.cwd()+'/out/pos.html'); await p.waitForTimeout(600);
+ const sh=async n=>{ await p.waitForTimeout(500); await p.screenshot({path:`shots/owner-${n}.png`}); };
+ await p.click('text=Rina Wijaya'); for(const c of '111111') await p.click(`#hkLoginBody .pin-key:text-is("${c}")`); await sh('1-pilih');
+ await p.click('#hkLoginBody .order-type-item:has-text("Gudang Pusat")'); await sh('2-gudang');
+ await p.click('button:has-text("Buka Kasir")'); await sh('3-home-gudang');
+ await p.evaluate(()=>{ addToCart(PRODUCTS.find(x=>x.sku==='TOT-009').id); goToPayment(); selectPayment('cash'); cashTendered=billCtx().amountNow; prosesBayar(); finishOrder(); });
+ await p.waitForTimeout(400); await p.evaluate(()=>hkOpenEventInfo()); await sh('4-info');
+ await p.evaluate(()=>{ closeSheet('sheetHkEvent'); hkGantiTempat(); }); await p.waitForTimeout(300);
+ await p.click('#hkLoginBody .order-type-item:has-text("Hikayat Fest")'); await sh('5-pilih-bdg');
+ await p.click('button:has-text("Masuk ke Kasir")'); await sh('6-home-bdg');
+ await p.evaluate(()=>openSheet('sheetMainMenu')); await sh('7-menu');
+ const st=await p.evaluate(()=>JSON.parse(localStorage.getItem('hk2:shift')).filter(s=>!s.tutup).map(s=>s.eventId+':'+s.kasir));
+ const d=await ctx.newPage(); d.on('pageerror',e=>errs.push('D:'+e.message)); await d.setViewportSize({width:1440,height:800});
+ await d.goto('file://'+process.cwd()+'/out/dashboard.html'); await d.evaluate(()=>localStorage.setItem('hk2dash:sesi',JSON.stringify({nama:'Dimas Pratama'}))); await d.reload(); await d.waitForTimeout(500); await d.waitForTimeout(500);
+ await d.evaluate(()=>{ state.view='laporan'; state.hk.lapPeriode='hari'; state.hk.lapTab='event'; render(); }); await d.screenshot({path:'shots/owner-d-lap.png'});
+ console.log(JSON.stringify({st,errs})); await b.close(); })();

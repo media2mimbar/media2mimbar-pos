@@ -1,0 +1,30 @@
+const { chromium } = require(require('child_process').execSync('npm root -g').toString().trim()+'/playwright');
+(async()=>{ const b=await chromium.launch(); const errs=[]; const out={};
+ const d=await b.newPage({viewport:{width:1440,height:900}}); d.on('pageerror',e=>errs.push(e.message));
+ const P=process.cwd(); await d.goto('file://'+P+'/out/dashboard.html'); await d.evaluate(()=>{localStorage.clear();localStorage.setItem('hk2dash:sesi',JSON.stringify({nama:'Dimas Pratama'}))}); await d.reload(); await d.waitForTimeout(500);
+ const toast=()=>d.evaluate(()=>document.querySelector('.toast')?.textContent);
+ const go=async v=>{ await d.evaluate(v=>{ state.view=v; render(); },v); await d.waitForTimeout(200); };
+ await go('lap-kerugian'); out.kerugianAwal=await d.evaluate(()=>[...document.querySelectorAll('.main tbody tr')].map(r=>r.innerText.replace(/\s+/g,' ').slice(0,160)));
+ await go('stok-terbuang'); await d.click('[data-inv="t-baru"]'); await d.waitForTimeout(200);
+ await d.selectOption('#ivTAlasan',{index:1}); await d.fill('#ivTPenj','Kaos terkena noda cat saat dipindahkan di gudang');
+ await d.click('[data-inv="pilih"]'); await d.waitForTimeout(200);
+ await d.evaluate(()=>{ const r=[...document.querySelectorAll('[data-hk-act="pil-cek"],[data-inv="pil-cek"],[data-hk-act="pil-cek"]')][0]; r&&r.click(); }); await d.waitForTimeout(150);
+ await d.evaluate(()=>{ const x=document.querySelector('[data-hk-act="pil-simpan"],[data-inv="pil-simpan"]'); x&&x.click(); }); await d.waitForTimeout(200);
+ await d.evaluate(()=>{ const i=document.querySelector('.hk-qty'); i.value='3'; i.dispatchEvent(new Event('input',{bubbles:true})); i.dispatchEvent(new Event('change',{bubbles:true})); });
+ await d.click('[data-inv="t-simpan"]'); await d.waitForTimeout(150); out.tolak={toast:await toast(), merah:await d.evaluate(()=>[...document.querySelectorAll('.hk-invalid')].map(x=>x.id))};
+ await d.screenshot({path:'shots/tb-pj-form.png'});
+ // pindah lokasi ke event: pj otomatis
+ const evs=await d.evaluate(()=>[...document.querySelectorAll('#ivTLok option')].map(o=>o.value)); 
+ await d.selectOption('#ivTLok', evs[1]); await d.waitForTimeout(200); out.pjEvent=await d.evaluate(()=>[document.getElementById('ivTPj').value, state.events.find(e=>e.nama===document.getElementById('ivTLok').value)?.pj]);
+ await d.selectOption('#ivTLok', evs[0]); await d.waitForTimeout(200);
+ await d.selectOption('#ivTPj','Budi Santoso'); await d.waitForTimeout(100);
+ out.items=await d.evaluate(()=>state.hk.inv.tb.items);
+ await d.click('[data-inv="t-simpan"]'); await d.waitForTimeout(250); out.simpan=await toast();
+ out.ledger=await d.evaluate(()=>[...document.querySelectorAll('.main tbody tr')][0]?.innerText.replace(/\s+/g,' '));
+ await go('lap-kerugian'); out.kerugian=await d.evaluate(()=>[...document.querySelectorAll('.main tbody tr')].map(r=>r.innerText.replace(/\s+/g,' ').slice(0,180)));
+ await d.screenshot({path:'shots/tb-pj-kerugian.png'});
+ // selesaikan
+ const key=await d.evaluate(()=>hkKerugianSemua({opname:JSON.parse(localStorage.getItem('hk2:opname')),shift:JSON.parse(localStorage.getItem('hk2:shift')),terbuang:JSON.parse(localStorage.getItem('hk2:terbuang')),events:JSON.parse(localStorage.getItem('hk2:events'))}).find(x=>x.jenis==='Terbuang'&&x.tanggungJawab.pj==='Budi Santoso').key);
+ await d.click(`[data-hk-act="kr-open"][data-hk-arg="${key}"]`); await d.waitForTimeout(200); await d.click('[data-hk-act="kr-save"]'); await d.waitForTimeout(250);
+ out.selesai=await toast(); out.tbStatus=await d.evaluate(()=>JSON.parse(localStorage.getItem('hk2:terbuang')).map(t=>[t.no,t.tanggungJawab.pj,t.tanggungJawab.status,t.kerugian]));
+ console.log(JSON.stringify({out, errs},null,1)); await b.close(); })();

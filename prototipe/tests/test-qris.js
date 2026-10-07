@@ -1,0 +1,15 @@
+const { chromium } = require(require('child_process').execSync('npm root -g').toString().trim()+'/playwright');
+(async()=>{ const b=await chromium.launch(); const ctx=await b.newContext(); const errs=[];
+ const d=await ctx.newPage(); d.on('pageerror',e=>errs.push('D:'+e.message)); await d.setViewportSize({width:1440,height:900});
+ await d.goto('file://'+process.cwd()+'/out/dashboard.html'); await d.evaluate(()=>localStorage.setItem('hk2dash:sesi',JSON.stringify({nama:'Dimas Pratama'}))); await d.reload(); await d.waitForTimeout(500); await d.waitForTimeout(500);
+ await d.evaluate(()=>{ state.view='pengaturan-pos'; render(); });
+ await d.setInputFiles('[data-hk-qris]','shots/qr-struk.png'); await d.waitForTimeout(700);
+ await d.evaluate(()=>document.querySelector('.hk-qris-up').scrollIntoView({block:'center'})); await d.screenshot({path:'shots/qris-d.png'});
+ const p=await ctx.newPage(); p.on('pageerror',e=>errs.push('P:'+e.message)); await p.setViewportSize({width:390,height:844});
+ await p.goto('file://'+process.cwd()+'/out/pos.html'); await p.waitForTimeout(600);
+ await p.click('text=Budi Santoso'); for(const c of '444444') await p.click(`#hkLoginBody .pin-key:text-is("${c}")`); await p.waitForTimeout(500);
+ await p.evaluate(()=>{ addToCart(PRODUCTS.find(x=>x.sku==='TB-002').id); goToPayment(); selectPayment('qris'); prosesBayar(); }); await p.waitForTimeout(600); await p.screenshot({path:'shots/qris-p.png'});
+ await p.fill('#hkQrisRef','7310'); await p.dispatchEvent('#hkQrisRef','input'); await p.evaluate(()=>checkQrisPayment()); await p.waitForTimeout(500);
+ const t=await p.evaluate(()=>JSON.parse(localStorage.getItem('hk2:trx')).slice(-1)[0]);
+ const sz=await p.evaluate(()=>localStorage.getItem('hk2:pos').length);
+ console.log(JSON.stringify({metode:t.metode, total:t.total, posBytes:sz, errs})); await b.close(); })();

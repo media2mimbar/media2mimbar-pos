@@ -1,0 +1,13 @@
+const { chromium } = require(require('child_process').execSync('npm root -g').toString().trim()+'/playwright');
+(async()=>{ const b=await chromium.launch(); const p=await b.newPage({viewport:{width:390,height:844}}); const errs=[]; const out={}; p.on('pageerror',e=>errs.push(e.message));
+ await p.goto('file://'+process.cwd()+'/out/pos.html'); await p.evaluate(()=>localStorage.clear()); await p.reload(); await p.waitForTimeout(500);
+ const pin=async s=>{ for(const c of s) await p.click(`#hkLoginBody .pin-key:text-is("${c}")`); await p.waitForTimeout(300); };
+ await p.click('text=Rina Wijaya'); await pin('111111');
+ await p.click('#hkLoginBody .order-type-item:has-text("Hikayat Fest")'); await p.click('#hkLoginBody button.btn-primary'); await p.waitForTimeout(400);
+ await p.evaluate(()=>hkTutupEventOpen('ev-bdg')); await p.waitForTimeout(400);
+ const jm=p.locator('#hkTevBody .hk-fisik[data-sku="JRS-006-M"]'); await jm.fill('6');
+ const kp=p.locator('#hkTevBody .hk-fisik').first(); await kp.fill('10'); await p.waitForTimeout(150);
+ out.row=await p.evaluate(()=>[document.getElementById('hkTevSel-JRS-006-M').textContent, document.getElementById('hkTevSel-KBP-005-S').textContent]);
+ out.sum=await p.evaluate(()=>[hkTevKurang.textContent,hkTevLebih.textContent,hkTevRugi.textContent]);
+ await jm.scrollIntoViewIfNeeded(); await p.screenshot({path:'shots/tev-sel.png'});
+ console.log(JSON.stringify({out,errs})); await b.close(); })();

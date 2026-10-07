@@ -1,0 +1,18 @@
+const { chromium } = require(require('child_process').execSync('npm root -g').toString().trim()+'/playwright');
+(async()=>{ const b=await chromium.launch(); const d=await b.newPage({viewport:{width:1440,height:900}}); const errs=[]; d.on('pageerror',e=>errs.push(e.message));
+ await d.goto('file://'+process.cwd()+'/out/dashboard.html'); await d.evaluate(()=>localStorage.clear()); await d.reload(); await d.waitForTimeout(500);
+ await d.screenshot({path:'shots/login-1.png'});
+ const opsi=await d.evaluate(()=>[...document.querySelectorAll('.hk-login input')].map(x=>x.id));
+ await d.fill('#hkDashEmail','dimas@hikayat.id'); await d.fill('#hkDashPw','salah1234'); await d.click('[data-hk-login-ok]'); await d.waitForTimeout(200);
+ const err=await d.evaluate(()=>document.querySelector('.hk-login').innerText.includes('Email atau password salah'));
+ await d.fill('#hkDashPw','hikayat123'); await d.click('[data-hk-login-ok]'); await d.waitForTimeout(400);
+ const who=await d.evaluate(()=>document.querySelector('.user-box .who').innerText);
+ await d.evaluate(()=>{ state.view='presale'; state.hk.psTab='Perlu Refund'; render(); document.querySelector('[data-hk-act="ps-refund"]').click(); }); await d.waitForTimeout(200);
+ await d.fill('[data-hk-bind="hk.modal.bank"]','BCA'); await d.fill('[data-hk-bind="hk.modal.norek"]','123'); await d.setInputFiles('[data-hk-file="bukti"]','shots/qr-struk.png'); await d.waitForTimeout(600);
+ await d.screenshot({path:'shots/login-2.png'});
+ await d.evaluate(()=>document.querySelector('[data-hk-act="ps-refund-ok"]').click()); await d.waitForTimeout(200);
+ const oleh=await d.evaluate(()=>state.posTrx.find(t=>t.refund).refund.oleh);
+ await d.evaluate(()=>{ document.querySelector('.user-box .kebab').click(); }); await d.waitForTimeout(100); await d.screenshot({path:'shots/login-3.png'});
+ await d.evaluate(()=>document.querySelector('[data-hk-act="dash-logout"]').click()); await d.waitForTimeout(200);
+ const keluar=await d.evaluate(()=>!!document.querySelector('.hk-login'));
+ console.log(JSON.stringify({opsi, err, who, oleh, keluar, errs})); await b.close(); })();

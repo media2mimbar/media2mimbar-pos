@@ -1,0 +1,41 @@
+const { chromium } = require(require('child_process').execSync('npm root -g').toString().trim()+'/playwright');
+(async()=>{ const b=await chromium.launch(); const ctx=await b.newContext({acceptDownloads:true}); const errs=[]; const out={};
+ const base='file://'+process.cwd()+'/out/';
+ const d=await ctx.newPage(); d.on('pageerror',e=>errs.push('D:'+e.message)); await d.setViewportSize({width:1440,height:900});
+ const LS=k=>d.evaluate(k=>JSON.parse(localStorage.getItem('hk2:'+k)),k);
+ const login=async n=>{ await d.evaluate(n=>localStorage.setItem('hk2dash:sesi',JSON.stringify({nama:n})),n); await d.reload(); await d.waitForTimeout(600); };
+ await d.goto(base+'dashboard.html'); await d.evaluate(()=>localStorage.clear()); await login('Dimas Pratama');
+ await d.evaluate(()=>{ const sh=JSON.parse(localStorage.getItem('hk2:shift')); sh.forEach(s=>{ if(!s.tutup) s.tutup='2026-10-05T10:00'; }); localStorage.setItem('hk2:shift',JSON.stringify(sh)); }); await d.reload(); await d.waitForTimeout(600);
+ await d.evaluate(()=>{ state.hk.evId='ev-bdg'; state.view='event-detail'; render(); }); await d.click('[data-hk-act="tutup-open"]'); await d.waitForTimeout(300);
+ await d.locator('[data-hk-fisik]').first().fill('7'); await d.locator('[data-hk-fisik]').nth(1).fill('20');
+ await d.selectOption('[data-hk-bind="hk.modal.pj"]',''); await d.click('[data-hk-act="tutup-save"]'); await d.waitForTimeout(300);
+ out.tanpaPj=await d.evaluate(()=>!JSON.parse(localStorage.getItem('hk2:events')).find(e=>e.id==='ev-bdg').ditutup);
+ await d.selectOption('[data-hk-bind="hk.modal.pj"]','Budi Santoso'); await d.fill('[data-hk-bind="hk.modal.alasan"]','2 kaos S dan 3 kaos M tidak ditemukan saat bongkar booth'); await d.dispatchEvent('[data-hk-bind="hk.modal.alasan"]','input');
+ await d.evaluate(()=>document.querySelector('[data-hk-bind="hk.modal.pj"]').scrollIntoView({block:'center'})); await d.screenshot({path:'shots/r5-tutup.png'});
+ await d.click('[data-hk-act="tutup-save"]'); await d.waitForTimeout(400);
+ const op=(await LS('opname'))[0]; out.op={kerugian:op.kerugian, tj:op.tanggungJawab};
+ await d.evaluate(()=>{ state.view='lap-kerugian'; render(); }); await d.waitForTimeout(300); await d.screenshot({path:'shots/r5-lap.png'});
+ // Admin: ganti sebagian, tidak bisa bebankan
+ await d.click('[data-hk-act="kr-open"]'); await d.waitForTimeout(300);
+ out.adminBebankan=await d.locator('.hk-check:has-text("Dibebankan")').getAttribute('data-hk-act');
+ await d.fill('[data-hk-bind="hk.modal.jumlah"]','100000'); await d.dispatchEvent('[data-hk-bind="hk.modal.jumlah"]','input');
+ await d.screenshot({path:'shots/r5-selesai.png'});
+ await d.click('[data-hk-act="kr-save"]'); await d.waitForTimeout(300); out.sesudahAdmin=(await LS('opname'))[0].tanggungJawab;
+ // Owner: bebankan sisa
+ await login('Rina Wijaya'); await d.evaluate(()=>{ state.view='lap-kerugian'; render(); }); await d.click('[data-hk-act="kr-open"]'); await d.waitForTimeout(200);
+ await d.click('[data-hk-act="kr-jenis"][data-hk-arg="Dibebankan perusahaan"]'); await d.waitForTimeout(200); await d.click('[data-hk-act="kr-save"]'); await d.waitForTimeout(300);
+ out.sesudahOwner=(await LS('opname'))[0].tanggungJawab; await d.screenshot({path:'shots/r5-lap2.png'});
+ // POS: kirim dari WA HP kasir (fallback)
+ const p=await ctx.newPage(); p.on('pageerror',e=>errs.push('P:'+e.message)); await p.setViewportSize({width:390,height:844});
+ await p.goto(base+'pos.html'); await p.waitForTimeout(600);
+ await p.click('text=Rina Wijaya'); for(const c of '111111') await p.click(`#hkLoginBody .pin-key:text-is("${c}")`);
+ await p.click('#hkLoginBody .order-type-item:has-text("Kajian")'); await p.click('#hkLoginBody button.btn-primary'); await p.waitForTimeout(400);
+ await p.evaluate(()=>{ addToCart(PRODUCTS.find(x=>x.sku==='KBP-005-L').id); selectCustomer(customers[0].code); }); await p.waitForTimeout(300);
+ await p.evaluate(()=>{ goToPayment(); selectPayment('cash'); cashTendered=billCtx().amountNow; prosesBayar(); }); await p.waitForTimeout(800);
+ out.links=await p.evaluate(()=>[...document.querySelectorAll('.hk-wabox .hk-wa-link')].map(x=>x.textContent));
+ const dlP=p.waitForEvent('download',{timeout:5000}).catch(e=>null); const pop=p.waitForEvent('popup',{timeout:5000}).catch(()=>null);
+ await p.evaluate(()=>[...document.querySelectorAll('.hk-wabox .hk-wa-link')].find(x=>x.textContent.includes('HP ini')).click());
+ const dl=await dlP, pg=await pop; await p.waitForTimeout(300);
+ out.share={file:dl&&dl.suggestedFilename(), wa:pg?pg.url():null, struk:(await p.evaluate(()=>JSON.parse(localStorage.getItem('hk2:trx')).slice(-1)[0].struk))};
+ await p.evaluate(()=>document.querySelector('.hk-wabox').scrollIntoView({block:'center'})); await p.screenshot({path:'shots/r5-wa.png'});
+ console.log(JSON.stringify({out,errs},null,1)); await b.close(); })();

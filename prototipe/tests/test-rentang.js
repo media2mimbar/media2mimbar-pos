@@ -1,0 +1,15 @@
+const { chromium } = require(require('child_process').execSync('npm root -g').toString().trim()+'/playwright');
+(async()=>{ const b=await chromium.launch(); const ctx=await b.newContext({acceptDownloads:true}); const d=await ctx.newPage(); const errs=[]; d.on('pageerror',e=>errs.push(e.message)); await d.setViewportSize({width:1440,height:900});
+ await d.goto('file://'+process.cwd()+'/out/dashboard.html'); await d.evaluate(()=>{ localStorage.clear(); localStorage.setItem('hk2dash:sesi',JSON.stringify({nama:'Rina Wijaya'})); }); await d.reload(); await d.waitForTimeout(700);
+ const ymd=n=>{ const t=new Date(); t.setDate(t.getDate()+n); return t.toISOString().slice(0,10); };
+ const info=()=>d.evaluate(()=>({sub:document.querySelector('.page-sub').textContent.split(' · ')[0], per:state.hk.lapPeriode, rows:document.querySelectorAll('.main table tbody tr').length, dari:document.querySelector('[data-hk-bind="hk.lapDari"]').value, sampai:document.querySelector('[data-hk-bind="hk.lapSampai"]').value, tot:(document.querySelector('.main table tfoot tr')||{}).innerText}));
+ await d.evaluate(()=>{ state.view='lap-harian'; render(); }); await d.waitForTimeout(200);
+ const out={awal:await info()};
+ await d.fill('[data-hk-bind="hk.lapDari"]', ymd(-3)); await d.waitForTimeout(200); out.ubahDari=await info();
+ await d.fill('[data-hk-bind="hk.lapSampai"]', ymd(-2)); await d.waitForTimeout(200); out.ubahSampai=await info();
+ await d.fill('[data-hk-bind="hk.lapDari"]', ymd(-1)); await d.waitForTimeout(200); out.dariLewat=await info();
+ await d.screenshot({path:'shots/rentang.png'});
+ await d.click('[data-hk-act="lap-per"][data-hk-arg="7"]'); await d.waitForTimeout(200); out.tab7=await info();
+ await d.click('.hk-rentang-x').catch(()=>{}); 
+ await d.evaluate(()=>{ state.view='lap-kasir'; render(); }); await d.fill('[data-hk-bind="hk.lapSampai"]', ymd(-1)); await d.waitForTimeout(200); out.kasir=await info();
+ console.log(JSON.stringify({out,errs},null,1)); await b.close(); })();

@@ -1,0 +1,30 @@
+const { chromium } = require(require('child_process').execSync('npm root -g').toString().trim()+'/playwright');
+(async()=>{ const b=await chromium.launch(); const errs=[]; const out={};
+ const d=await b.newPage({viewport:{width:1440,height:900}}); d.on('pageerror',e=>errs.push(e.message));
+ const P=process.cwd(); await d.goto('file://'+P+'/out/dashboard.html'); await d.evaluate(()=>{localStorage.clear();localStorage.setItem('hk2dash:sesi',JSON.stringify({nama:'Dimas Pratama'}))}); await d.reload(); await d.waitForTimeout(500);
+ const toast=()=>d.evaluate(()=>document.querySelector('.toast')?.textContent);
+ const go=async v=>{ await d.evaluate(v=>{ state.view=v; render(); },v); await d.waitForTimeout(200); };
+ const gud=sku=>d.evaluate(sku=>hkStokDi(state.stokItems,sku,HK_GUDANG),sku);
+ const hpp=sku=>d.evaluate(sku=>JSON.parse(localStorage.getItem('hk2:produk')).find(p=>p.sku===sku).modal,sku);
+ await go('faktur-list');
+ const f1=await d.evaluate(()=>state.faktur.find(f=>f.no.endsWith('0001')).no);
+ // buat faktur baru KP-004 dengan harga beda supaya HPP berubah, lalu batalkan
+ out.awal={gud:await gud('KP-004'), hpp:await hpp('KP-004')};
+ await d.evaluate(()=>{ const f={no:'FA/TEST/0009', tanggal:hkYmd(new Date()), pemasokId:'sup1', items:[{sku:'KP-004',nama:'Kaos Polos',qty:20,harga:40000}], total:800000, jatuhTempo:null, catatan:'', oleh:'Dimas Pratama', waktu:hkIso(new Date()), bayar:[{tanggal:hkYmd(new Date()),jumlah:300000,cara:'Transfer',oleh:'Dimas Pratama'}]}; const D={}; HK_KEYS.forEach(k=>D[k]=JSON.parse(localStorage.getItem('hk2:'+k))); hkTerimaFaktur(D, f); HK_KEYS.forEach(k=>localStorage.setItem('hk2:'+k,JSON.stringify(D[k]))); }); await d.reload(); await d.waitForTimeout(400); await go('faktur-list');
+ out.setelahMasuk={gud:await gud('KP-004'), hpp:await hpp('KP-004')};
+ await d.click('[data-inv="f-buka"][data-inv-arg="FA/TEST/0009"]'); await d.waitForTimeout(200);
+ await d.click('[data-inv="f-batalkan"]'); await d.waitForTimeout(200);
+ await d.click('[data-inv="f-batal-ok"]'); await d.waitForTimeout(150); out.tolakAlasan={toast:await toast(), merah:await d.evaluate(()=>[...document.querySelectorAll('.hk-invalid')].map(x=>x.id))};
+ await d.fill('#ivFBatalAlasan','Salah input harga beli'); await d.click('[data-inv="f-batal-ok"]'); await d.waitForTimeout(250);
+ out.toastBatal=await toast(); out.setelahBatal={gud:await gud('KP-004'), hpp:await hpp('KP-004')};
+ out.note=await d.evaluate(()=>document.querySelector('.hk-modal .hk-note')?.innerText);
+ await d.screenshot({path:'shots/faktur-batal.png'});
+ await d.click('[data-hk-act="modal-close"]'); await d.waitForTimeout(150);
+ out.statusList=await d.evaluate(()=>[...document.querySelectorAll('.main tbody tr')].filter(r=>r.innerText.includes('FA/TEST')).map(r=>r.innerText.replace(/\s+/g,' ')));
+ // tidak bisa batal: stok gudang sudah terpakai
+ await d.evaluate(()=>{ const it=hkStokRow(state.stokItems,'TMB-007'), g=hkPO(it,HK_GUDANG); const k=g.akhir-5; g.akhir-=k; it.akhir-=k; });
+ const f2=await d.evaluate(()=>state.faktur.find(f=>f.no.endsWith('0002')).no);
+ await d.click(`[data-inv="f-buka"][data-inv-arg="${f2}"]`); await d.waitForTimeout(200); await d.click('[data-inv="f-batalkan"]'); await d.waitForTimeout(200);
+ out.tidakBisa={note:await d.evaluate(()=>document.querySelector('.hk-modal .hk-note')?.innerText), tombolOk:await d.evaluate(()=>!!document.querySelector('[data-inv="f-batal-ok"]'))};
+ await d.screenshot({path:'shots/faktur-tidakbisa.png'});
+ console.log(JSON.stringify({out, errs},null,1)); await b.close(); })();

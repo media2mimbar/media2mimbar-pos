@@ -1,0 +1,31 @@
+const { chromium } = require(require('child_process').execSync('npm root -g').toString().trim()+'/playwright');
+(async()=>{ const b=await chromium.launch(); const errs=[]; const out={};
+ const d=await b.newPage({viewport:{width:1440,height:900}}); d.on('pageerror',e=>errs.push(e.message));
+ const P=process.cwd(); const masuk=async(nama,email)=>{ await d.evaluate(([n,e])=>localStorage.setItem('hk2dash:sesi',JSON.stringify({nama:n,email:e})),[nama,email]); await d.reload(); await d.waitForTimeout(500); };
+ await d.goto('file://'+P+'/out/dashboard.html'); await d.evaluate(()=>localStorage.clear()); await masuk('Dimas Pratama','dimas@hikayat.id');
+ const toast=()=>d.evaluate(()=>document.querySelector('.toast')?.textContent);
+ const go=async v=>{ await d.evaluate(v=>{ state.view=v; render(); },v); await d.waitForTimeout(250); };
+ // ADMIN
+ out.adminNav=await d.evaluate(()=>document.getElementById('sidebar').innerText.includes('Keuangan'));
+ await go('keu-ringkasan'); out.adminRedirect=[await d.evaluate(()=>state.view), await toast()];
+ await d.evaluate(()=>{ state.hk.evId='ev-bdg'; state.view='event-detail'; render(); }); await d.waitForTimeout(250);
+ out.adminDetail={lapBtn:await d.evaluate(()=>!!document.querySelector('[data-ku="ev-lap"]')), ubah:await d.evaluate(()=>document.querySelectorAll('[data-ku="biaya-ubah"]').length), kartu:await d.evaluate(()=>[...document.querySelectorAll('.widget-title')].map(x=>x.innerText).find(t=>t.startsWith('Biaya event')))};
+ await d.screenshot({path:'shots/keu2-admin-detail.png', fullPage:true});
+ await d.click('[data-ku="biaya-baru"]'); await d.waitForTimeout(250);
+ out.adminForm={view:await d.evaluate(()=>state.view), umum:await d.evaluate(()=>[...document.querySelectorAll('#kuTuju option')].some(o=>o.value===''))};
+ await d.selectOption('#kuKat','Potongan bank & MDR QRIS'); await d.waitForTimeout(100); await d.fill('#kuKet','MDR QRIS hari 1-2'); await d.fill('#kuJml','4200');
+ await d.click('[data-ku="b-simpan"]'); await d.waitForTimeout(300); out.adminSimpan=[await toast(), await d.evaluate(()=>state.view)];
+ // OWNER
+ await masuk('Rina Wijaya','rina@hikayat.id');
+ out.ownerNav=await d.evaluate(()=>document.getElementById('sidebar').innerText.includes('Keuangan'));
+ await d.evaluate(()=>{ state.hk.keu={evId:'ev-sby', per:'semua'}; state.view='keu-event'; render(); }); await d.waitForTimeout(300);
+ const kpi=()=>d.evaluate(()=>[...document.querySelectorAll('.metric-card')].slice(2,4).map(m=>m.innerText.replace(/\s+/g,' ')));
+ out.sbyOff=await kpi();
+ await d.click('[data-ku="alok"]'); await d.waitForTimeout(300); out.sbyOn=await kpi(); out.toastAlok=await toast();
+ out.baris=await d.evaluate(()=>[...document.querySelectorAll('.ku-lr tr')].map(r=>r.innerText.replace(/\s+/g,' ')).find(t=>t.includes('Bagian biaya umum')));
+ await d.screenshot({path:'shots/keu2-sby-alok.png', fullPage:true});
+ await go('keu-ringkasan'); out.allOn=await d.evaluate(()=>[...document.querySelectorAll('.metric-card')][3].innerText.replace(/\s+/g,' '));
+ out.evTabel=await d.evaluate(()=>[...document.querySelectorAll('tr[data-ku="ev-lap"]')].map(r=>r.innerText.replace(/\s+/g,' ')));
+ await d.click('[data-ku="alok"]'); await d.waitForTimeout(300); out.allOff=await d.evaluate(()=>[...document.querySelectorAll('.metric-card')][3].innerText.replace(/\s+/g,' '));
+ await go('keu-biaya'); out.ownerUbah=await d.evaluate(()=>document.querySelectorAll('[data-ku="biaya-ubah"]').length);
+ console.log(JSON.stringify({out, errs},null,1)); await b.close(); })();

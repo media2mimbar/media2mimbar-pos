@@ -1,0 +1,11 @@
+const { chromium } = require(require('child_process').execSync('npm root -g').toString().trim()+'/playwright');
+(async()=>{ const b=await chromium.launch(); const errs=[]; const p=await b.newPage({viewport:{width:390,height:844}}); p.on('pageerror',e=>errs.push(e.message));
+ await p.goto('file://'+process.cwd()+'/out/pos.html'); await p.evaluate(()=>localStorage.clear()); await p.reload(); await p.waitForTimeout(600);
+ await p.click('text=Sari Handayani'); for(const c of '333333') await p.click(`#hkLoginBody .pin-key:text-is("${c}")`); await p.waitForTimeout(500);
+ await p.evaluate(()=>{ addToCart(PRODUCTS.find(x=>x.sku==='TB-002').id); goToPayment(); selectPayment('cash'); cashTendered=billCtx().amountNow; prosesBayar(); }); await p.waitForTimeout(500);
+ const id=await p.evaluate(()=>JSON.parse(localStorage.getItem('hk2:trx')).slice(-1)[0].id);
+ await p.evaluate(id=>hkRwOpen(id),id); await p.waitForTimeout(400);
+ await p.evaluate(()=>{ hkVoidAlasan(document.querySelector('#hkVoidChips .chip'),'Salah input'); hkVoid(); }); await p.waitForTimeout(600);
+ await p.evaluate(()=>'582914'.split('').forEach(hkSupKey)); await p.waitForTimeout(400);
+ const r=await p.evaluate(id=>{ const t=JSON.parse(localStorage.getItem('hk2:trx')).find(x=>x.id===id); return {status:t.status, oleh:t.void&&t.void.oleh, pinBaru:JSON.parse(localStorage.getItem('hk2:staff')).find(x=>x.nama==='Laila Nur').pinBaru}; },id);
+ console.log(JSON.stringify({r, errs})); await b.close(); })();

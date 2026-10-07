@@ -1,0 +1,14 @@
+const { chromium } = require(require('child_process').execSync('npm root -g').toString().trim()+'/playwright');
+(async()=>{ const b=await chromium.launch(); const errs=[]; const p=await b.newPage({viewport:{width:390,height:844}}); p.on('pageerror',e=>errs.push(e.message));
+ await p.goto('file://'+process.cwd()+'/out/pos.html'); await p.evaluate(()=>localStorage.clear()); await p.reload(); await p.waitForTimeout(600);
+ await p.click('text=Sari Handayani'); for(const c of '333333') await p.click(`#hkLoginBody .pin-key:text-is("${c}")`); await p.waitForTimeout(500);
+ await p.evaluate(()=>{ addToCart(PRODUCTS.find(x=>x.sku==='TB-002').id); goToPayment(); selectPayment('qris'); prosesBayar(); }); await p.waitForTimeout(600);
+ const dis0=await p.evaluate(()=>document.getElementById('btnCekPembayaranQris').disabled);
+ await p.fill('#hkQrisRef','12a'); const v1=await p.evaluate(()=>[document.getElementById('hkQrisRef').value,document.getElementById('btnCekPembayaranQris').disabled]);
+ await p.fill('#hkQrisRef','4821'); await p.dispatchEvent('#hkQrisRef','input'); const dis2=await p.evaluate(()=>document.getElementById('btnCekPembayaranQris').disabled);
+ await p.screenshot({path:'shots/qris-ref.png'});
+ await p.click('#btnCekPembayaranQris'); await p.waitForTimeout(500);
+ await p.screenshot({path:'shots/qris-ref-struk.png'});
+ const t=await p.evaluate(()=>JSON.parse(localStorage.getItem('hk2:trx')).slice(-1)[0]);
+ const mini=await p.evaluate(()=>document.getElementById('miniReceipt').innerText);
+ console.log(JSON.stringify({dis0, v1, dis2, metode:t.metode, kasir:t.kasir, pembayaran:t.pembayaran, miniRef:/4 digit referensi\s*4821/.test(mini), errs},null,1)); await b.close(); })();

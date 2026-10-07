@@ -1,0 +1,13 @@
+const { chromium } = require(require('child_process').execSync('npm root -g').toString().trim()+'/playwright');
+(async()=>{ const b=await chromium.launch(); const ctx=await b.newContext(); const errs=[]; const out={}; const base='file://'+process.cwd()+'/out/';
+ const d=await ctx.newPage(); d.on('pageerror',e=>errs.push('D:'+e.message)); await d.setViewportSize({width:1440,height:900});
+ await d.goto(base+'dashboard.html'); await d.evaluate(()=>{ localStorage.clear(); localStorage.setItem('hk2dash:sesi',JSON.stringify({nama:'Rina Wijaya'})); }); await d.reload(); await d.waitForTimeout(500);
+ const baca=()=>d.evaluate(()=>({kpi:[...document.querySelectorAll('.main .metric-card')].map(x=>x.innerText.replace(/\n/g,' ')), kartu:[...document.querySelectorAll('.main .card')].map(c=>c.innerText.replace(/\s+/g,' ').slice(0,260))}));
+ await d.evaluate(()=>{ state.view='karyawan'; render(); }); out.tabs=await d.evaluate(()=>[...document.querySelectorAll('[data-inv="k-tab"]')].map(x=>x.innerText));
+ await d.click('[data-inv="k-tab"][data-inv-arg="tugas"]'); await d.waitForTimeout(200); out.awal=await baca(); await d.screenshot({path:'shots/bertugas-1.png', fullPage:true});
+ const p=await ctx.newPage(); p.on('pageerror',e=>errs.push('P:'+e.message)); await p.setViewportSize({width:390,height:844});
+ await p.goto(base+'pos.html'); await p.waitForTimeout(500); await p.click('text=Sari Handayani'); for(const c of '333333') await p.click(`#hkLoginBody .pin-key:text-is("${c}")`); await p.waitForTimeout(500);
+ await d.reload(); await d.waitForTimeout(400); await d.evaluate(()=>{ state.view='karyawan'; render(); }); await d.waitForTimeout(150);
+ await d.click('[data-inv="k-tab"][data-inv-arg="tugas"]'); await d.waitForTimeout(200); out.setelah=(await baca()).kartu.filter(t=>/Bandung/.test(t));
+ await d.click('[data-inv="bt-event"] >> nth=0'); await d.waitForTimeout(150); out.keEvent=await d.evaluate(()=>state.view+' '+state.hk.evId);
+ console.log(JSON.stringify({out,errs},null,1)); await b.close(); })();

@@ -1,0 +1,32 @@
+const { chromium } = require(require('child_process').execSync('npm root -g').toString().trim()+'/playwright');
+(async()=>{ const b=await chromium.launch(); const errs=[]; const out={};
+ const d=await b.newPage({viewport:{width:1440,height:900}}); d.on('pageerror',e=>errs.push(e.message));
+ const P=process.cwd(); await d.goto('file://'+P+'/out/dashboard.html'); await d.evaluate(()=>{localStorage.clear();localStorage.setItem('hk2dash:sesi',JSON.stringify({nama:'Rina Wijaya',email:'rina@hikayat.id'}))}); await d.reload(); await d.waitForTimeout(500);
+ const toast=()=>d.evaluate(()=>document.querySelector('.toast')?.textContent);
+ const go=async v=>{ await d.evaluate(v=>{ state.view=v; render(); },v); await d.waitForTimeout(250); };
+ out.nav=await d.evaluate(()=>NAV.find(n=>n.id==='keuangan').children.map(c=>c.label));
+ await go('keu-event'); out.evKpi=await d.evaluate(()=>[...document.querySelectorAll('.metric-card')].map(m=>m.innerText.replace(/\s+/g,' ')));
+ out.evLR=await d.evaluate(()=>document.querySelector('.ku-lr').innerText.split('\n').filter(Boolean).slice(0,60));
+ await d.screenshot({path:'shots/keu-event.png', fullPage:true});
+ // pilih Surabaya
+ await d.selectOption('[data-hk-bind="hk.keu.evId"]','ev-sby'); await d.waitForTimeout(300);
+ out.sbyKpi=await d.evaluate(()=>[...document.querySelectorAll('.metric-card')].map(m=>m.innerText.replace(/\s+/g,' ')));
+ await d.screenshot({path:'shots/keu-sby.png', fullPage:true});
+ await go('keu-ringkasan'); out.allKpi=await d.evaluate(()=>[...document.querySelectorAll('.metric-card')].map(m=>m.innerText.replace(/\s+/g,' ')));
+ await d.screenshot({path:'shots/keu-all.png', fullPage:true});
+ await d.click('[data-ku="per"][data-ku-arg="semua"]'); await d.waitForTimeout(250); out.allSemua=await d.evaluate(()=>[...document.querySelectorAll('.metric-card')].map(m=>m.innerText.replace(/\s+/g,' ')));
+ await d.screenshot({path:'shots/keu-all-semua.png', fullPage:true});
+ await go('keu-biaya'); out.biayaRows=await d.evaluate(()=>document.querySelectorAll('.main tbody tr').length);
+ await d.screenshot({path:'shots/keu-biaya.png', fullPage:true});
+ await d.click('[data-ku="biaya-baru"]'); await d.waitForTimeout(200);
+ await d.click('[data-ku="b-simpan"]'); await d.waitForTimeout(150); out.tolak={t:await toast(), m:await d.evaluate(()=>[...document.querySelectorAll('.hk-invalid')].map(x=>x.id))};
+ await d.selectOption('#kuTuju','ev-bdg'); await d.waitForTimeout(250);
+ out.katEvent=await d.evaluate(()=>[...document.querySelectorAll('#kuKat option')].map(o=>o.value).filter(Boolean).length);
+ await d.selectOption('#kuKat','Honor kru'); await d.fill('#kuKet','Honor kru tambahan hari ke-3'); await d.fill('#kuJml','300000');
+ await d.screenshot({path:'shots/keu-form.png'});
+ await d.click('[data-ku="b-simpan"]'); await d.waitForTimeout(250); out.simpan=await toast();
+ await d.evaluate(()=>{ state.hk.keu.evId='ev-bdg'; }); await go('keu-event'); out.bdgSetelah=await d.evaluate(()=>[...document.querySelectorAll('.metric-card')][2].innerText.replace(/\s+/g,' '));
+ // event detail tombol
+ await d.evaluate(()=>{ state.hk.evId='ev-sby'; state.view='event-detail'; render(); }); await d.waitForTimeout(200);
+ await d.click('[data-ku="ev-lap"]'); await d.waitForTimeout(250); out.dariDetail=await d.evaluate(()=>[state.view, state.hk.keu.evId]);
+ console.log(JSON.stringify({out, errs},null,1)); await b.close(); })();

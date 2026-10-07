@@ -1,0 +1,33 @@
+const { chromium } = require(require('child_process').execSync('npm root -g').toString().trim()+'/playwright');
+(async()=>{ const b=await chromium.launch(); const ctx=await b.newContext(); const errs=[]; const out={}; const base='file://'+process.cwd()+'/out/';
+ const p=await ctx.newPage(); p.on('pageerror',e=>errs.push('P:'+e.message)); await p.setViewportSize({width:390,height:844});
+ const toast=()=>p.evaluate(()=>document.querySelector('.toast,#toast').textContent);
+ await p.goto(base+'pos.html'); await p.evaluate(()=>localStorage.clear()); await p.reload(); await p.waitForTimeout(500);
+ await p.click('text=Sari Handayani'); for(const c of '333333') await p.click(`#hkLoginBody .pin-key:text-is("${c}")`); await p.waitForTimeout(500);
+ await p.evaluate(()=>hkBukaMutasi()); await p.waitForTimeout(300);
+ out.addBtn=await p.evaluate(()=>getComputedStyle(document.getElementById('invAddBtn')).display);
+ out.kartu=await p.evaluate(()=>document.querySelectorAll('.hk-tm-card').length);
+ await p.screenshot({path:'shots/tm-list.png'});
+ await p.evaluate(()=>hkSimulasiKirim()); await p.waitForTimeout(300); out.toastSim=await toast();
+ out.kartu2=await p.evaluate(()=>document.querySelectorAll('.hk-tm-card').length);
+ const no=await p.evaluate(()=>JSON.parse(localStorage.getItem('hk2:mutasi'))[0].no);
+ const sku=await p.evaluate(()=>JSON.parse(localStorage.getItem('hk2:mutasi'))[0].items[0].sku);
+ const st0=await p.evaluate(sku=>hkStokDi(JSON.parse(localStorage.getItem('hk2:stok')),sku,'Hikayat Fest Bandung'),sku);
+ await p.click(`.hk-tm-card:has-text("${no}")`); await p.waitForTimeout(300);
+ const inp=p.locator(`.hk-tm[data-sku="${sku}"]`); await inp.fill('99'); await p.waitForTimeout(100); out.clamp=await inp.inputValue();
+ await inp.fill('3'); await p.waitForTimeout(100); out.sel=await p.evaluate(sku=>[document.getElementById('hkTmSel-'+sku).textContent, hkTmKurang.textContent],sku);
+ await p.screenshot({path:'shots/tm-form.png'});
+ await p.evaluate(()=>hkTerimaSimpan()); out.tanpaCatatan=await toast();
+ await p.fill('#hkTmCatatan','2 pcs tidak ada di dus'); await p.evaluate(()=>hkTerimaSimpan()); await p.waitForTimeout(300); out.toastOk=await toast();
+ const m=await p.evaluate(no=>JSON.parse(localStorage.getItem('hk2:mutasi')).find(x=>x.no===no),no); out.mutasi={status:m.status, penerima:m.penerima, item:m.items[0]};
+ out.stok=[st0, await p.evaluate(sku=>hkStokDi(JSON.parse(localStorage.getItem('hk2:stok')),sku,'Hikayat Fest Bandung'),sku)];
+ await p.screenshot({path:'shots/tm-after.png'});
+ // dashboard melihat & dashboard kirim -> muncul di POS
+ const d=await ctx.newPage(); d.on('pageerror',e=>errs.push('D:'+e.message)); await d.goto(base+'dashboard.html'); await d.evaluate(()=>localStorage.setItem('hk2dash:sesi',JSON.stringify({nama:'Dimas Pratama'}))); await d.reload(); await d.waitForTimeout(500);
+ out.dashMutasi=await d.evaluate(no=>{ const m=hkLoad().mutasi.find(x=>x.no===no); return m&&m.status; },no);
+ await d.evaluate(()=>{ const D=hkLoad(); hkKirimStok(D, D.events.find(e=>e.id==='ev-bdg'), [['TMB-007',2]], 'Dimas Pratama'); hkSaveAll(D); });
+ await p.evaluate(()=>{ D=hkLoad(); }).catch(()=>{}); await p.reload(); await p.waitForTimeout(500); await p.evaluate(()=>hkBukaMutasi()); await p.waitForTimeout(300);
+ out.dariDash=await p.evaluate(()=>[...document.querySelectorAll('.hk-tm-card')].map(x=>x.innerText.replace(/\n/g,' ').slice(0,90)));
+ // gudang
+ await p.evaluate(()=>{ hkKeluar(); }); await p.waitForTimeout(200);
+ console.log(JSON.stringify({out,errs},null,1)); await b.close(); })();

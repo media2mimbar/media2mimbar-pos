@@ -1,0 +1,11 @@
+const { chromium } = require(require('child_process').execSync('npm root -g').toString().trim()+'/playwright');
+(async()=>{ const b=await chromium.launch(); const d=await (await b.newContext({viewport:{width:1440,height:900}})).newPage(); const errs=[]; d.on('pageerror',e=>errs.push(e.message));
+ await d.goto('file://'+process.cwd()+'/out/dashboard.html'); await d.evaluate(()=>{ localStorage.clear(); localStorage.setItem('hk2dash:sesi',JSON.stringify({nama:'Rina Wijaya'})); }); await d.reload(); await d.waitForTimeout(700);
+ await d.evaluate(()=>{ state.view='promo-produk'; render(); }); await d.click('[data-inv="pr-baru"]'); await d.waitForTimeout(150); await d.click('[data-inv="pr-jenis"][data-inv-arg="promoProduk"]'); await d.waitForTimeout(300);
+ await d.evaluate(()=>{ const r=document.getElementById('promoFormRoot'); r.scrollTop=99999; }); await d.waitForTimeout(200); await d.screenshot({path:'shots/fp-promo-bawah.png'});
+ await d.click('#promoFormRoot .close'); await d.waitForTimeout(200); const promoTutup=await d.evaluate(()=>!state.promoProdukForm);
+ await d.evaluate(()=>{ state.view='pelanggan-list'; render(); }); await d.click('[data-open-customer-import]'); await d.waitForTimeout(300); await d.screenshot({path:'shots/fp-import-pelanggan.png'});
+ await d.click('.topbar >> text=Karyawan'); await d.waitForTimeout(300); const importTutup=await d.evaluate(()=>!document.querySelector('.overlay.open > .hk-page')); await d.click('.topbar >> text=Penjualan'); await d.waitForTimeout(300);
+ await d.evaluate(()=>{ state.view='produk-list'; render(); }); await d.click('[data-hk-act="harga-open"]'); await d.waitForTimeout(200); await d.click('#hkModalRoot .close'); await d.waitForTimeout(200);
+ const hargaTutup=await d.evaluate(()=>!state.hk.modal);
+ console.log(JSON.stringify({importTutup,promoTutup,hargaTutup,errs})); await b.close(); })();

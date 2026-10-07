@@ -1,0 +1,10 @@
+const { chromium } = require(require('child_process').execSync('npm root -g').toString().trim()+'/playwright');
+(async()=>{ const b=await chromium.launch(); const errs=[]; const p=await b.newPage({viewport:{width:390,height:844}}); p.on('pageerror',e=>errs.push(e.message));
+ await p.goto('file://'+process.cwd()+'/out/pos.html'); await p.evaluate(()=>localStorage.clear()); await p.reload(); await p.waitForTimeout(600);
+ await p.click('text=Budi Santoso'); for(const c of '444444') await p.click(`#hkLoginBody .pin-key:text-is("${c}")`); await p.waitForTimeout(500);
+ await p.evaluate(()=>{ addToCart(PRODUCTS.find(x=>x.sku==='TB-002').id); goToPayment(); selectPayment('qris'); prosesBayar(); }); await p.waitForTimeout(600);
+ const v=await p.evaluate(()=>({judul:document.querySelector('#sheetQris .sheet-title').textContent, badge:document.querySelector('#sheetQris .qris-brand-badge').textContent, contoh:!!document.querySelector('.hk-qris-contoh'), svg:!!document.querySelector('#qrisCodeBox svg'), status:document.getElementById('qrisStatusRow').innerText, tombol:document.getElementById('btnCekPembayaranQris').textContent, dinamis:document.body.innerHTML.includes('Dinamis')}));
+ await p.screenshot({path:'shots/qris-contoh.png'});
+ await p.evaluate(()=>checkQrisPayment()); await p.waitForTimeout(400);
+ const t=await p.evaluate(()=>JSON.parse(localStorage.getItem('hk2:trx')).slice(-1)[0]);
+ console.log(JSON.stringify({v, metode:t.metode, errs},null,1)); await b.close(); })();

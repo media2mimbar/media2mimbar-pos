@@ -1,0 +1,14 @@
+const { chromium } = require(require('child_process').execSync('npm root -g').toString().trim()+'/playwright');
+(async()=>{ const b=await chromium.launch(); const p=await b.newPage({viewport:{width:390,height:844}}); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
+ await p.goto('file://'+process.cwd()+'/out/pos.html'); await p.evaluate(()=>localStorage.clear()); await p.reload(); await p.waitForTimeout(500);
+ await p.click('text=Rina Wijaya'); for(const c of '111111') await p.click(`#hkLoginBody .pin-key:text-is("${c}")`);
+ await p.click('#hkLoginBody .order-type-item:has-text("Hikayat Fest")'); await p.click('#hkLoginBody button.btn-primary'); await p.waitForTimeout(400);
+ await p.evaluate(()=>addToCart(PRODUCTS.find(x=>x.sku==='KBP-005-L').id)); await p.waitForTimeout(300);
+ await p.click('#btnPromosi'); await p.waitForTimeout(250);
+ const menu=await p.evaluate(()=>[...document.querySelectorAll('#promoQuickMenu .quick-menu-item')].map(x=>x.textContent.trim()));
+ await p.waitForTimeout(500); await p.screenshot({path:'shots/promo-tersedia.png'});
+ const tersedia=await p.evaluate(()=>[...document.querySelectorAll('#promoListBody .promo-card')].map(c=>c.querySelector('.promo-name').innerText.split('\n')[0]+' | '+(c.querySelector('.promo-note,.promo-desc')||{}).innerText));
+ await p.evaluate(()=>closeSheet('sheetListPromo')); await p.waitForTimeout(300);
+ await p.evaluate(()=>{ activeCat='promo'; renderProductArea(); }); await p.waitForTimeout(400); await p.screenshot({path:'shots/promo-list-pos.png'});
+ const semua=await p.evaluate(()=>[...document.querySelectorAll('#promoDepositList .pd-title')].map(x=>x.innerText.split('\n')[0]));
+ console.log(JSON.stringify({menu,tersedia,semua,errs},null,1)); await b.close(); })();

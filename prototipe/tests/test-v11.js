@@ -1,0 +1,52 @@
+const { chromium } = require(require('child_process').execSync('npm root -g').toString().trim()+'/playwright');
+(async()=>{ const b=await chromium.launch(); const ctx=await b.newContext({viewport:{width:390,height:844},deviceScaleFactor:2}); const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));
+ const base='file://'+process.cwd()+'/out/'; await p.goto(base+'pos.html'); await p.waitForTimeout(700);
+ const sh=async n=>{ await p.waitForTimeout(500); await p.screenshot({path:`shots/v11-${n}.png`}); };
+ const LS=k=>p.evaluate(k=>JSON.parse(localStorage.getItem('hk2:'+k)),k);
+ const login=async(nama,pin)=>{ await p.click(`text=${nama}`); for(const c of pin) await p.click(`#hkLoginBody .pin-key:text-is("${c}")`); await p.waitForTimeout(300); };
+ await login('Rina Wijaya','111111');
+ await p.click('#hkLoginBody .order-type-item:has-text("Kajian")'); await p.click('button:has-text("Buka Kasir")'); await p.waitForTimeout(400);
+ await p.evaluate(()=>{ addToCart(PRODUCTS.find(x=>x.sku==='KBP-005-M').id); selectCustomer(customers.find(c=>c.name==='Fajar Ramadhan').code); goToPayment(); selectPayment('transfer'); prosesBayar(); });
+ await sh('01-struk-qr');
+ await p.locator('#miniReceipt .hk-struk-qr svg').screenshot({path:'shots/qr-struk.png'});
+ const t=(await LS('trx')).slice(-1)[0];
+ // hari H: Kajian mulai hari ini, stok tersedia
+ await p.evaluate(()=>{ const ev=JSON.parse(localStorage.getItem('hk2:events')); const k=ev.find(e=>e.id==='ev-jkt'); const d=new Date(); k.mulai=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; localStorage.setItem('hk2:events',JSON.stringify(ev));
+   const st=JSON.parse(localStorage.getItem('hk2:stok')); ['KBP-005-M','KBP-005-XL','KBP-005-L','TMB-007'].forEach(s=>{ const it=st.find(x=>x.sku===s); it.perOutlet.push({outlet:'Kajian Akbar Istiqlal',awal:0,masuk:5,keluar:0,terjual:0,akhir:5}); it.akhir+=5; }); localStorage.setItem('hk2:stok',JSON.stringify(st)); });
+ await p.reload(); await p.waitForTimeout(700);
+ await p.evaluate(()=>{ finishOrder&&0; hkBukaRiwayat(); }); await p.waitForTimeout(500); await p.evaluate(()=>hkRwScope('presale')); await sh('02-list');
+ await p.evaluate(id=>hkRwOpen(id), t.id); await sh('03-detail-belum');
+ await p.evaluate(()=>{ closeSheet('sheetHkTrx'); hkScanBuka(); }); await sh('04-scan');
+ await p.setInputFiles('#hkScanFile','shots/qr-struk.png'); await p.waitForTimeout(900); await sh('05-qr-cocok');
+ await p.evaluate(id=>hkSerahkan(id,'QR'), t.id); await p.waitForTimeout(300);
+ const t2=(await LS('trx')).find(x=>x.id===t.id);
+ // manual: Umar (seed) 4 digit 7766
+ const umar=(await LS('trx')).find(x=>x.pelanggan&&x.pelanggan.nama==='Umar Faruq');
+ await p.evaluate(id=>hkRwOpen(id), umar.id); await p.waitForTimeout(400);
+ await p.evaluate(()=>{ document.querySelector('.hk-manual').open=true; document.getElementById('hkHp4').value='1111'; }); await p.evaluate(id=>hkManualCek(id),umar.id); await p.waitForTimeout(300);
+ const salah=await p.evaluate(()=>document.querySelector('.toast').textContent);
+ await p.evaluate(()=>{ document.getElementById('hkHp4').value='7766'; }); await p.evaluate(id=>hkManualCek(id),umar.id); await p.waitForTimeout(500);
+ for(const c of '222222') await p.evaluate(c=>hkSupKey(c),c); await p.waitForTimeout(600); await sh('06-manual-ok');
+ await p.evaluate(id=>hkSerahkan(id,'Manual'), umar.id); await p.waitForTimeout(300);
+ const umar2=(await LS('trx')).find(x=>x.id===umar.id);
+ // gudang: Nadia dari Surabaya (event ditutup, Perlu Refund)
+ await p.evaluate(()=>hkGantiTempat()); await p.waitForTimeout(300); await p.click('#hkLoginBody .order-type-item:has-text("Gudang Pusat")'); await p.click('button:has-text("Buka Kasir")'); await p.waitForTimeout(400);
+ await p.evaluate(()=>{ hkBukaRiwayat(); }); await p.waitForTimeout(400); await p.evaluate(()=>hkRwScope('presale')); await sh('07-gudang-list');
+ const nadia=(await LS('trx')).find(x=>x.pelanggan&&x.pelanggan.nama==='Nadia Putri');
+ const gStok0=(await LS('stok')).find(s=>s.sku==='JRS-006-M').perOutlet.find(o=>o.outlet==='Gudang Pusat').akhir;
+ await p.evaluate(id=>hkRwOpen(id,'QR'), nadia.id); await sh('08-gudang-serah');
+ await p.evaluate(id=>hkSerahkan(id,'QR'), nadia.id); await p.waitForTimeout(300);
+ const nadia2=(await LS('trx')).find(x=>x.id===nadia.id); const gStok1=(await LS('stok')).find(s=>s.sku==='JRS-006-M').perOutlet.find(o=>o.outlet==='Gudang Pusat').akhir;
+ // dashboard refund dengan bukti: pakai pesanan Kajian lain? buat Perlu Refund: tutup Kajian dulu
+ const d=await ctx.newPage(); d.on('pageerror',e=>errs.push('D:'+e.message)); await d.setViewportSize({width:1440,height:900}); await d.goto(base+'dashboard.html'); await d.evaluate(()=>localStorage.setItem('hk2dash:sesi',JSON.stringify({nama:'Dimas Pratama'}))); await d.reload(); await d.waitForTimeout(500); await d.waitForTimeout(500);
+ await d.evaluate(()=>{ const t=state.posTrx.find(x=>x.pengambilan&&x.pengambilan.status==='Menunggu'); state.hk.psTab='Menunggu'; state.view='presale'; render(); });
+ await d.evaluate(()=>document.querySelector('[data-hk-act="ps-refund"]').click()); await d.waitForTimeout(200);
+ await d.fill('[data-hk-bind="hk.modal.bank"]','BCA'); await d.fill('[data-hk-bind="hk.modal.norek"]','1234567890');
+ await d.evaluate(()=>document.querySelector('[data-hk-act="ps-refund-ok"]').click()); await d.waitForTimeout(200);
+ const tanpaFoto=await d.evaluate(()=>document.getElementById('toast').textContent);
+ await d.setInputFiles('[data-hk-file="bukti"]','shots/qr-struk.png'); await d.waitForTimeout(700); await d.screenshot({path:'shots/v11-d-refund.png'});
+ await d.evaluate(()=>document.querySelector('[data-hk-act="ps-refund-ok"]').click()); await d.waitForTimeout(300);
+ await d.evaluate(()=>{ state.hk.psTab='Semua'; render(); }); await d.screenshot({path:'shots/v11-d-list.png'});
+ await d.evaluate(()=>document.querySelector('[data-hk-act="ps-bukti"]').click()); await d.waitForTimeout(200); await d.screenshot({path:'shots/v11-d-bukti.png'});
+ console.log(JSON.stringify({qrPeng:t.pengambilan.status, t2:t2.pengambilan, salah, umar2:umar2.pengambilan, nadia2:nadia2.pengambilan, gudang:[gStok0,gStok1], tanpaFoto, errs}));
+ await b.close(); })();
