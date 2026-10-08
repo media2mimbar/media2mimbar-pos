@@ -8,7 +8,8 @@ Langkah:
 1. Buat database D1 `hikayat` kalau belum ada.
 2. Jalankan file migrations/*.sql yang belum pernah dijalankan (dicatat di tabel _migrasi).
 3. Unggah semua modul dist/*.js sebagai Worker, dengan binding DB.
-4. Buat secret PEPPER dan SETUP_KODE kalau belum ada. Nilai PEPPER tidak pernah dicetak.
+4. Buat secret PEPPER kalau belum ada (nilainya tidak pernah dicetak), dan SETUP_KODE
+   selama belum ada akun sama sekali.
 5. Nyalakan alamat <nama>.<subdomain>.workers.dev.
 """
 import json, os, secrets, sys, urllib.error, urllib.request, uuid
@@ -86,13 +87,14 @@ def unggah_worker(db_id):
     print(f"Worker {NAMA_WORKER} diunggah ({len(modul)} modul)")
 
 
-def siapkan_secret():
+def siapkan_secret(db_id):
     ada = {s["name"] for s in req("GET", f"/accounts/{ACCOUNT}/workers/scripts/{NAMA_WORKER}/secrets")}
     if "PEPPER" not in ada:
         req("PUT", f"/accounts/{ACCOUNT}/workers/scripts/{NAMA_WORKER}/secrets",
             {"name": "PEPPER", "text": secrets.token_urlsafe(32), "type": "secret_text"})
         print("Secret PEPPER dibuat")
-    if "SETUP_KODE" not in ada:
+    belum_ada_akun = sql(db_id, "SELECT count(*) AS n FROM staff")[0]["results"][0]["n"] == 0
+    if "SETUP_KODE" not in ada and belum_ada_akun:
         kode = secrets.token_hex(4).upper()
         req("PUT", f"/accounts/{ACCOUNT}/workers/scripts/{NAMA_WORKER}/secrets",
             {"name": "SETUP_KODE", "text": kode, "type": "secret_text"})
@@ -108,5 +110,5 @@ def nyalakan_alamat():
 if __name__ == "__main__":
     db_id = siapkan_db()
     unggah_worker(db_id)
-    siapkan_secret()
+    siapkan_secret(db_id)
     nyalakan_alamat()
