@@ -154,6 +154,7 @@ test("POS: pilih nama, PIN, wajib ganti PIN sementara", async () => {
   assert.equal((await api("GET", "/api/pos/karyawan")).status, 401);
   const daftar = await api("GET", "/api/pos/karyawan", { headers: hp });
   assert.deepEqual(daftar.data.karyawan.map((k) => k.nama), ["Dimas Pratama", "Rina Wijaya", "Sari Handayani"]);
+  assert.ok(daftar.data.karyawan.every((k) => k.petunjuk === ""));
 
   const salah = await api("POST", "/api/pos/masuk", { headers: hp, body: { staff_id: sari.id, pin: "000000" } });
   assert.equal(salah.status, 401);
@@ -167,6 +168,15 @@ test("POS: pilih nama, PIN, wajib ganti PIN sementara", async () => {
   assert.equal((await api("GET", "/api/pos/saya", { headers: pos })).data.staff.wajib_ganti_pin, false);
   // Sesi POS terikat ke HP: token sesi tanpa token HP yang sama ditolak.
   assert.equal((await api("GET", "/api/pos/saya", { headers: { "x-sesi": sesiSari } })).status, 401);
+});
+
+test("nama sama di POS diberi petunjuk pembeda", async () => {
+  const k = await api("POST", "/api/karyawan", { cookie: ownerCookie, body: { nama: "Sari Handayani", role: ["kasir"], telp: "081234567890" } });
+  const daftar = (await api("GET", "/api/pos/karyawan", { headers: { "x-perangkat": tokenHp } })).data.karyawan;
+  const sari2 = daftar.filter((x) => x.nama === "Sari Handayani");
+  assert.equal(sari2.find((x) => x.id === k.data.id).petunjuk, "HP …7890");
+  assert.equal((await api("GET", "/api/pos/karyawan", { headers: { "x-perangkat": tokenHp } })).data.karyawan.find((x) => x.nama === "Dimas Pratama").petunjuk, "");
+  await api("PATCH", `/api/karyawan/${k.data.id}`, { cookie: ownerCookie, body: { nama: "Sari Handayani", role: ["kasir"], aktif: false } });
 });
 
 test("PIN dikunci 15 menit setelah 5 kali salah", async () => {

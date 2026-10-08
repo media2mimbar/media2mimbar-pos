@@ -8,13 +8,34 @@ export async function infoPerangkat(req: Request, env: Env) {
   return json({ perangkat: await perangkatDari(env.DB, req) });
 }
 
+// Petunjuk pembeda untuk nama yang sama: email disamarkan (m.zi…@gmail.com) atau 4 digit akhir no HP.
+function petunjuk(email: string | null, telp: string | null): string {
+  if (email) {
+    const [lokal, domain] = email.split("@");
+    return `${lokal.slice(0, 4)}…@${domain}`;
+  }
+  return telp ? `HP …${telp.slice(-4)}` : "";
+}
+
 export async function daftarKaryawan(req: Request, env: Env) {
   await perangkatDari(env.DB, req);
   // Tahap 4 nanti menyaring sesuai penugasan event. Untuk sekarang semua karyawan aktif.
   const { results } = await env.DB
-    .prepare(`SELECT s.id, s.nama, (SELECT group_concat(role) FROM staff_role WHERE staff_id = s.id) AS role FROM staff s WHERE s.aktif = 1 ORDER BY s.nama`)
-    .all<{ id: string; nama: string; role: string | null }>();
-  return json({ karyawan: results.map((r) => ({ id: r.id, nama: r.nama, role: r.role ? r.role.split(",").sort() : [] })) });
+    .prepare(
+      `SELECT s.id, s.nama, s.email, s.telp, (SELECT group_concat(role) FROM staff_role WHERE staff_id = s.id) AS role
+       FROM staff s WHERE s.aktif = 1 ORDER BY s.nama, s.dibuat_pada`,
+    )
+    .all<{ id: string; nama: string; email: string | null; telp: string | null; role: string | null }>();
+  const jumlah = new Map<string, number>();
+  for (const r of results) jumlah.set(r.nama.toLowerCase(), (jumlah.get(r.nama.toLowerCase()) ?? 0) + 1);
+  return json({
+    karyawan: results.map((r) => ({
+      id: r.id,
+      nama: r.nama,
+      role: r.role ? r.role.split(",").sort() : [],
+      petunjuk: (jumlah.get(r.nama.toLowerCase()) ?? 0) > 1 ? petunjuk(r.email, r.telp) : "",
+    })),
+  });
 }
 
 export async function masuk(req: Request, env: Env) {

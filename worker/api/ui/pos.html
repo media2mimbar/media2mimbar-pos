@@ -161,7 +161,7 @@ async function pilihOrang() {
   $("#daftarOrang").innerHTML = '<p class="muted">Memuat…</p>';
   const { karyawan } = await api("GET", "/api/pos/karyawan");
   $("#daftarOrang").innerHTML = karyawan.map((k) => `<button data-id="${k.id}" data-nama="${esc(k.nama)}">
-    <span class="av">${esc(inisial(k.nama))}</span><span><b>${esc(k.nama)}</b><br><span class="small muted">${k.role.map((r) => NAMA_ROLE[r]).join(", ")}</span></span></button>`).join("");
+    <span class="av">${esc(inisial(k.nama))}</span><span><b>${esc(k.nama)}</b><br><span class="small muted">${k.role.map((r) => NAMA_ROLE[r]).join(", ")}${k.petunjuk ? " · " + esc(k.petunjuk) : ""}</span></span></button>`).join("");
   $("#daftarOrang").querySelectorAll("button").forEach((b) => (b.onclick = () => mintaPin({
     judul: b.dataset.nama, info: "Masukkan PIN 6 angka", av: inisial(b.dataset.nama), batal: pilihOrang,
     selesai: async (pin) => {
