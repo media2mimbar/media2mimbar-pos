@@ -55,7 +55,7 @@ th{font-size:12px;color:var(--text-2);font-weight:600;background:#FAFAF8}
 .kode{font:700 34px/1.2 ui-monospace,Menlo,monospace;letter-spacing:4px;background:var(--accent-bg);color:var(--accent-dark);padding:16px;border-radius:10px;text-align:center;margin:12px 0}
 .cred{font:600 16px ui-monospace,Menlo,monospace;background:var(--bg);padding:2px 8px;border-radius:6px}
 .overlay{position:fixed;inset:0;background:rgba(30,35,33,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
-.overlay .card{max-width:440px;width:100%}
+.overlay .card{max-width:520px;width:100%;max-height:90vh;overflow-y:auto}
 textarea{min-height:70px;resize:vertical}
 .num{text-align:right;white-space:nowrap}
 .subtabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:18px;flex-wrap:wrap}
@@ -136,6 +136,7 @@ tfoot td{font-weight:700;background:#FAFAF8}
 
 <script src="/dash-katalog.js"></script>
 <script src="/dash-inventori.js"></script>
+<script src="/dash-penjualan.js"></script>
 <script>
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -237,7 +238,7 @@ function mulai(staff) {
   $("#akunNama").textContent = staff.nama;
   $("#akunRole").textContent = staff.role.map((r) => NAMA_ROLE[r]).join(", ");
   const owner = staff.role.includes("owner");
-  const tabs = [["produk", "Produk"], ["inventori", "Inventori"], owner && ["karyawan", "Karyawan"], ["perangkat", "Perangkat POS"], owner && ["riwayat", "Riwayat Masuk"]].filter(Boolean);
+  const tabs = [["penjualan", "Penjualan"], ["produk", "Produk"], ["inventori", "Inventori"], ["pengaturan", "Pengaturan POS"], owner && ["karyawan", "Karyawan"], ["perangkat", "Perangkat POS"], owner && ["riwayat", "Riwayat Masuk"]].filter(Boolean);
   $("#nav").innerHTML = tabs.map(([k, n]) => `<button data-tab="${k}">${n}</button>`).join("");
   $("#nav").onclick = (e) => e.target.dataset.tab && buka(e.target.dataset.tab);
   tampil("layarApp");
@@ -247,7 +248,7 @@ function mulai(staff) {
 function buka(t) {
   tab = t;
   for (const b of $("#nav").children) b.classList.toggle("on", b.dataset.tab === t);
-  ({ produk: halProduk, inventori: halInventori, karyawan: halKaryawan, perangkat: halPerangkat, riwayat: halRiwayat })[t]();
+  ({ penjualan: halPenjualan, pengaturan: halPengaturan, produk: halProduk, inventori: halInventori, karyawan: halKaryawan, perangkat: halPerangkat, riwayat: halRiwayat })[t]();
 }
 
 // ---------- Karyawan ----------

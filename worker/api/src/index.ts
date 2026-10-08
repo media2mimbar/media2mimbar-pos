@@ -3,6 +3,9 @@ import * as inventori from "./inventori.js";
 import * as katalog from "./katalog.js";
 import { HALAMAN } from "./halaman.js";
 import * as karyawan from "./karyawan.js";
+import * as kasir from "./kasir.js";
+import * as pengaturan from "./pengaturan.js";
+import * as penjualan from "./penjualan.js";
 import * as perangkat from "./perangkat.js";
 import * as pos from "./pos.js";
 import { Gagal, json } from "./util.js";
@@ -49,7 +52,26 @@ const RUTE: [string, string, Handler][] = [
   ["GET", "/api/stok", inventori.daftarStok],
   ["GET", "/api/stok/gerak", inventori.gerakStok],
 
+  ["GET", "/api/harga-saluran/:id", katalog.ambilHargaSaluran],
+  ["PUT", "/api/harga-saluran/:id", katalog.simpanHargaSaluran],
+  ["GET", "/api/pengaturan/pos", pengaturan.ambilPengaturanPos],
+  ["PUT", "/api/pengaturan/pos", pengaturan.simpanPengaturanPos],
+  ["POST", "/api/berkas", pengaturan.unggahBerkas],
+  ["GET", "/api/berkas/:id", pengaturan.ambilBerkas],
+  ["GET", "/api/transaksi", penjualan.daftarTransaksi],
+  ["GET", "/api/transaksi/:id", penjualan.detailTransaksi],
+  ["GET", "/api/shift", penjualan.daftarShift],
+  ["GET", "/api/shift/:id", penjualan.detailShift],
+  ["GET", "/api/dokumen-ditolak", penjualan.daftarDitolak],
+  ["POST", "/api/dokumen-ditolak/:id/selesai", penjualan.selesaiDitolak],
+
   ["POST", "/api/pos/daftar", perangkat.sambungkan],
+  ["GET", "/api/pos/tarik", kasir.tarik],
+  ["POST", "/api/pos/sinkron", kasir.sinkron],
+  ["POST", "/api/pos/setujui", kasir.setujui],
+  ["GET", "/api/pos/shift/:id", kasir.shiftPos],
+  ["GET", "/api/pos/penjualan", kasir.penjualanPos],
+  ["GET", "/api/pos/berkas/:id", pengaturan.ambilBerkasPos],
   ["GET", "/api/pos/perangkat", pos.infoPerangkat],
   ["GET", "/api/pos/karyawan", pos.daftarKaryawan],
   ["POST", "/api/pos/masuk", pos.masuk],
@@ -80,7 +102,7 @@ function cocokkan(method: string, path: string): { h: Handler; id: string } | "s
 
 const HEADER_HALAMAN = {
   "cache-control": "no-cache",
-  "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'",
+  "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'",
   "x-content-type-options": "nosniff",
   "referrer-policy": "same-origin",
 };
@@ -92,7 +114,9 @@ export default {
 
     if (!path.startsWith("/api/")) {
       const html = HALAMAN[path as keyof typeof HALAMAN];
-      const jenis = path.endsWith(".js") ? "text/javascript; charset=utf-8" : "text/html; charset=utf-8";
+      const jenis = path.endsWith(".js") ? "text/javascript; charset=utf-8"
+        : path.endsWith(".webmanifest") ? "application/manifest+json"
+        : path.endsWith(".svg") ? "image/svg+xml" : "text/html; charset=utf-8";
       if (req.method === "GET" && html) return new Response(html, { headers: { ...HEADER_HALAMAN, "content-type": jenis } });
       return new Response("Tidak ditemukan", { status: 404 });
     }

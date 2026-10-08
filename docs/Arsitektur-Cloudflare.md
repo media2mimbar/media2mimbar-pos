@@ -258,9 +258,9 @@ Ini angka perkiraan. Setelah 2 minggu berjalan, cek angka sebenarnya di halaman 
 
 Saran: jalankan tahap 3 di satu event kecil sebelum tahap 4 sampai 7 selesai. Masalah offline dan sinyal paling cepat ketahuan di lapangan.
 
-### Catatan tahap 1 dan 2 (Oktober 2026)
+### Catatan pembangunan (Oktober 2026)
 
-Tahap 1 dan 2 sudah dibangun di `worker/api` dan berjalan di `https://hikayat-api.media2mimbar.workers.dev`. Beberapa hal berbeda dari rancangan di atas karena lingkungan pengembangan saat itu tidak bisa mengunduh paket npm:
+Tahap 1 sampai 3 sudah dibangun di `worker/api` dan berjalan di `https://hikayat-api.media2mimbar.workers.dev`. Beberapa hal berbeda dari rancangan di atas karena lingkungan pengembangan saat itu tidak bisa mengunduh paket npm:
 
 | Rancangan | Yang dipakai sekarang | Rencana |
 |---|---|---|
@@ -271,6 +271,14 @@ Tahap 1 dan 2 sudah dibangun di `worker/api` dan berjalan di `https://hikayat-ap
 | `wrangler deploy` | `deploy.py` memanggil API Cloudflare langsung | Tetap bisa memakai wrangler kapan saja |
 
 Tahap 2 menambah migrasi `0002_katalog_stok.sql`: `kategori`, `produk`, `varian`, `lokasi` (berisi Gudang Pusat), `stok`, `stok_gerak`, `pemasok`, `faktur`, `faktur_item`, `faktur_bayar`, `hpp_riwayat`, dan `log_aktivitas`. Rumus HPP dan status faktur ada di `src/aturan.ts` (calon `packages/aturan`) dan diuji dengan angka dari prototipe. Pemeriksaan stok saat batal faktur dan sisa tagihan saat bayar dijalankan di dalam `db.batch` yang sama dengan penulisannya, jadi dua orang yang menyimpan bersamaan tidak bisa membuat stok gudang atau sisa tagihan jadi salah.
+
+Tahap 3 menambah migrasi `0003_pos.sql`: `shift`, `kas_laci`, `trx`, `trx_item`, `trx_bayar`, `harga_saluran`, `berkas` (foto di D1), `persetujuan`, dan `dokumen_ditolak`. POS di HP:
+- File aplikasi disimpan service worker (`/pos-sw.js`, cakupan `/pos`), jadi POS tetap terbuka tanpa sinyal.
+- Katalog, stok, pengaturan, dan gambar QRIS disimpan di IndexedDB. Tarik data memakai `sejak` dan indeks `diubah_pada` supaya baris yang dibaca D1 tetap kecil.
+- Setiap aksi kasir (buka shift, kas, transaksi, tutup kasir, riwayat masuk) masuk antrean dengan ULID, lalu dikirim berurutan ke `POST /api/pos/sinkron`. Server memeriksa ulang angka (subtotal, total, pembayaran, 4 digit QRIS). Kiriman yang tidak lolos disimpan di `dokumen_ditolak` dan tampil di Dashboard › Penjualan › Kiriman Ditolak.
+- Masuk offline memakai PBKDF2(PIN, salt HP) yang disimpan saat karyawan pernah masuk online di HP itu.
+- Tutup kasir online memakai token persetujuan sekali pakai dari `POST /api/pos/setujui`. Tutup kasir offline ditandai `offline = 1`.
+- Setoran kasir di dashboard menghitung ulang "seharusnya" dari transaksi yang sudah masuk server, jadi tetap benar walau ada HP yang mengirim belakangan.
 
 Batas yang perlu diingat: satu query D1 maksimal 100 parameter, jadi satu faktur dibatasi 90 baris barang dan satu produk 40 varian.
 

@@ -299,3 +299,43 @@ export async function ubahProduk(req: Request, env: Env, id: string) {
   await env.DB.batch(tulis);
   return json({ ok: true });
 }
+
+// ---------- Harga khusus per saluran (sekarang: Harga Jual Langsung Gudang) ----------
+
+const SALURAN_HARGA = ["gudang"];
+
+export async function ambilHargaSaluran(req: Request, env: Env, saluran: string) {
+  await sesiSiap(env.DB, req, "owner", "admin");
+  if (!SALURAN_HARGA.includes(saluran)) throw new Gagal(404, "Saluran tidak dikenal");
+  const { results } = await env.DB.prepare("SELECT sku, harga FROM harga_saluran WHERE saluran = ?").bind(saluran).all<{ sku: string; harga: number }>();
+  return json({ harga: Object.fromEntries(results.map((r) => [r.sku, r.harga])) });
+}
+
+// Isi { harga: { SKU: angka | null } }. null atau kosong berarti kembali ke harga normal.
+export async function simpanHargaSaluran(req: Request, env: Env, saluran: string) {
+  const { staff } = await sesiSiap(env.DB, req, "owner", "admin");
+  if (!SALURAN_HARGA.includes(saluran)) throw new Gagal(404, "Saluran tidak dikenal");
+  const b = await bacaJson(req);
+  const h = b.harga as Obj;
+  if (!h || typeof h !== "object" || Array.isArray(h)) throw new Gagal(400, "Harga tidak valid");
+  const entri = Object.entries(h);
+  if (entri.length > 500) throw new Gagal(400, "Terlalu banyak SKU sekaligus");
+  const t = sekarang();
+  const tulis = [];
+  for (const [sku, v] of entri) {
+    if (v === null || v === "") {
+      tulis.push(env.DB.prepare("DELETE FROM harga_saluran WHERE sku = ? AND saluran = ?").bind(sku, saluran));
+      continue;
+    }
+    const harga = wajibBulat({ v }, "v", `Harga ${sku}`, { max: MAKS_HARGA });
+    tulis.push(env.DB.prepare(
+      `INSERT INTO harga_saluran (sku, saluran, harga, diubah_pada, diubah_oleh) SELECT ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM varian WHERE sku = ?)
+       ON CONFLICT (sku, saluran) DO UPDATE SET harga = excluded.harga, diubah_pada = excluded.diubah_pada, diubah_oleh = excluded.diubah_oleh`,
+    ).bind(sku, saluran, harga, t, staff.id, sku));
+  }
+  // Varian ikut ditandai berubah supaya HP mengambil harga baru saat tarik data berikutnya.
+  for (const [sku] of entri) tulis.push(env.DB.prepare("UPDATE varian SET diubah_pada = ? WHERE sku = ?").bind(t, sku));
+  tulis.push(logAktivitas(env.DB, staff, "Ubah harga jual langsung gudang", { tabel: "harga_saluran", id: saluran, keterangan: `${entri.length} SKU` }));
+  for (let i = 0; i < tulis.length; i += 90) await env.DB.batch(tulis.slice(i, i + 90));
+  return json({ ok: true });
+}

@@ -9,7 +9,7 @@ function halProduk(sub) {
 }
 
 const kepalaProduk = () => `<div class="head"><div><h1>Produk</h1></div>
-  ${subProduk === "daftar" ? '<button class="btn primary" id="tambahProduk">+ Produk</button>' : ""}</div>
+  ${subProduk === "daftar" ? '<div style="display:flex;gap:8px"><button class="btn" id="hargaGudang">Harga Jual Langsung Gudang</button><button class="btn primary" id="tambahProduk">+ Produk</button></div>' : ""}</div>
   ${subtabs([["daftar", "Daftar Produk"], ["kategori", "Kategori"]], subProduk)}`;
 
 async function daftarProduk() {
@@ -41,6 +41,7 @@ async function daftarProduk() {
     <tbody id="tbProduk"></tbody></table></div></main>`;
   pasangSubtabs(halProduk);
   $("#tambahProduk").onclick = () => formProduk(null);
+  $("#hargaGudang").onclick = formHargaGudang;
   $("#cariProduk").oninput = (e) => { filterProduk.cari = e.target.value; gambar(); };
   $("#katProduk").onchange = (e) => { filterProduk.kategori = e.target.value; gambar(); };
   gambar();

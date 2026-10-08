@@ -37,7 +37,7 @@ try {
   assert.match(await laptop.locator("#fMasuk .err").textContent(), /Sisa 4/);
   await laptop.locator("#fMasuk [name=password]").fill("hikayat123");
   await laptop.locator("#fMasuk button.primary").click();
-  await laptop.getByRole("heading", { name: "Produk" }).waitFor();
+  await laptop.getByRole("heading", { name: "Penjualan" }).waitFor();
   await laptop.getByRole("button", { name: "Karyawan" }).click();
   await laptop.getByRole("heading", { name: "Karyawan" }).waitFor();
 
@@ -72,7 +72,7 @@ try {
   assert.equal(await hp.locator("#fDaftar [name=kode]").inputValue(), kode);
   await hp.locator("#fDaftar button").click();
   await hp.getByText("Siapa yang bertugas?").waitFor();
-  assert.equal(await hp.locator("#kodeHp").textContent(), "HP A1");
+  assert.match(await hp.locator(".bar").textContent(), /HP A1/);
   await hp.screenshot({ path: SHOTS + "4-pos-pilih-nama.png" });
 
   const ketik = async (pin) => { for (const d of pin) await hp.locator(`#pad [data-k="${d}"]`).click(); };
@@ -86,14 +86,14 @@ try {
   await ketik("333333");
   await ketik("482913");
   await ketik("482913");
-  await hp.locator("#lBeranda:not([hidden])").waitFor();
-  assert.equal(await hp.locator("#berandaNama").textContent(), "Sari Handayani");
-  assert.match(await hp.locator("#berandaPesan").textContent(), /PIN berhasil diganti/);
+  // Kasir belum ditugaskan di event mana pun (event menyusul di tahap 4).
+  await hp.getByText("Belum ada tempat jualan").waitFor();
+  assert.match(await hp.locator(".bar").textContent(), /Sari Handayani/);
   await hp.screenshot({ path: SHOTS + "6-pos-masuk.png" });
 
   // Muat ulang: HP tetap terdaftar, kasir tetap masuk.
   await hp.reload();
-  await hp.locator("#lBeranda:not([hidden])").waitFor();
+  await hp.getByText("Belum ada tempat jualan").waitFor();
 
   // ---------- Owner menonaktifkan HP ----------
   await laptop.getByRole("button", { name: "Perangkat POS" }).click();
@@ -104,7 +104,7 @@ try {
   await laptop.screenshot({ path: SHOTS + "7-hp-nonaktif.png" });
 
   await hp.reload();
-  await hp.locator("#lDaftar:not([hidden])").waitFor();
+  await hp.locator("#fDaftar").waitFor();
 
   await laptop.getByRole("button", { name: "Riwayat Masuk" }).click();
   const riwayat = await laptop.locator("table").textContent();

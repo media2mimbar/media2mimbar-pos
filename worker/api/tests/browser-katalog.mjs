@@ -31,6 +31,8 @@ try {
   await hal.locator("#fMasuk button.primary").click();
 
   // Produk kosong: diarahkan membuat kategori dulu.
+  await hal.getByRole("heading", { name: "Penjualan" }).waitFor();
+  await hal.getByRole("button", { name: "Produk", exact: true }).click();
   await hal.getByRole("heading", { name: "Produk" }).waitFor();
   await hal.getByRole("button", { name: "+ Produk" }).click();
   await hal.getByText("Buat kategori dulu").waitFor();

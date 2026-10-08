@@ -2,6 +2,9 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 
+// D1 mengembalikan BLOB sebagai array angka (Array.from), bukan Uint8Array.
+const baris = (r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v instanceof Uint8Array ? Array.from(v) : v]));
+
 class Stmt {
   constructor(db, sql, params = []) {
     this.db = db;
@@ -9,14 +12,16 @@ class Stmt {
     this.params = params;
   }
   bind(...v) {
-    return new Stmt(this.db, this.sql, v.map((x) => (x === undefined ? null : typeof x === "boolean" ? Number(x) : x)));
+    // Sama dengan D1: undefined ditolak (D1_TYPE_ERROR), boolean jadi 0/1.
+    if (v.some((x) => x === undefined)) throw new TypeError(`D1_TYPE_ERROR: undefined di parameter ${v.findIndex((x) => x === undefined) + 1} untuk: ${this.sql.slice(0, 80)}`);
+    return new Stmt(this.db, this.sql, v.map((x) => (typeof x === "boolean" ? Number(x) : x)));
   }
   async first() {
     const r = this.db.prepare(this.sql).get(...this.params);
-    return r ? { ...r } : null;
+    return r ? baris(r) : null;
   }
   async all() {
-    return { results: this.db.prepare(this.sql).all(...this.params).map((r) => ({ ...r })), meta: { changes: 0 } };
+    return { results: this.db.prepare(this.sql).all(...this.params).map(baris), meta: { changes: 0 } };
   }
   async run() {
     return this._run();

@@ -4,7 +4,7 @@ Sistem kasir (POS di HP) dan dashboard untuk penjualan merchandise Hikayat di ev
 
 Status:
 - **Prototipe** (`prototipe/`): data tersimpan di browser (`localStorage`), jadi HP kasir dan dashboard belum saling terhubung. Demo: https://hikayat-pos-demo.pages.dev/dashboard dan https://hikayat-pos-demo.pages.dev/pos
-- **Versi produksi** (`worker/api/`): tahap 1 dan 2 dari `docs/Arsitektur-Cloudflare.md` sudah jalan di https://hikayat-api.media2mimbar.workers.dev (login dashboard, karyawan, pendaftaran HP, masuk POS dengan PIN, produk dan varian, kategori, pemasok, faktur pembelian ke Gudang Pusat, HPP rata-rata tertimbang, daftar stok).
+- **Versi produksi** (`worker/api/`): tahap 1 sampai 3 dari `docs/Arsitektur-Cloudflare.md` sudah jalan di https://hikayat-api.media2mimbar.workers.dev (login dashboard, karyawan, pendaftaran HP, masuk POS dengan PIN, produk dan varian, kategori, pemasok, faktur pembelian ke Gudang Pusat, HPP rata-rata tertimbang, daftar stok, POS di HP dengan mode offline, pengaturan POS, setoran kasir).
 
 ## Isi
 
@@ -53,6 +53,7 @@ cd worker/api
 npm test                           # build + uji API dengan database tiruan
 node tests/browser-fondasi.mjs     # uji tampilan tahap 1 di Chromium (butuh Playwright)
 node tests/browser-katalog.mjs     # uji tampilan tahap 2 di Chromium
+node tests/browser-pos.mjs         # uji POS tahap 3 (online, offline, sinkron, tutup kasir)
 node tests/server-lokal.mjs        # jalan di http://localhost:8787, kode setup SETUP-LOKAL
 python3 deploy.py                  # deploy ke Cloudflare (butuh CLOUDFLARE_ACCOUNT_ID dan CLOUDFLARE_API_TOKEN)
 ```
