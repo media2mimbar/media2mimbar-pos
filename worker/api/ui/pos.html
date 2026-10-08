@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#FF6100">
+<link rel="manifest" href="/pos.webmanifest">
+<link rel="icon" href="/pos-ikon.svg" type="image/svg+xml">
+<title>Hikayat POS</title>
+<style>
+:root{--accent:#FF6100;--accent-dark:#E5570A;--accent-bg:#FFF0E5;--bg:#F4F5F3;--card:#fff;--border:#E7E8E4;--border-strong:#D6D8D1;--text:#1E2321;--text-2:#5B615C;--text-mut:#93988F;--danger:#C0392B;--danger-bg:#FDECEA;--ok:#00734E;--ok-bg:#E4F7EF;--warn:#B7791F;--warn-bg:#FDF2DD}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{margin:0;font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);overscroll-behavior:none}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit}
+.bar{background:var(--accent);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:5;min-height:52px}
+.bar .judul{flex:1;min-width:0}
+.bar .judul b{display:block;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar .judul span{font-size:12px;color:#FFE1CC}
+.bar button{background:rgba(255,255,255,.16);border:0;color:#fff;border-radius:8px;padding:7px 10px;font-weight:600;font-size:13px}
+.titik-on{display:inline-block;width:8px;height:8px;border-radius:50%;background:#7CF2B5;margin-right:4px;vertical-align:1px}
+.titik-on.off{background:#FFD0D0}
+.wrap{max-width:460px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0 0 6px}h2{font-size:17px;margin:0 0 10px}
+.muted{color:var(--text-mut)}.small{font-size:13px}.center{text-align:center}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px}
+label{display:block;font-weight:600;font-size:13px;margin:12px 0 6px}
+input,select,textarea{width:100%;padding:12px;border:1px solid var(--border-strong);border-radius:10px;font:inherit;background:#fff}
+input.kode{font:700 26px ui-monospace,Menlo,monospace;letter-spacing:4px;text-align:center;text-transform:uppercase;margin:14px 0}
+.btn{display:block;width:100%;padding:14px;border-radius:12px;border:1px solid var(--border-strong);background:#fff;font-weight:700;margin-top:10px;text-align:center}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.danger{color:var(--danger)}
+.btn:disabled{opacity:.45}
+.btn.kecil{display:inline-block;width:auto;padding:8px 12px;margin:0;font-size:13px;border-radius:9px}
+.err{background:var(--danger-bg);color:var(--danger);padding:10px 12px;border-radius:10px;margin-top:12px}
+.ok{background:var(--ok-bg);color:var(--ok);padding:10px 12px;border-radius:10px;margin-top:12px}
+.warn{background:var(--warn-bg);color:var(--warn);padding:10px 12px;border-radius:10px;margin-top:12px}
+.daftar{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.daftar>button{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px 14px;text-align:left;width:100%}
+.daftar>button:disabled{opacity:.5}
+.av{width:40px;height:40px;border-radius:50%;background:var(--accent-bg);color:var(--accent-dark);display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+.titik{display:flex;justify-content:center;gap:14px;margin:20px 0}
+.titik span{width:14px;height:14px;border-radius:50%;border:2px solid var(--border-strong)}
+.titik span.isi{background:var(--accent);border-color:var(--accent)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pad button{padding:16px 0;font-size:24px;font-weight:600;background:#fff;border:1px solid var(--border);border-radius:12px}
+.pad button:active{background:var(--accent-bg)}
+.pad .kosong{visibility:hidden}
+.tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:600;background:var(--bg);color:var(--text-2)}
+.tag.ok{background:var(--ok-bg);color:var(--ok);margin:0;padding:1px 8px}
+.tag.warn{background:var(--warn-bg);color:var(--warn);margin:0;padding:1px 8px}
+.tag.off{background:var(--danger-bg);color:var(--danger)}
+/* Halaman kasir */
+.kasir{display:flex;flex-direction:column;height:100vh;height:100dvh}
+.kasir .atas{padding:10px 12px 0;background:var(--bg)}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:8px 0;scrollbar-width:none}
+.chips button{flex:none;border:1px solid var(--border-strong);background:#fff;border-radius:99px;padding:6px 14px;font-size:14px;font-weight:600}
+.chips button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.grid{flex:1;overflow-y:auto;padding:4px 12px 12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;align-content:start}
+.kartu{background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px;text-align:left;min-height:96px;display:flex;flex-direction:column;gap:4px;position:relative}
+.kartu b{font-size:14px;line-height:1.3}
+.kartu .harga{color:var(--accent-dark);font-weight:700;margin-top:auto}
+.kartu .stok{font-size:12px;color:var(--text-mut)}
+.kartu.habis{opacity:.45}
+.kartu .jml{position:absolute;top:8px;right:8px;background:var(--accent);color:#fff;border-radius:99px;min-width:22px;height:22px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 6px}
+.bawah{background:#fff;border-top:1px solid var(--border);padding:10px 12px calc(10px + env(safe-area-inset-bottom));display:flex;gap:10px;align-items:center}
+.bawah .total{flex:1;background:none;border:0;text-align:left;padding:0}
+.bawah .total small{display:block;color:var(--text-mut);font-size:12px}
+.bawah .total b{font-size:20px}
+.bawah .btn{width:auto;margin:0;padding:13px 26px}
+.aksi{display:flex;gap:8px;padding:0 12px 8px}
+.aksi button{flex:1;background:#fff;border:1px solid var(--border);border-radius:10px;padding:8px;font-size:13px;font-weight:600}
+/* Lembar bawah (sheet) */
+.lapis{position:fixed;inset:0;background:rgba(30,35,33,.45);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.lembar{background:#fff;width:100%;max-width:520px;border-radius:18px 18px 0 0;max-height:88vh;overflow-y:auto;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+.baris{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.baris .isi{flex:1;min-width:0}
+.qty{display:flex;align-items:center;gap:6px}
+.qty button{width:34px;height:34px;border-radius:9px;border:1px solid var(--border-strong);background:#fff;font-size:18px;font-weight:700}
+.qty span{min-width:24px;text-align:center;font-weight:700}
+.rinci{width:100%;border-collapse:collapse;margin-top:6px}
+.rinci td{padding:5px 0}
+.rinci td:last-child{text-align:right}
+.rinci tr.tebal td{font-weight:700;font-size:17px;border-top:1px solid var(--border);padding-top:9px}
+.metode{display:flex;gap:8px;margin:12px 0}
+.metode button{flex:1;padding:11px;border-radius:10px;border:1px solid var(--border-strong);background:#fff;font-weight:700}
+.metode button.on{border-color:var(--accent);background:var(--accent-bg);color:var(--accent-dark)}
+.cepat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.cepat button{padding:11px 4px;border-radius:10px;border:1px solid var(--border-strong);background:#fff;font-weight:600;font-size:14px}
+.qris{text-align:center;margin-top:8px}
+.qris img{max-width:240px;width:100%;border:1px solid var(--border);border-radius:10px}
+.contoh{position:relative;display:inline-block}
+.contoh:after{content:"CONTOH";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--danger);font-weight:800;font-size:34px;transform:rotate(-20deg)}
+.struk{background:#fff;border:1px dashed var(--border-strong);border-radius:10px;padding:14px;font-size:13px}
+.struk .tengah{text-align:center}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#1E2321;color:#fff;padding:10px 16px;border-radius:10px;z-index:50;max-width:90vw;font-size:14px}
+.kunci{position:fixed;inset:0;background:var(--bg);z-index:40;overflow-y:auto}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="lapis" class="lapis" hidden><div class="lembar" id="lembar"></div></div>
+<div id="kunci" class="kunci" hidden></div>
+<script src="/pos-qrcode.js"></script>
+<script src="/pos-struk.js"></script>
+<script src="/pos-data.js"></script>
+<script src="/pos-app.js"></script>
+</body>
+</html>

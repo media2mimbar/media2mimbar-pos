@@ -1,0 +1,11 @@
+{
+  "name": "Hikayat POS",
+  "short_name": "Hikayat POS",
+  "start_url": "/pos",
+  "scope": "/pos",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F4F5F3",
+  "theme_color": "#FF6100",
+  "icons": [{ "src": "/pos-ikon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
