@@ -258,9 +258,9 @@ Ini angka perkiraan. Setelah 2 minggu berjalan, cek angka sebenarnya di halaman 
 
 Saran: jalankan tahap 3 di satu event kecil sebelum tahap 4 sampai 7 selesai. Masalah offline dan sinyal paling cepat ketahuan di lapangan.
 
-### Catatan tahap 1 (Oktober 2026)
+### Catatan tahap 1 dan 2 (Oktober 2026)
 
-Tahap 1 sudah dibangun di `worker/api` dan berjalan di `https://hikayat-api.media2mimbar.workers.dev`. Beberapa hal berbeda dari rancangan di atas karena lingkungan pengembangan saat itu tidak bisa mengunduh paket npm:
+Tahap 1 dan 2 sudah dibangun di `worker/api` dan berjalan di `https://hikayat-api.media2mimbar.workers.dev`. Beberapa hal berbeda dari rancangan di atas karena lingkungan pengembangan saat itu tidak bisa mengunduh paket npm:
 
 | Rancangan | Yang dipakai sekarang | Rencana |
 |---|---|---|
@@ -269,6 +269,10 @@ Tahap 1 sudah dibangun di `worker/api` dan berjalan di `https://hikayat-api.medi
 | Zod | Fungsi validasi di `src/util.ts` | Ganti Zod saat paket bisa dipasang |
 | Dashboard dan POS di Pages (React + Vite) | Halaman HTML sederhana di `ui/`, dilayani Worker yang sama (`/` dan `/pos`) | Dipindah ke Pages saat tahap 3 (PWA) |
 | `wrangler deploy` | `deploy.py` memanggil API Cloudflare langsung | Tetap bisa memakai wrangler kapan saja |
+
+Tahap 2 menambah migrasi `0002_katalog_stok.sql`: `kategori`, `produk`, `varian`, `lokasi` (berisi Gudang Pusat), `stok`, `stok_gerak`, `pemasok`, `faktur`, `faktur_item`, `faktur_bayar`, `hpp_riwayat`, dan `log_aktivitas`. Rumus HPP dan status faktur ada di `src/aturan.ts` (calon `packages/aturan`) dan diuji dengan angka dari prototipe. Pemeriksaan stok saat batal faktur dan sisa tagihan saat bayar dijalankan di dalam `db.batch` yang sama dengan penulisannya, jadi dua orang yang menyimpan bersamaan tidak bisa membuat stok gudang atau sisa tagihan jadi salah.
+
+Batas yang perlu diingat: satu query D1 maksimal 100 parameter, jadi satu faktur dibatasi 90 baris barang dan satu produk 40 varian.
 
 Jumlah iterasi PBKDF2 ditetapkan 8.000 (sekitar 4 sampai 5 ms CPU di Node). Ganti password menjalankan dua hash, jadi angka ini sengaja tidak dinaikkan. Cek waktu CPU sebenarnya di Cloudflare › Workers › hikayat-api › Observability setelah dipakai.
 

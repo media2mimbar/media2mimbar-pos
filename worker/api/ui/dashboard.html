@@ -15,7 +15,7 @@ h1{font-size:20px;margin:0 0 4px}h2{font-size:17px;margin:0 0 12px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px}
 .narrow{width:100%;max-width:380px}
 label{display:block;font-weight:600;font-size:13px;margin:14px 0 6px}
-input[type=text],input[type=email],input[type=password],input[type=tel]{width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:8px;font:inherit}
+input[type=text],input[type=email],input[type=password],input[type=tel],input[type=number],input[type=date],input[type=search],select,textarea{width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:8px;font:inherit}
 input:focus{outline:2px solid var(--accent-bg);border-color:var(--accent)}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:8px;border:1px solid var(--border-strong);background:#fff;font:inherit;font-weight:600;cursor:pointer;color:var(--text)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn.primary:hover{background:var(--accent-dark)}
@@ -56,6 +56,23 @@ th{font-size:12px;color:var(--text-2);font-weight:600;background:#FAFAF8}
 .cred{font:600 16px ui-monospace,Menlo,monospace;background:var(--bg);padding:2px 8px;border-radius:6px}
 .overlay{position:fixed;inset:0;background:rgba(30,35,33,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
 .overlay .card{max-width:440px;width:100%}
+textarea{min-height:70px;resize:vertical}
+.num{text-align:right;white-space:nowrap}
+.subtabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:18px;flex-wrap:wrap}
+.subtabs button{background:none;border:0;border-bottom:2px solid transparent;padding:8px 14px;font:inherit;font-weight:600;color:var(--text-2);cursor:pointer}
+.subtabs button.on{color:var(--accent-dark);border-bottom-color:var(--accent)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.kpi b{display:block;font-size:20px;margin-top:2px}
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.filters>*,.filters input,.filters select{width:auto}
+.filters input[type=search]{min-width:220px}
+td input,td select{padding:7px 9px}
+tr.klik{cursor:pointer}tr.klik:hover td{background:#FAFAF8}
+tfoot td{font-weight:700;background:#FAFAF8}
+.pilih{max-height:60vh;overflow:auto;border:1px solid var(--border);border-radius:8px;margin-top:10px}
+.pilih label{display:flex;gap:10px;align-items:center;font-weight:400;margin:0;padding:9px 12px;border-bottom:1px solid var(--border)}
+.section{margin-top:22px}
 </style>
 </head>
 <body>
@@ -117,11 +134,30 @@ th{font-size:12px;color:var(--text-2);font-weight:600;background:#FAFAF8}
 
 <div class="overlay" id="popup" hidden><div class="card" id="popupIsi"></div></div>
 
+<script src="/dash-katalog.js"></script>
+<script src="/dash-inventori.js"></script>
 <script>
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const NAMA_ROLE = { owner: "Owner", admin: "Admin", kasir: "Kasir" };
 const waktu = (iso) => iso ? new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "—";
+const rp = (n) => "Rp " + Number(n || 0).toLocaleString("id-ID");
+const tgl = (ymd) => ymd ? new Date(ymd + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "—";
+const hariIni = () => new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
+const angka = (v) => (v === "" || v === null || v === undefined ? null : Number(String(v).replace(/[.\s]/g, "")));
+function subtabs(daftar, aktif, pilih) {
+  return `<div class="subtabs">${daftar.map(([k, n]) => `<button type="button" data-sub="${k}" class="${k === aktif ? "on" : ""}">${n}</button>`).join("")}</div>`;
+}
+function pasangSubtabs(pilih) {
+  document.querySelectorAll("[data-sub]").forEach((b) => (b.onclick = () => pilih(b.dataset.sub)));
+}
+function unduhCsv(nama, baris) {
+  const isi = baris.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\ufeff" + isi], { type: "text/csv" }));
+  a.download = nama;
+  a.click();
+}
 let saya = null;
 let tab = null;
 
@@ -201,7 +237,7 @@ function mulai(staff) {
   $("#akunNama").textContent = staff.nama;
   $("#akunRole").textContent = staff.role.map((r) => NAMA_ROLE[r]).join(", ");
   const owner = staff.role.includes("owner");
-  const tabs = [owner && ["karyawan", "Karyawan"], ["perangkat", "Perangkat POS"], owner && ["riwayat", "Riwayat Masuk"]].filter(Boolean);
+  const tabs = [["produk", "Produk"], ["inventori", "Inventori"], owner && ["karyawan", "Karyawan"], ["perangkat", "Perangkat POS"], owner && ["riwayat", "Riwayat Masuk"]].filter(Boolean);
   $("#nav").innerHTML = tabs.map(([k, n]) => `<button data-tab="${k}">${n}</button>`).join("");
   $("#nav").onclick = (e) => e.target.dataset.tab && buka(e.target.dataset.tab);
   tampil("layarApp");
@@ -211,7 +247,7 @@ function mulai(staff) {
 function buka(t) {
   tab = t;
   for (const b of $("#nav").children) b.classList.toggle("on", b.dataset.tab === t);
-  ({ karyawan: halKaryawan, perangkat: halPerangkat, riwayat: halRiwayat })[t]();
+  ({ produk: halProduk, inventori: halInventori, karyawan: halKaryawan, perangkat: halPerangkat, riwayat: halRiwayat })[t]();
 }
 
 // ---------- Karyawan ----------

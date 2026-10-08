@@ -37,6 +37,8 @@ try {
   assert.match(await laptop.locator("#fMasuk .err").textContent(), /Sisa 4/);
   await laptop.locator("#fMasuk [name=password]").fill("hikayat123");
   await laptop.locator("#fMasuk button.primary").click();
+  await laptop.getByRole("heading", { name: "Produk" }).waitFor();
+  await laptop.getByRole("button", { name: "Karyawan" }).click();
   await laptop.getByRole("heading", { name: "Karyawan" }).waitFor();
 
   await laptop.getByRole("button", { name: "+ Karyawan" }).click();

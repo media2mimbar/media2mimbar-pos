@@ -158,3 +158,9 @@ export async function sesiSiap(db: D1Database, req: Request, ...boleh: Role[]) {
   if (boleh.length) wajibRole(s.staff, ...boleh);
   return s;
 }
+
+export function logAktivitas(db: D1Database, staff: Staff, aksi: string, ref: { tabel?: string; id?: string; keterangan?: string } = {}) {
+  return db
+    .prepare("INSERT INTO log_aktivitas (id, waktu, staff_id, nama, aksi, ref_tabel, ref_id, keterangan) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+    .bind(ulid(), sekarang(), staff.id, staff.nama, aksi, ref.tabel ?? null, ref.id ?? null, ref.keterangan ?? null);
+}

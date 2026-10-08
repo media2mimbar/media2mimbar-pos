@@ -1,4 +1,6 @@
 import * as akun from "./akun.js";
+import * as inventori from "./inventori.js";
+import * as katalog from "./katalog.js";
 import { HALAMAN } from "./halaman.js";
 import * as karyawan from "./karyawan.js";
 import * as perangkat from "./perangkat.js";
@@ -26,6 +28,26 @@ const RUTE: [string, string, Handler][] = [
   ["POST", "/api/perangkat", perangkat.tambah],
   ["POST", "/api/perangkat/:id/kode-baru", perangkat.kodeBaru],
   ["POST", "/api/perangkat/:id/nonaktifkan", perangkat.nonaktifkan],
+
+  ["GET", "/api/kategori", katalog.daftarKategori],
+  ["POST", "/api/kategori", katalog.tambahKategori],
+  ["PATCH", "/api/kategori/:id", katalog.ubahKategori],
+  ["DELETE", "/api/kategori/:id", katalog.hapusKategori],
+  ["GET", "/api/produk", katalog.daftarProduk],
+  ["POST", "/api/produk", katalog.tambahProduk],
+  ["GET", "/api/produk/:id", katalog.detailProduk],
+  ["PATCH", "/api/produk/:id", katalog.ubahProduk],
+
+  ["GET", "/api/pemasok", inventori.daftarPemasok],
+  ["POST", "/api/pemasok", inventori.tambahPemasok],
+  ["PATCH", "/api/pemasok/:id", inventori.ubahPemasok],
+  ["GET", "/api/faktur", inventori.daftarFaktur],
+  ["POST", "/api/faktur", inventori.tambahFaktur],
+  ["GET", "/api/faktur/:id", inventori.detailFaktur],
+  ["POST", "/api/faktur/:id/bayar", inventori.bayarFaktur],
+  ["POST", "/api/faktur/:id/batal", inventori.batalFaktur],
+  ["GET", "/api/stok", inventori.daftarStok],
+  ["GET", "/api/stok/gerak", inventori.gerakStok],
 
   ["POST", "/api/pos/daftar", perangkat.sambungkan],
   ["GET", "/api/pos/perangkat", pos.infoPerangkat],
@@ -57,7 +79,6 @@ function cocokkan(method: string, path: string): { h: Handler; id: string } | "s
 }
 
 const HEADER_HALAMAN = {
-  "content-type": "text/html; charset=utf-8",
   "cache-control": "no-cache",
   "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'",
   "x-content-type-options": "nosniff",
@@ -71,7 +92,8 @@ export default {
 
     if (!path.startsWith("/api/")) {
       const html = HALAMAN[path as keyof typeof HALAMAN];
-      if (req.method === "GET" && html) return new Response(html, { headers: HEADER_HALAMAN });
+      const jenis = path.endsWith(".js") ? "text/javascript; charset=utf-8" : "text/html; charset=utf-8";
+      if (req.method === "GET" && html) return new Response(html, { headers: { ...HEADER_HALAMAN, "content-type": jenis } });
       return new Response("Tidak ditemukan", { status: 404 });
     }
 

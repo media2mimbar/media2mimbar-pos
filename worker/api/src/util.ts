@@ -55,7 +55,7 @@ export function bacaCookie(req: Request, nama: string): string | null {
 
 // Validasi input sederhana (pengganti Zod).
 
-type Obj = Record<string, unknown>;
+export type Obj = Record<string, unknown>;
 
 export async function bacaJson(req: Request): Promise<Obj> {
   if (!(req.headers.get("content-type") ?? "").includes("application/json")) {
@@ -122,4 +122,40 @@ export function daftarRole(o: Obj, k: string): Role[] {
   const hasil = [...new Set(v)];
   for (const r of hasil) if (!ROLE.includes(r as Role)) throw new Gagal(400, `Role tidak dikenal: ${String(r)}`);
   return hasil as Role[];
+}
+
+export function bulat(o: Obj, k: string, label: string, opsi: { min?: number; max?: number; wajib?: boolean } = {}): number | null {
+  const v = o[k];
+  if (v === undefined || v === null || v === "") {
+    if (opsi.wajib === false) return null;
+    throw new Gagal(400, `${label} wajib diisi`);
+  }
+  const n = typeof v === "string" ? Number(v.replace(/[.\s]/g, "")) : v;
+  if (typeof n !== "number" || !Number.isInteger(n)) throw new Gagal(400, `${label} harus angka bulat`);
+  const min = opsi.min ?? 0, max = opsi.max ?? 1_000_000_000_000;
+  if (n < min) throw new Gagal(400, `${label} minimal ${min}`);
+  if (n > max) throw new Gagal(400, `${label} maksimal ${max}`);
+  return n;
+}
+
+export function wajibBulat(o: Obj, k: string, label: string, opsi: { min?: number; max?: number } = {}): number {
+  return bulat(o, k, label, { ...opsi, wajib: true }) as number;
+}
+
+export function tanggal(o: Obj, k: string, label: string, wajib = true): string | null {
+  const s = teks(o, k, label, { max: 10, wajib });
+  if (s === null) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || Number.isNaN(Date.parse(s))) throw new Gagal(400, `${label} tidak valid`);
+  return s;
+}
+
+export function daftar(o: Obj, k: string, label: string): Obj[] {
+  const v = o[k];
+  if (!Array.isArray(v)) throw new Gagal(400, `${label} tidak valid`);
+  if (v.some((x) => !x || typeof x !== "object" || Array.isArray(x))) throw new Gagal(400, `${label} tidak valid`);
+  return v as Obj[];
+}
+
+export function benar(o: Obj, k: string, bawaan: boolean): boolean {
+  return o[k] === undefined ? bawaan : o[k] === true;
 }
