@@ -5,7 +5,7 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 
 const dir = new URL(".", import.meta.url).pathname;
 const halaman = {
-  "/": "dashboard.html", "/dash-katalog.js": "dash-katalog.js", "/dash-inventori.js": "dash-inventori.js", "/dash-penjualan.js": "dash-penjualan.js",
+  "/": "dashboard.html", "/dash-katalog.js": "dash-katalog.js", "/dash-inventori.js": "dash-inventori.js", "/dash-penjualan.js": "dash-penjualan.js", "/dash-event.js": "dash-event.js",
   "/pos": "pos.html", "/pos-app.js": "pos-app.js", "/pos-data.js": "pos-data.js", "/pos-struk.js": "pos-struk.js",
   "/pos-qrcode.js": "pos-qrcode.js", "/pos-sw.js": "pos-sw.js", "/pos.webmanifest": "pos.webmanifest", "/pos-ikon.svg": "pos-ikon.svg",
 };

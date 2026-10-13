@@ -312,6 +312,7 @@ function gambarKasir() {
   tampil(`<div class="kasir">
     ${bar(esc(A.snap.lokasi.nama), `${esc(t.staff.nama)} · <span id="sinyal">${statusSinyal()}</span> <span id="antre"></span>`, '<button id="btnKunci">Kunci</button><button id="btnMenu">Menu</button>')}
     <div class="atas">
+      ${pillTempat()}
       <input type="search" id="cari" placeholder="Cari produk atau SKU" value="${esc(A.cari)}">
       <div class="chips" id="chips"><button data-k="semua">Semua</button>${kat.map((k) => `<button data-k="${k.id}">${esc(k.nama)}</button>`).join("")}</div>
     </div>
@@ -319,6 +320,7 @@ function gambarKasir() {
     <div class="aksi"><button id="btnHapus">••• Hapus pesanan</button></div>
     <div class="bawah"><button class="total" id="btnTotal"><small id="jmlBarang"></small><b id="totalBelanja"></b></button><button class="btn primary" id="btnBayar">Bayar</button></div>
   </div>`, "kasir");
+  if ($("#pillTempat")) $("#pillTempat").onclick = () => layarInventori("kiriman");
   $("#chips").onclick = (e) => { if (e.target.dataset.k) { A.kategori = e.target.dataset.k; gambarKatalog(); } };
   $("#cari").oninput = (e) => { A.cari = e.target.value; gambarKatalog(); };
   $("#btnMenu").onclick = lembarMenu;
@@ -328,6 +330,16 @@ function gambarKasir() {
   $("#btnHapus").onclick = () => { if (A.keranjang.length && confirm("Hapus semua barang di keranjang?")) { A.keranjang = []; simpanSesi(); gambarKatalog(); } };
   gambarKatalog();
   gambarAntrean();
+}
+
+// Info tempat di atas katalog: event, tanggal, dan pengingat kiriman yang belum diterima.
+function pillTempat() {
+  const e = A.snap.lokasi.event;
+  if (!e) return "";
+  const tgl = (d) => new Date(d + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+  return `<button id="pillTempat" class="card small" style="width:100%;text-align:left;margin-bottom:8px;padding:10px 12px">
+    <b>${esc(e.nama)}</b> · ${esc(e.venue ?? "")} · ${tgl(e.mulai)}${e.selesai !== e.mulai ? "–" + tgl(e.selesai) : ""}
+    ${A.snap.kiriman_menunggu ? `<div class="warn" style="margin-top:6px;padding:6px 10px">${A.snap.kiriman_menunggu} kiriman stok belum diterima. Ketuk untuk menerima</div>` : ""}</button>`;
 }
 
 function gambarKatalog() {
@@ -578,6 +590,7 @@ function lembarMenu() {
   bukaLembar(`<h2>Menu</h2><div class="daftar">
     <button data-m="riwayat">Penjualan shift ini</button>
     <button data-m="kas">Kas kasir</button>
+    ${A.snap.lokasi.jenis === "event" ? '<button data-m="inventori">Inventori: terima kiriman, stok opname</button>' : ""}
     <button data-m="sinkron">Status sinkron</button>
     ${owner ? '<button data-m="tempat">Ganti tempat jualan</button>' : ""}
     <button data-m="pin">Ganti PIN</button>
@@ -589,7 +602,7 @@ function lembarMenu() {
     if (!m) return;
     tutupLembar();
     ({
-      riwayat: layarRiwayat, kas: layarKas, sinkron: layarSinkron, pin: () => (S.online ? gantiPin(false) : toast("Ganti PIN butuh sinyal")),
+      riwayat: layarRiwayat, kas: layarKas, inventori: layarInventori, sinkron: layarSinkron, pin: () => (S.online ? gantiPin(false) : toast("Ganti PIN butuh sinyal")),
       tutup: layarTutupKasir, keluar: () => keluar(),
       tempat: async () => {
         if (A.keranjang.length) return toast("Kosongkan keranjang dulu");
@@ -672,6 +685,123 @@ async function layarSinkron() {
     </div>`, "sinkron");
   $("#kembali").onclick = gambarKasir;
   $("#kirim").onclick = async () => { await sinkronSekarang(); layarSinkron(); };
+}
+
+// ---------- Inventori di POS: terima kiriman, stok opname ----------
+
+async function dataInventori() {
+  const kunci = "inv:" + A.sesi.lokasi_id;
+  let inv = await kv.get(kunci);
+  if (S.online && A.sesi.sesi) {
+    try { inv = await api("GET", `/api/pos/inventori?lokasi=${A.sesi.lokasi_id}`); await kv.set(kunci, inv); } catch {}
+  }
+  inv ??= { mutasi: [], opname: [] };
+  // Kiriman yang sudah diterima di HP tapi belum terkirim ke server.
+  const antre = await isiAntrean();
+  for (const d of antre.filter((d) => d.jenis === "terima")) {
+    const m = inv.mutasi.find((x) => x.id === d.data.id);
+    if (m && m.status === "Dikirim") { m.status = "Diterima"; m.lokal = true; m.items.forEach((i) => (i.diterima = d.data.items.find((x) => x.sku === i.sku)?.diterima ?? i.dikirim)); }
+  }
+  inv.opname_lokal = antre.filter((d) => d.jenis === "opname").map((d) => d.data);
+  return inv;
+}
+
+async function layarInventori(tab = "kiriman") {
+  tampil(`${bar("Inventori", esc(A.snap.lokasi.nama), '<button id="kembali">Kembali</button>')}<div class="wrap"><p class="muted">Memuat…</p></div>`, "inventori");
+  $("#kembali").onclick = gambarKasir;
+  const inv = await dataInventori();
+  const menunggu = inv.mutasi.filter((m) => m.status === "Dikirim"), sudah = inv.mutasi.filter((m) => m.status === "Diterima");
+  const tgl = (iso) => (iso ? tglJam(iso) : "");
+  const kartuMutasi = (m) => `<button data-mutasi="${m.id}" ${m.status === "Dikirim" ? "" : "disabled"}><span class="isi"><b>${esc(m.no)}</b>
+    <br><span class="small muted">Dikirim ${esc(m.dikirim_oleh ?? "")} · ${tgl(m.dikirim_pada)} · ${m.items.reduce((a, i) => a + i.dikirim, 0)} pcs</span>
+    ${m.status === "Diterima" ? `<br><span class="small">${m.lokal ? "Diterima di HP, menunggu terkirim" : `Diterima ${esc(m.diterima_oleh ?? "")} · ${tgl(m.diterima_pada)}`}${m.items.some((i) => i.diterima < i.dikirim) ? ` · <span class="tag off">kurang ${m.items.reduce((a, i) => a + i.dikirim - i.diterima, 0)}</span>` : ""}</span>` : ""}</span></button>`;
+  const STATUS = { "Menunggu persetujuan": "warn", "Perlu opname ulang": "off", Disetujui: "ok", Diganti: "" };
+  $("#app .wrap").innerHTML = `
+    <div class="metode"><button data-tab="kiriman" class="${tab === "kiriman" ? "on" : ""}">Terima kiriman</button><button data-tab="opname" class="${tab === "opname" ? "on" : ""}">Stok opname</button></div>
+    ${tab === "kiriman" ? `
+      <h2>Menunggu diterima</h2><div class="daftar">${menunggu.map(kartuMutasi).join("") || '<p class="muted">Tidak ada kiriman.</p>'}</div>
+      <h2 style="margin-top:16px">Sudah diterima</h2><div class="daftar">${sudah.map(kartuMutasi).join("") || '<p class="muted">Belum ada.</p>'}</div>
+      <p class="small muted">Kiriman dibuat Admin atau Owner dari dashboard (Event › Kirim Stok).</p>`
+    : `
+      ${inv.opname_lokal.length ? '<div class="warn">Hasil opname tersimpan di HP, menunggu terkirim.</div>' : ""}
+      ${inv.opname.filter((o) => o.status !== "Diganti").slice(0, 5).map((o) => `<div class="card small" style="margin-top:8px"><b>${esc(o.no)}</b> <span class="tag ${STATUS[o.status]}">${esc(o.status)}</span>
+        <br>Dihitung ${esc(o.dihitung_oleh)} · ${tgl(o.dihitung_pada)}${o.disetujui_oleh ? ` · disetujui ${esc(o.disetujui_oleh)}` : ""}
+        ${o.status === "Perlu opname ulang" ? `<div class="err">Diminta hitung ulang: ${esc(o.ulang_alasan)}</div>` : ""}</div>`).join("")}
+      <button class="btn primary" id="hitung">Hitung stok sekarang</button>`}`;
+  $$("[data-tab]").forEach((b) => (b.onclick = () => layarInventori(b.dataset.tab)));
+  $$("[data-mutasi]").forEach((b) => (b.onclick = () => layarTerima(inv.mutasi.find((m) => m.id === b.dataset.mutasi))));
+  if ($("#hitung")) $("#hitung").onclick = layarOpname;
+}
+
+function layarTerima(m) {
+  tampil(`${bar("Terima " + esc(m.no), esc(A.snap.lokasi.nama), '<button id="kembali">Kembali</button>')}
+    <div class="wrap"><form class="card" id="fTerima">
+      <p class="muted small">Jumlah diterima sudah terisi sesuai yang dikirim. Ubah kalau ada yang kurang.</p>
+      ${m.items.map((i) => `<div class="baris"><div class="isi"><b>${esc(i.nama)}</b><div class="small muted">Dikirim ${i.dikirim}</div></div>
+        <input type="number" inputmode="numeric" min="0" max="${i.dikirim}" data-sku="${esc(i.sku)}" value="${i.dikirim}" style="width:90px"></div>`).join("")}
+      <div id="kurangT"></div>
+      <label>Catatan</label><textarea name="catatan" placeholder="Wajib diisi kalau ada barang kurang"></textarea>
+      <div class="err" hidden></div>
+      <button class="btn primary">Terima barang</button>
+    </form></div>`, "terima");
+  $("#kembali").onclick = () => layarInventori();
+  const f = $("#fTerima");
+  const hitung = () => {
+    let kurang = 0;
+    $$("[data-sku]", f).forEach((el) => {
+      const maks = Number(el.max);
+      if (Number(el.value) > maks) { el.value = maks; toast(`Maksimal ${maks}`); }
+      kurang += maks - Number(el.value || 0);
+    });
+    $("#kurangT").innerHTML = kurang ? `<div class="err">Kurang ${kurang} pcs. Dicatat hilang di perjalanan.</div>` : '<div class="ok">Semua barang lengkap</div>';
+    return kurang;
+  };
+  f.oninput = hitung;
+  hitung();
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    const kurang = hitung();
+    if (kurang && f.catatan.value.trim().length < 3) { $(".err", f).textContent = "Ada barang kurang: tulis catatan"; $(".err", f).hidden = false; return; }
+    await antrekan("terima", { id: m.id, lokasi_id: A.sesi.lokasi_id, oleh: A.sesi.staff.id, waktu: sekarang(), catatan: f.catatan.value.trim() || null,
+      items: $$("[data-sku]", f).map((el) => ({ sku: el.dataset.sku, diterima: Number(el.value || 0) })) });
+    A.snap.kiriman_menunggu = Math.max(0, (A.snap.kiriman_menunggu ?? 1) - 1);
+    await kv.set("snap:" + A.sesi.lokasi_id, A.snap);
+    A.stok = await stokTersedia(A.snap);
+    toast("Barang diterima. Stok event bertambah");
+    layarInventori();
+  };
+}
+
+function layarOpname() {
+  const daftar = Object.values(A.snap.varian).filter((v) => A.snap.produk[v.produk_id]?.aktif && (v.aktif || (A.stok[v.sku] ?? 0) !== 0))
+    .sort((a, b) => namaBarang(a).localeCompare(namaBarang(b)));
+  tampil(`${bar("Stok opname", esc(A.snap.lokasi.nama), '<button id="kembali">Kembali</button>')}
+    <div class="wrap"><form class="card" id="fOpname">
+      <p class="muted small">Hitung barang di booth. Kosong berarti sama dengan sistem. Stok belum berubah sampai disetujui Owner atau Admin.</p>
+      ${daftar.map((v) => `<div class="baris"><div class="isi"><b>${esc(namaBarang(v))}</b><div class="small muted">Sistem ${A.stok[v.sku] ?? 0} · <span data-sel="${esc(v.sku)}"></span></div></div>
+        <input type="number" inputmode="numeric" min="0" data-sku="${esc(v.sku)}" placeholder="${A.stok[v.sku] ?? 0}" style="width:90px"></div>`).join("")}
+      <div id="ringkasO"></div>
+      <label>Catatan</label><textarea name="catatan"></textarea>
+      <button class="btn primary">Kirim hasil opname</button>
+    </form></div>`, "opname");
+  $("#kembali").onclick = () => layarInventori("opname");
+  const f = $("#fOpname");
+  const baris = () => $$("[data-sku]", f).map((el) => { const sistem = A.stok[el.dataset.sku] ?? 0; return { sku: el.dataset.sku, sistem, fisik: el.value === "" ? Math.max(0, sistem) : Number(el.value) }; });
+  f.oninput = () => {
+    let kurang = 0, lebih = 0;
+    for (const b of baris()) {
+      const d = b.fisik - b.sistem;
+      $(`[data-sel="${CSS.escape(b.sku)}"]`).textContent = d === 0 ? "" : d < 0 ? `kurang ${-d}` : `lebih ${d}`;
+      if (d < 0) kurang -= d; else lebih += d;
+    }
+    $("#ringkasO").innerHTML = kurang || lebih ? `<div class="warn">Kurang ${kurang} · lebih ${lebih}</div>` : "";
+  };
+  f.onsubmit = async (e) => {
+    e.preventDefault();
+    await antrekan("opname", { id: ulid(), lokasi_id: A.sesi.lokasi_id, oleh: A.sesi.staff.id, waktu: sekarang(), catatan: f.catatan.value.trim() || null, items: baris() });
+    toast("Hasil opname dikirim. Menunggu persetujuan");
+    layarInventori("opname");
+  };
 }
 
 // ---------- Tutup kasir ----------

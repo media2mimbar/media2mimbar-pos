@@ -9,10 +9,10 @@ const CARA_BAYAR = ["Transfer", "Tunai", "Lainnya"];
 
 // Pernyataan penjaga: membatalkan seluruh batch kalau syarat tidak terpenuhi saat batch dijalankan.
 // SQLite tidak punya RAISE di luar trigger, jadi dipakai json() yang gagal dengan pesan bertanda.
-function penjaga(db: D1Database, syarat: string, ...nilai: unknown[]) {
+export function penjaga(db: D1Database, syarat: string, ...nilai: unknown[]) {
   return db.prepare(`SELECT CASE WHEN ${syarat} THEN 1 ELSE json('penjaga') END`).bind(...nilai);
 }
-const kenaPenjaga = (e: unknown) => String((e as Error)?.message ?? e).includes("malformed JSON");
+export const kenaPenjaga = (e: unknown) => String((e as Error)?.message ?? e).includes("malformed JSON");
 
 // ---------- Pemasok ----------
 

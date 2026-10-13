@@ -1,4 +1,6 @@
 import * as akun from "./akun.js";
+import * as event from "./event.js";
+import * as opname from "./opname.js";
 import * as inventori from "./inventori.js";
 import * as katalog from "./katalog.js";
 import { HALAMAN } from "./halaman.js";
@@ -26,6 +28,7 @@ const RUTE: [string, string, Handler][] = [
   ["POST", "/api/karyawan/:id/reset-password", karyawan.resetPassword],
   ["POST", "/api/karyawan/:id/reset-pin", karyawan.resetPin],
   ["GET", "/api/riwayat-masuk", karyawan.riwayatMasuk],
+  ["GET", "/api/staf", karyawan.daftarRingkas],
 
   ["GET", "/api/perangkat", perangkat.daftar],
   ["POST", "/api/perangkat", perangkat.tambah],
@@ -62,6 +65,22 @@ const RUTE: [string, string, Handler][] = [
   ["GET", "/api/transaksi/:id", penjualan.detailTransaksi],
   ["GET", "/api/shift", penjualan.daftarShift],
   ["GET", "/api/shift/:id", penjualan.detailShift],
+  ["GET", "/api/event", event.daftarEvent],
+  ["POST", "/api/event", event.tambahEvent],
+  ["GET", "/api/event/:id", event.detailEvent],
+  ["PATCH", "/api/event/:id", event.ubahEvent],
+  ["POST", "/api/event/:id/kirim", event.kirimStok],
+  ["POST", "/api/event/:id/tarik", event.tarikStok],
+  ["GET", "/api/event/:id/tutup", event.siapTutup],
+  ["POST", "/api/event/:id/tutup", event.tutupEvent],
+  ["POST", "/api/mutasi/:id/batal", event.batalKiriman],
+  ["GET", "/api/opname", opname.daftarOpname],
+  ["POST", "/api/opname/gudang", opname.opnameGudang],
+  ["GET", "/api/opname/:id", opname.detailOpname],
+  ["POST", "/api/opname/:id/setujui", opname.setujuiOpname],
+  ["POST", "/api/opname/:id/ulang", opname.ulangOpname],
+  ["GET", "/api/kerugian", opname.daftarKerugian],
+  ["POST", "/api/kerugian/:id/selesaikan", opname.selesaikanKerugian],
   ["GET", "/api/dokumen-ditolak", penjualan.daftarDitolak],
   ["POST", "/api/dokumen-ditolak/:id/selesai", penjualan.selesaiDitolak],
 
@@ -71,6 +90,7 @@ const RUTE: [string, string, Handler][] = [
   ["POST", "/api/pos/setujui", kasir.setujui],
   ["GET", "/api/pos/shift/:id", kasir.shiftPos],
   ["GET", "/api/pos/penjualan", kasir.penjualanPos],
+  ["GET", "/api/pos/inventori", kasir.inventoriPos],
   ["GET", "/api/pos/berkas/:id", pengaturan.ambilBerkasPos],
   ["GET", "/api/pos/perangkat", pos.infoPerangkat],
   ["GET", "/api/pos/karyawan", pos.daftarKaryawan],

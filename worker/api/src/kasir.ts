@@ -2,6 +2,9 @@
 // HP bisa bekerja tanpa sinyal: semua dokumen punya ID tetap dari HP, jadi kiriman ulang tidak tercatat dua kali.
 
 import { hariIniWib } from "./aturan.js";
+import { statusEvent } from "./event.js";
+import { tulisOpnameBaru } from "./opname.js";
+import { denganNomor } from "./dokumen.js";
 import { bacaPengaturan } from "./pengaturan.js";
 import { hashPin, samaPersis, sha256, tokenAcak } from "./sandi.js";
 import { ambilRole, catatSalah, cekTerkunci, hapusSalah, logMasuk, Perangkat, perangkatDari, sesiPos, Staff } from "./sesi.js";
@@ -18,26 +21,44 @@ export interface Tempat {
   shift_terbuka: { id: string; kasir_id: string; kasir: string; buka: string; modal: number } | null;
 }
 
-// Tahap 3: hanya Owner yang bisa jual langsung dari Gudang Pusat. Event ditambahkan di tahap 4.
-export async function daftarTempat(db: D1Database, role: Role[]): Promise<Tempat[]> {
+// Tempat jualan per role (PRD 2):
+// - Kasir: event berlangsung tempat ia ditugaskan.
+// - Admin: semua event berlangsung.
+// - Owner: semua event yang belum ditutup (termasuk pre-sale dan yang perlu ditutup) + jual langsung di Gudang Pusat.
+export async function daftarTempat(db: D1Database, role: Role[], staffId = ""): Promise<Tempat[]> {
   const { results } = await db
     .prepare(
-      `SELECT l.id, l.jenis, l.nama, s.id AS shift_id, s.kasir_id, st.nama AS kasir, s.buka, s.modal
-       FROM lokasi l LEFT JOIN shift s ON s.lokasi_id = l.id AND s.status = 'buka' LEFT JOIN staff st ON st.id = s.kasir_id
-       WHERE l.aktif = 1 ORDER BY l.jenis, l.nama, s.buka`,
+      `SELECT l.id, l.jenis, l.nama, s.id AS shift_id, s.kasir_id, st.nama AS kasir, s.buka, s.modal,
+        e.mulai, e.selesai, e.ditutup, e.presale_aktif, e.presale_mode,
+        (SELECT 1 FROM event_kasir k WHERE k.event_id = l.id AND k.staff_id = ?) AS ditugaskan
+       FROM lokasi l LEFT JOIN event e ON e.id = l.id
+       LEFT JOIN shift s ON s.lokasi_id = l.id AND s.status = 'buka' LEFT JOIN staff st ON st.id = s.kasir_id
+       WHERE l.aktif = 1 ORDER BY l.jenis DESC, e.mulai, l.nama, s.buka`,
     )
-    .all<{ id: string; jenis: "gudang" | "event"; nama: string; shift_id: string | null; kasir_id: string; kasir: string; buka: string; modal: number }>();
-  const owner = role.includes("owner");
+    .bind(staffId)
+    .all<{ id: string; jenis: "gudang" | "event"; nama: string; shift_id: string | null; kasir_id: string; kasir: string; buka: string; modal: number;
+      mulai: string; selesai: string; ditutup: number; presale_aktif: number; presale_mode: string; ditugaskan: number | null }>();
+  const owner = role.includes("owner"), admin = role.includes("admin");
+  const hari = hariIniWib();
   const tempat = new Map<string, Tempat>();
   for (const r of results) {
     if (tempat.has(r.id)) continue; // satu laci per tempat: ambil shift terbuka yang paling awal
-    if (r.jenis === "gudang" && !owner) continue;
+    let label: string, boleh = true;
+    if (r.jenis === "gudang") {
+      if (!owner) continue;
+      label = "Jual langsung";
+    } else {
+      const st = statusEvent(r, hari);
+      if (st === "Selesai") continue;
+      if (!owner && st !== "Berlangsung") continue;
+      if (!owner && !admin && !r.ditugaskan) continue;
+      if (st === "Akan Datang") {
+        boleh = r.presale_aktif === 1;
+        label = boleh ? (r.presale_mode === "ambil" ? "Pre-sale · ambil nanti" : "Pre-sale · stok langsung") : "Belum mulai · pre-sale nonaktif";
+      } else label = st;
+    }
     tempat.set(r.id, {
-      id: r.id,
-      jenis: r.jenis,
-      nama: r.nama,
-      label: r.jenis === "gudang" ? "Jual langsung" : "Berlangsung",
-      boleh_jual: true,
+      id: r.id, jenis: r.jenis, nama: r.nama, label, boleh_jual: boleh,
       shift_terbuka: r.shift_id ? { id: r.shift_id, kasir_id: r.kasir_id, kasir: r.kasir, buka: r.buka, modal: r.modal } : null,
     });
   }
@@ -45,11 +66,12 @@ export async function daftarTempat(db: D1Database, role: Role[]): Promise<Tempat
 }
 
 // Harga yang berlaku di satu tempat: harga khusus tempat itu kalau ada, kalau tidak harga normal.
+// Di event, katalog hanya berisi varian yang dipilih di form event.
 function sqlHarga(lokasi: { id: string; jenis: string }) {
   if (lokasi.jenis === "gudang") {
     return { kolom: "COALESCE(h.harga, v.harga_jual)", join: "LEFT JOIN harga_saluran h ON h.sku = v.sku AND h.saluran = 'gudang'", nilai: [] as unknown[] };
   }
-  return { kolom: "v.harga_jual", join: "", nilai: [] as unknown[] };
+  return { kolom: "COALESCE(ev.harga, v.harga_jual)", join: "JOIN event_varian ev ON ev.sku = v.sku AND ev.event_id = ?", nilai: [lokasi.id] as unknown[] };
 }
 
 async function ambilLokasi(db: D1Database, id: string) {
@@ -65,12 +87,22 @@ export async function tarik(req: Request, env: Env) {
   const lokasiId = url.searchParams.get("lokasi");
   const sejak = url.searchParams.get("sejak") || "";
   const waktu = sekarang();
-  const [pengaturan, tempat] = await Promise.all([bacaPengaturan(env.DB), daftarTempat(env.DB, staff.role)]);
+  const [pengaturan, tempat] = await Promise.all([bacaPengaturan(env.DB), daftarTempat(env.DB, staff.role, staff.id)]);
   const hasil: Obj = { waktu, pengaturan, tempat };
   if (!lokasiId) return json(hasil);
   if (!tempat.some((t) => t.id === lokasiId)) throw new Gagal(403, "Anda tidak bisa berjualan di tempat ini");
   const lokasi = await ambilLokasi(env.DB, lokasiId);
   const h = sqlHarga(lokasi);
+  // Perubahan form event (produk yang dijual, harga event) membuat HP menarik ulang katalog lengkap.
+  const ev = lokasi.jenis === "event"
+    ? await env.DB.prepare("SELECT id, nama, venue, mulai, selesai, zona, presale_aktif, presale_mode, diubah_pada FROM event WHERE id = ?").bind(lokasiId).first<{ diubah_pada: string }>()
+    : null;
+  if (ev && sejak && ev.diubah_pada > sejak) return json(await bacaKatalog(env, p, lokasi, h, hasil, ev));
+  return json(await bacaKatalog(env, p, lokasi, h, hasil, ev, sejak));
+}
+
+async function bacaKatalog(env: Env, p: Perangkat, lokasi: { id: string; jenis: string; nama: string }, h: ReturnType<typeof sqlHarga>, hasil: Obj, ev: Obj | null, sejak = "") {
+  const lokasiId = lokasi.id;
   const [kategori, produk, varian, stok] = await Promise.all([
     env.DB.prepare("SELECT id, nama, urutan, tampil_menu FROM kategori ORDER BY urutan, nama").all(),
     env.DB.prepare(`SELECT id, sku, nama, kategori_id, satuan, punya_varian, tampil_pos, aktif FROM produk ${sejak ? "WHERE diubah_pada > ?" : ""}`)
@@ -84,8 +116,9 @@ export async function tarik(req: Request, env: Env) {
   // Nomor transaksi terakhir HP ini hari ini, supaya penomoran tetap lanjut walau data HP sempat terhapus.
   const awalan = `HK-${hariIniWib().slice(2).replace(/-/g, "")}-${p.kode}-`;
   const terakhir = await env.DB.prepare("SELECT MAX(no) AS no FROM trx WHERE perangkat_id = ? AND no LIKE ?").bind(p.id, awalan + "%").first<{ no: string | null }>();
-  return json({ ...hasil, lokasi, penuh: !sejak, kategori: kategori.results, produk: produk.results, varian: varian.results, stok: stok.results,
-    nomor_terakhir: terakhir?.no ? Number(terakhir.no.slice(awalan.length)) : 0 });
+  const kiriman = await env.DB.prepare("SELECT COUNT(*) AS n FROM mutasi WHERE ke = ? AND status = 'Dikirim'").bind(lokasiId).first<{ n: number }>();
+  return { ...hasil, lokasi: { ...lokasi, event: ev }, penuh: !sejak, kategori: kategori.results, produk: produk.results, varian: varian.results, stok: stok.results,
+    nomor_terakhir: terakhir?.no ? Number(terakhir.no.slice(awalan.length)) : 0, kiriman_menunggu: kiriman?.n ?? 0 };
 }
 
 // ---------- Ringkasan shift (dipakai Tutup Kasir dan dashboard) ----------
@@ -369,8 +402,106 @@ async function prosesShiftTutup(env: Env, p: Perangkat, d: Obj): Promise<Hasil["
       pj_id = ?, penjelasan = ?, offline = MAX(offline, ?), diubah_pada = ? WHERE id = ? AND status = 'buka'`,
   ).bind(cekWaktu(d.tutup, "Waktu tutup"), kasHitung, seharusnya, selisih, cekTeks(d.catatan, "Catatan", 300), oleh.id, setuju.id, pj, penjelasan,
     d.offline ? 1 : 0, t, id));
+  // Kas laci kurang diperlakukan sama dengan kerugian stok (PRD keputusan 48).
+  if (selisih < 0) {
+    const lok = await env.DB.prepare("SELECT lokasi_id FROM shift WHERE id = ?").bind(id).first<{ lokasi_id: string }>();
+    tulis.push(env.DB.prepare(
+      `INSERT OR IGNORE INTO kerugian (id, jenis, ref_tabel, ref_id, lokasi_id, tanggal, jumlah, rincian, pj_id, penjelasan, disetujui_oleh, dibuat_pada)
+       VALUES (?, 'kas', 'shift', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(ulid(), id, lok?.lokasi_id ?? null, cekWaktu(d.tutup, "Waktu tutup"), -selisih, `Kas laci kurang Rp${(-selisih).toLocaleString("id-ID")}`, pj, penjelasan, setuju.id, t));
+  }
   await env.DB.batch(tulis);
   return "ok";
+}
+
+// Terima kiriman stok di POS. Jumlah diterima tidak boleh lebih dari dikirim; kekurangan dicatat hilang di perjalanan.
+async function prosesTerima(env: Env, p: Perangkat, d: Obj): Promise<Hasil["status"]> {
+  const id = cekId(d.id, "Mutasi");
+  const m = await env.DB.prepare("SELECT id, no, ke, status FROM mutasi WHERE id = ?").bind(id).first<{ id: string; no: string; ke: string; status: string }>();
+  if (!m) throw new Tolak("Kiriman tidak ditemukan");
+  if (m.status === "Diterima") return "sudah";
+  if (m.status !== "Dikirim") throw new Tolak(`Kiriman berstatus ${m.status}`);
+  const oleh = await cekStaff(env.DB, d.oleh);
+  const waktu = cekWaktu(d.waktu, "Waktu terima");
+  const { results: item } = await env.DB.prepare(
+    `SELECT i.id, i.sku, i.dikirim, p.hpp, TRIM(p.nama || ' ' || v.nama) AS nama FROM mutasi_item i JOIN varian v ON v.sku = i.sku JOIN produk p ON p.id = v.produk_id WHERE i.mutasi_id = ?`,
+  ).bind(id).all<{ id: string; sku: string; dikirim: number; hpp: number; nama: string }>();
+  const terima = new Map(((d.items ?? []) as Obj[]).map((x) => [String(x?.sku), x?.diterima]));
+  const baris = item.map((i) => {
+    const v = terima.has(i.sku) ? cekInt(terima.get(i.sku), `Diterima ${i.sku}`, 0, i.dikirim) : i.dikirim;
+    return { ...i, diterima: v, kurang: i.dikirim - v };
+  });
+  const catatan = cekTeks(d.catatan, "Catatan", 300);
+  const kurang = baris.filter((b) => b.kurang > 0);
+  if (kurang.length && !catatan) throw new Tolak("Ada barang kurang: catatan wajib");
+  const t = sekarang();
+  const pj = await env.DB.prepare("SELECT pj_id FROM event WHERE id = ?").bind(m.ke).first<{ pj_id: string }>();
+  const tulis = [
+    env.DB.prepare("UPDATE mutasi SET status = 'Diterima', diterima_pada = ?, diterima_oleh = ?, perangkat_id = ?, catatan_terima = ?, diubah_pada = ? WHERE id = ? AND status = 'Dikirim'")
+      .bind(waktu, oleh.id, p.id, catatan, t, id),
+    ...baris.flatMap((b) => [
+      env.DB.prepare("UPDATE mutasi_item SET diterima = ? WHERE id = ?").bind(b.diterima, b.id),
+      env.DB.prepare("UPDATE stok SET transit = transit - ?, qty = qty + ?, diubah_pada = ? WHERE sku = ? AND lokasi_id = ?").bind(b.dikirim, b.diterima, t, b.sku, m.ke),
+      ...(b.diterima > 0 ? [env.DB.prepare("INSERT INTO stok_gerak (id, sku, lokasi_id, jumlah, jenis, ref_tabel, ref_id, waktu, oleh) VALUES (?, ?, ?, ?, 'kirim_masuk', 'mutasi', ?, ?, ?)")
+        .bind(ulid(), b.sku, m.ke, b.diterima, id, waktu, oleh.id)] : []),
+    ]),
+  ];
+  const rugi = kurang.reduce((a, b) => a + b.kurang * b.hpp, 0);
+  if (rugi > 0) {
+    tulis.push(env.DB.prepare(
+      `INSERT OR IGNORE INTO kerugian (id, jenis, ref_tabel, ref_id, lokasi_id, tanggal, jumlah, rincian, pj_id, penjelasan, dibuat_pada) VALUES (?, 'kiriman', 'mutasi', ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(ulid(), id, m.ke, waktu, rugi, kurang.map((b) => `${b.nama} kurang ${b.kurang}`).join(", "), pj?.pj_id ?? null, catatan, t));
+  }
+  await env.DB.batch(tulis);
+  return "ok";
+}
+
+// Stok opname dari POS: tersimpan sebagai "Menunggu persetujuan", stok belum berubah.
+async function prosesOpname(env: Env, p: Perangkat, d: Obj): Promise<Hasil["status"]> {
+  const id = cekId(d.id, "Opname");
+  if (await env.DB.prepare("SELECT 1 FROM opname WHERE id = ?").bind(id).first()) return "sudah";
+  const lokasi = await env.DB.prepare("SELECT id FROM lokasi WHERE id = ? AND jenis = 'event'").bind(typeof d.lokasi_id === "string" ? d.lokasi_id : "").first<{ id: string }>();
+  if (!lokasi) throw new Tolak("Event tidak dikenal");
+  const oleh = await cekStaff(env.DB, d.oleh);
+  if (!Array.isArray(d.items) || !d.items.length || d.items.length > 300) throw new Tolak("Daftar barang tidak valid");
+  const items = (d.items as Obj[]).map((x, i) => ({
+    sku: cekTeks(x?.sku, `SKU ${i + 1}`, 40, true)!, sistem: cekInt(x?.sistem, `Sistem ${i + 1}`, -1_000_000, 1_000_000), fisik: cekInt(x?.fisik, `Fisik ${i + 1}`, 0, 1_000_000),
+  }));
+  const hpp = new Map<string, number>();
+  for (let i = 0; i < items.length; i += 90) {
+    const bagian = items.slice(i, i + 90).map((x) => x.sku);
+    const { results } = await env.DB.prepare(`SELECT v.sku, p.hpp FROM varian v JOIN produk p ON p.id = v.produk_id WHERE v.sku IN (${bagian.map(() => "?").join(",")})`)
+      .bind(...bagian).all<{ sku: string; hpp: number }>();
+    for (const r of results) hpp.set(r.sku, r.hpp);
+  }
+  for (const x of items) if (!hpp.has(x.sku)) throw new Tolak(`SKU ${x.sku} tidak dikenal`);
+  await denganNomor(env.DB, "SO", (no) => env.DB.batch(tulisOpnameBaru(env.DB, {
+    id, no, lokasi_id: lokasi.id, jenis: "pos", oleh: oleh.id, waktu: cekWaktu(d.waktu, "Waktu"), perangkat_id: p.id, catatan: cekTeks(d.catatan, "Catatan", 500),
+    item: items.map((x) => ({ ...x, hpp: hpp.get(x.sku)! })),
+  })));
+  return "ok";
+}
+
+// Kiriman stok dan status opname untuk satu tempat (layar Inventori di POS).
+export async function inventoriPos(req: Request, env: Env) {
+  await sesiPos(env.DB, req);
+  const lokasi = new URL(req.url).searchParams.get("lokasi") ?? "";
+  const [mutasi, item, opname] = await Promise.all([
+    env.DB.prepare(
+      `SELECT m.id, m.no, m.status, m.dikirim_pada, m.diterima_pada, a.nama AS dikirim_oleh, b.nama AS diterima_oleh, m.catatan, m.catatan_terima FROM mutasi m
+       LEFT JOIN staff a ON a.id = m.dikirim_oleh LEFT JOIN staff b ON b.id = m.diterima_oleh WHERE m.ke = ? AND m.jenis = 'kirim' AND m.status <> 'Batal'
+       ORDER BY m.dikirim_pada DESC LIMIT 50`,
+    ).bind(lokasi).all<{ id: string }>(),
+    env.DB.prepare(
+      `SELECT i.mutasi_id, i.sku, i.dikirim, i.diterima, TRIM(p.nama || ' ' || v.nama) AS nama FROM mutasi_item i JOIN mutasi m ON m.id = i.mutasi_id
+       JOIN varian v ON v.sku = i.sku JOIN produk p ON p.id = v.produk_id WHERE m.ke = ? AND m.jenis = 'kirim'`,
+    ).bind(lokasi).all<{ mutasi_id: string }>(),
+    env.DB.prepare(
+      `SELECT o.id, o.no, o.status, o.dihitung_pada, a.nama AS dihitung_oleh, o.ulang_alasan, b.nama AS disetujui_oleh FROM opname o
+       JOIN staff a ON a.id = o.dihitung_oleh LEFT JOIN staff b ON b.id = o.disetujui_oleh WHERE o.lokasi_id = ? ORDER BY o.dihitung_pada DESC LIMIT 20`,
+    ).bind(lokasi).all(),
+  ]);
+  return json({ mutasi: mutasi.results.map((m) => ({ ...m, items: item.results.filter((i) => i.mutasi_id === m.id) })), opname: opname.results });
 }
 
 const AKSI_LOG = ["Masuk offline", "Buka kasir", "Gabung kasir", "Buka kunci layar", "Terkunci otomatis", "Tutup kasir", "Keluar", "PIN salah"];
@@ -391,6 +522,8 @@ const PROSES: Record<string, (env: Env, p: Perangkat, d: Obj, req: Request) => P
   kas: prosesKas,
   trx: prosesTrx,
   shift_tutup: prosesShiftTutup,
+  terima: prosesTerima,
+  opname: prosesOpname,
   log: prosesLog,
 };
 

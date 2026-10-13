@@ -167,3 +167,12 @@ export async function riwayatMasuk(req: Request, env: Env) {
     .all();
   return json({ riwayat: results });
 }
+
+// Daftar nama karyawan aktif untuk pilihan di form (kasir event, penanggung jawab). Owner dan Admin.
+export async function daftarRingkas(req: Request, env: Env) {
+  await sesiSiap(env.DB, req, "owner", "admin");
+  const { results } = await env.DB.prepare(
+    `SELECT s.id, s.nama, (SELECT group_concat(role) FROM staff_role WHERE staff_id = s.id) AS role FROM staff s WHERE s.aktif = 1 ORDER BY s.nama`,
+  ).all<{ id: string; nama: string; role: string | null }>();
+  return json({ karyawan: results.map((r) => ({ id: r.id, nama: r.nama, role: r.role ? r.role.split(",").sort() : [], aktif: true })) });
+}

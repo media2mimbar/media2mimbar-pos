@@ -260,7 +260,7 @@ Saran: jalankan tahap 3 di satu event kecil sebelum tahap 4 sampai 7 selesai. Ma
 
 ### Catatan pembangunan (Oktober 2026)
 
-Tahap 1 sampai 3 sudah dibangun di `worker/api` dan berjalan di `https://hikayat-api.media2mimbar.workers.dev`. Beberapa hal berbeda dari rancangan di atas karena lingkungan pengembangan saat itu tidak bisa mengunduh paket npm:
+Tahap 1 sampai 4 sudah dibangun di `worker/api` dan berjalan di `https://hikayat-api.media2mimbar.workers.dev`. Beberapa hal berbeda dari rancangan di atas karena lingkungan pengembangan saat itu tidak bisa mengunduh paket npm:
 
 | Rancangan | Yang dipakai sekarang | Rencana |
 |---|---|---|
@@ -279,6 +279,8 @@ Tahap 3 menambah migrasi `0003_pos.sql`: `shift`, `kas_laci`, `trx`, `trx_item`,
 - Masuk offline memakai PBKDF2(PIN, salt HP) yang disimpan saat karyawan pernah masuk online di HP itu.
 - Tutup kasir online memakai token persetujuan sekali pakai dari `POST /api/pos/setujui`. Tutup kasir offline ditandai `offline = 1`.
 - Setoran kasir di dashboard menghitung ulang "seharusnya" dari transaksi yang sudah masuk server, jadi tetap benar walau ada HP yang mengirim belakangan.
+
+Tahap 4 menambah migrasi `0004_event.sql`: `event`, `event_kasir`, `event_varian` (produk yang dijual + harga event), `mutasi`, `mutasi_item`, `opname`, `opname_item`, `kerugian`, `kerugian_riwayat`. Setiap event juga punya baris `lokasi` dengan ID yang sama, jadi stok dan transaksi menempel ke ID dan ikut "pindah" saat nama event diganti. Kirim stok mengurangi gudang dan menambah `transit` di event; diterima di POS lewat dokumen antrean `terima`. Opname dari POS lewat dokumen `opname`. Tutup event membatalkan kiriman yang belum diterima, menyesuaikan stok ke hitungan fisik, mencatat kerugian, lalu memindahkan sisa ke gudang dalam satu `db.batch`. Kerugian kas laci dicatat otomatis saat tutup kasir kurang.
 
 Batas yang perlu diingat: satu query D1 maksimal 100 parameter, jadi satu faktur dibatasi 90 baris barang dan satu produk 40 varian.
 

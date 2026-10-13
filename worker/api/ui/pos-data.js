@@ -106,6 +106,13 @@ function sinkronSekarang() {
           if (h.status === "ditolak") ditolak.push({ ...kirim[i], alasan: h.alasan, waktu: sekarang() });
         });
         for (const [i, d] of kirim.entries()) {
+          if (d.jenis === "terima" && r.hasil[i].status === "ok") {
+            const snap = await kv.get("snap:" + d.data.lokasi_id);
+            if (snap && snap.waktu < r.waktu) {
+              for (const it of d.data.items) snap.stok[it.sku] = (snap.stok[it.sku] ?? 0) + it.diterima;
+              await kv.set("snap:" + d.data.lokasi_id, snap);
+            }
+          }
           if (d.jenis !== "trx") continue;
           const t = await tx("trx", "readonly", (s) => s.get(d.data.id));
           if (t) await tx("trx", "readwrite", (s) => s.put({ ...t, terkirim: r.hasil[i].status !== "ditolak", ditolak: r.hasil[i].alasan ?? null }));
@@ -141,6 +148,7 @@ async function tarikData(lokasiId) {
   snap.waktu = r.waktu;
   snap.lokasi = r.lokasi;
   snap.kategori = r.kategori;
+  snap.kiriman_menunggu = r.kiriman_menunggu ?? 0;
   for (const p of r.produk) snap.produk[p.id] = p;
   for (const v of r.varian) snap.varian[v.sku] = v;
   for (const s of r.stok) snap.stok[s.sku] = s.qty;
@@ -174,8 +182,10 @@ async function simpanGambarQris(id) {
 async function stokTersedia(snap) {
   const kurang = {};
   for (const d of await isiAntrean()) {
-    if (d.jenis !== "trx" || d.data.lokasi_id !== snap.lokasi.id) continue;
-    for (const i of d.data.items) kurang[i.sku] = (kurang[i.sku] ?? 0) + i.qty;
+    if (d.data.lokasi_id !== snap.lokasi.id) continue;
+    // Penjualan yang belum terkirim mengurangi stok; kiriman yang sudah diterima di HP tapi belum terkirim menambah.
+    if (d.jenis === "trx") for (const i of d.data.items) kurang[i.sku] = (kurang[i.sku] ?? 0) + i.qty;
+    if (d.jenis === "terima") for (const i of d.data.items) kurang[i.sku] = (kurang[i.sku] ?? 0) - i.diterima;
   }
   const hasil = {};
   for (const sku of Object.keys(snap.varian)) hasil[sku] = (snap.stok[sku] ?? 0) - (kurang[sku] ?? 0);
