@@ -24,6 +24,7 @@ input:focus{outline:2px solid var(--accent-bg);border-color:var(--accent)}
 .btn:disabled{opacity:.5;cursor:default}
 .err{background:var(--danger-bg);color:var(--danger-text);padding:10px 12px;border-radius:8px;margin-top:14px}
 .ok{background:var(--success-bg);color:var(--success-text);padding:10px 12px;border-radius:8px;margin-top:14px}
+.warn{background:var(--warn-bg);color:var(--warn-text);padding:10px 12px;border-radius:8px;margin-top:14px}
 .top{background:var(--accent);color:#fff;display:flex;align-items:center;gap:20px;padding:0 20px;height:56px;flex-wrap:wrap}
 .top b{font-size:16px}
 .top nav{display:flex;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none}
@@ -139,6 +140,7 @@ tfoot td{font-weight:700;background:#FAFAF8}
 <script src="/dash-penjualan.js"></script>
 <script src="/dash-event.js"></script>
 <script src="/dash-promo.js"></script>
+<script src="/dash-online.js"></script>
 <script>
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -240,7 +242,7 @@ function mulai(staff) {
   $("#akunNama").textContent = staff.nama;
   $("#akunRole").textContent = staff.role.map((r) => NAMA_ROLE[r]).join(", ");
   const owner = staff.role.includes("owner");
-  const tabs = [["penjualan", "Penjualan"], ["event", "Event"], ["presale", "Pre-sale"], ["produk", "Produk"], ["promosi", "Promosi"], ["inventori", "Inventori"], ["laporan", "Laporan"], ["pengaturan", "Pengaturan POS"], owner && ["karyawan", "Karyawan"], ["perangkat", "Perangkat POS"], owner && ["riwayat", "Riwayat Masuk"]].filter(Boolean);
+  const tabs = [["penjualan", "Penjualan"], ["event", "Event"], ["presale", "Pre-sale"], ["online", "Online"], ["produk", "Produk"], ["pelanggan", "Pelanggan"], ["promosi", "Promosi"], ["inventori", "Inventori"], ["laporan", "Laporan"], ["pengaturan", "Pengaturan POS"], owner && ["karyawan", "Karyawan"], ["perangkat", "Perangkat POS"], owner && ["riwayat", "Riwayat Masuk"]].filter(Boolean);
   $("#nav").innerHTML = tabs.map(([k, n]) => `<button data-tab="${k}">${n}</button>`).join("");
   $("#nav").onclick = (e) => e.target.dataset.tab && buka(e.target.dataset.tab);
   tampil("layarApp");
@@ -250,7 +252,7 @@ function mulai(staff) {
 function buka(t) {
   tab = t;
   for (const b of $("#nav").children) b.classList.toggle("on", b.dataset.tab === t);
-  ({ presale: halPresale, promosi: halPromosi, event: halEvent, laporan: halLaporan, penjualan: halPenjualan, pengaturan: halPengaturan, produk: halProduk, inventori: halInventori, karyawan: halKaryawan, perangkat: halPerangkat, riwayat: halRiwayat })[t]();
+  ({ online: halOnline, pelanggan: halPelanggan, presale: halPresale, promosi: halPromosi, event: halEvent, laporan: halLaporan, penjualan: halPenjualan, pengaturan: halPengaturan, produk: halProduk, inventori: halInventori, karyawan: halKaryawan, perangkat: halPerangkat, riwayat: halRiwayat })[t]();
 }
 
 // ---------- Karyawan ----------

@@ -125,11 +125,14 @@ function bentukProduk(p: BarisProduk, varian: BarisVarian[]) {
 
 export async function daftarProduk(req: Request, env: Env) {
   await sesiSiap(env.DB, req, "owner", "admin");
-  const [p, v] = await Promise.all([
+  const [p, v, mp] = await Promise.all([
     env.DB.prepare(`${SELECT_PRODUK} ORDER BY p.aktif DESC, k.urutan, p.nama`).all<BarisProduk>(),
     env.DB.prepare(`${SELECT_VARIAN} ORDER BY v.produk_id, v.aktif DESC, v.urutan`).all<BarisVarian>(),
+    env.DB.prepare("SELECT DISTINCT v.produk_id, s.nama, s.aktif FROM saluran_varian x JOIN varian v ON v.sku = x.sku JOIN saluran s ON s.id = x.saluran_id ORDER BY s.urutan")
+      .all<{ produk_id: string; nama: string; aktif: number }>(),
   ]);
-  return json({ produk: p.results.map((x) => bentukProduk(x, v.results)) });
+  // Marketplace tempat produk dijual, untuk kolom di Daftar Produk.
+  return json({ produk: p.results.map((x) => ({ ...bentukProduk(x, v.results), marketplace: mp.results.filter((m) => m.produk_id === x.id).map((m) => ({ nama: m.nama, toko_aktif: m.aktif === 1 })) })) });
 }
 
 export async function ambilProduk(db: D1Database, id: string) {

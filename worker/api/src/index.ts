@@ -3,7 +3,9 @@ import * as event from "./event.js";
 import * as lengkap from "./kasir-lengkap.js";
 import * as presale from "./presale.js";
 import * as promosi from "./promosi.js";
+import * as online from "./online.js";
 import * as opname from "./opname.js";
+import * as pelanggan from "./pelanggan.js";
 import * as inventori from "./inventori.js";
 import * as katalog from "./katalog.js";
 import { HALAMAN } from "./halaman.js";
@@ -92,6 +94,22 @@ const RUTE: [string, string, Handler][] = [
   ["POST", "/api/presale/:id/refund", presale.refundPresale],
   ["GET", "/api/terbuang", presale.daftarTerbuang],
   ["POST", "/api/terbuang", presale.catatTerbuang],
+  ["GET", "/api/saluran", online.daftarSaluran],
+  ["PATCH", "/api/saluran/:id", online.ubahSaluran],
+  ["GET", "/api/saluran/:id/katalog", online.katalogSaluran],
+  ["GET", "/api/produk/:id/saluran", online.hargaMarketplaceProduk],
+  ["PUT", "/api/produk/:id/saluran", online.simpanHargaMarketplace],
+  ["GET", "/api/online", online.daftarPesanan],
+  ["POST", "/api/online", online.tambahPesanan],
+  ["GET", "/api/online/impor", online.riwayatImpor],
+  ["POST", "/api/online/impor", online.imporPesanan],
+  ["POST", "/api/online/impor/cek", online.cekImpor],
+  ["GET", "/api/online/:id", online.detailPesanan],
+  ["POST", "/api/online/:id/status", online.ubahStatusPesanan],
+  ["GET", "/api/pelanggan", pelanggan.daftarPelanggan],
+  ["POST", "/api/pelanggan", pelanggan.tambahPelanggan],
+  ["GET", "/api/pelanggan/:id", pelanggan.detailPelanggan],
+  ["PATCH", "/api/pelanggan/:id", pelanggan.ubahPelanggan],
   ["GET", "/api/dokumen-ditolak", penjualan.daftarDitolak],
   ["POST", "/api/dokumen-ditolak/:id/selesai", penjualan.selesaiDitolak],
 

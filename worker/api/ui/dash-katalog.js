@@ -27,9 +27,10 @@ async function daftarProduk() {
         <td class="num">${rp(p.hpp)}</td><td class="num">${harga}</td>
         <td class="num">${margin}%</td>
         <td class="num">${p.stok}${p.transit ? `<div class="small muted">+${p.transit} di jalan</div>` : ""} ${menipis}</td>
+        <td>${p.marketplace.map((m) => `<span class="tag ${m.toko_aktif ? "" : "off"}" title="${m.toko_aktif ? "" : "Toko nonaktif"}">${esc(m.nama)}</span>`).join("") || '<span class="muted">—</span>'}</td>
         <td>${p.tampil_pos ? "Ya" : '<span class="muted">Tidak</span>'}</td>
         <td>${p.aktif ? '<span class="tag aktif">Aktif</span>' : '<span class="tag off">Nonaktif</span>'}</td></tr>`;
-    }).join("") : `<tr><td colspan="7" class="muted">${produk.length ? "Tidak ada produk yang cocok." : "Belum ada produk. Buat kategori dulu, lalu tambah produk."}</td></tr>`;
+    }).join("") : `<tr><td colspan="8" class="muted">${produk.length ? "Tidak ada produk yang cocok." : "Belum ada produk. Buat kategori dulu, lalu tambah produk."}</td></tr>`;
     $("#tbProduk").querySelectorAll("tr[data-id]").forEach((tr) => (tr.onclick = () => formProduk(tr.dataset.id)));
   };
   $("#isi").innerHTML = `<main>${kepalaProduk()}
@@ -37,7 +38,7 @@ async function daftarProduk() {
       <input type="search" id="cariProduk" placeholder="Cari nama atau SKU" value="${esc(filterProduk.cari)}">
       <select id="katProduk"><option value="">Semua kategori</option>${kategori.map((k) => `<option value="${k.id}" ${k.id === filterProduk.kategori ? "selected" : ""}>${esc(k.nama)}</option>`).join("")}</select>
     </div>
-    <div class="tablewrap"><table><thead><tr><th>Produk</th><th class="num">HPP</th><th class="num">Harga jual</th><th class="num">Margin</th><th class="num">Stok</th><th>Tampil di POS</th><th>Status</th></tr></thead>
+    <div class="tablewrap"><table><thead><tr><th>Produk</th><th class="num">HPP</th><th class="num">Harga jual</th><th class="num">Margin</th><th class="num">Stok</th><th>Marketplace</th><th>Tampil di POS</th><th>Status</th></tr></thead>
     <tbody id="tbProduk"></tbody></table></div></main>`;
   pasangSubtabs(halProduk);
   $("#tambahProduk").onclick = () => formProduk(null);
@@ -89,6 +90,7 @@ async function formProduk(id) {
       <div class="err" hidden></div>
       <div class="actions"><button class="btn primary">Simpan</button><button type="button" class="btn" id="batal">Batal</button></div>
     </form>
+    ${p ? '<div id="bagianMp"></div>' : '<p class="small muted" style="margin-top:12px">Harga marketplace bisa diatur setelah produk disimpan.</p>'}
     ${p ? `<div class="section"><h2>Stok per lokasi</h2><div class="tablewrap"><table><thead><tr><th>SKU</th><th>Lokasi</th><th class="num">Stok</th><th class="num">Dalam perjalanan</th></tr></thead><tbody>
       ${detail.stok_lokasi.length ? detail.stok_lokasi.map((s) => `<tr><td>${esc(s.sku)}</td><td>${esc(s.lokasi)}</td><td class="num">${s.qty}</td><td class="num">${s.transit}</td></tr>`).join("") : '<tr><td colspan="4" class="muted">Belum ada stok.</td></tr>'}
       </tbody></table></div></div>
@@ -128,6 +130,7 @@ async function formProduk(id) {
     $("#tambahVarian").onclick = () => { varian.push({ nama: "", sku: "", harga_jual: "", stok_awal: "", aktif: true }); gambarHarga(); };
   };
   gambarHarga();
+  if (p) bagianMarketplace(p.id, $("#bagianMp"));
   if (baru) {
     $("#pakaiVarian").onchange = (e) => { pakaiVarian = e.target.checked; gambarHarga(); };
     f.sku.oninput = () => pakaiVarian && $("#bagianHarga").querySelectorAll('[data-k="sku"]').forEach((el) => {
