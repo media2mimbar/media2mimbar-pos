@@ -235,10 +235,12 @@ function layarTempat() {
       <div class="daftar">${tempat.map((t) => `<button data-id="${t.id}" ${t.boleh_jual ? "" : "disabled"}>
         <span class="av">${t.jenis === "gudang" ? "G" : "E"}</span>
         <span><b>${esc(t.nama)}</b><br><span class="small muted">${esc(t.label)}${t.shift_terbuka ? ` · Kasir terbuka · ${esc(t.shift_terbuka.kasir)}` : ""}</span></span></button>`).join("")}</div>
+      ${owner ? tempat.filter((t) => t.jenis === "event" && t.label !== "Akan Datang" && !t.label.startsWith("Pre-sale") && !t.label.startsWith("Belum")).map((t) => `<p class="small" style="margin:6px 0 0">Selesai di ${esc(t.nama)}? <a href="#" data-tutupev="${t.id}">Tutup event</a></p>`).join("") : ""}
       ${tempat.length ? "" : `<div class="card" style="margin-top:12px"><b>Belum ada tempat jualan</b><p class="muted small">${owner ? "Muat ulang saat ada sinyal." : "Anda belum ditugaskan di event yang sedang berlangsung. Minta Admin menambahkan Anda di form event."}</p></div>`}
     </div>`, "tempat");
   $("#btnKeluar").onclick = () => keluar();
   $$(".daftar button[data-id]").forEach((b) => (b.onclick = () => pilihTempat(tempat.find((t) => t.id === b.dataset.id))));
+  $$("[data-tutupev]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); A.snap ??= { lokasi: { nama: "" } }; layarTutupEventPos(a.dataset.tutupev, layarTempat); }));
 }
 
 async function pilihTempat(t) {
@@ -343,7 +345,7 @@ function gambarKasir() {
   $("#btnTotal").onclick = lembarKeranjang;
   $("#btnPromo").onclick = lembarPromo;
   $("#btnSimpan").onclick = () => simpanOrder();
-  $("#btnOrder").onclick = layarOrder;
+  $("#btnOrder").onclick = () => layarOrder();
   $("#btnBayar").onclick = () => (A.keranjang.length ? layarBayar() : toast("Keranjang masih kosong"));
   $("#btnHapus").onclick = () => {
     if (!A.keranjang.length || !confirm("Hapus semua barang di keranjang?")) return;
@@ -687,10 +689,14 @@ function lembarMenu() {
   bukaLembar(`<h2>Menu</h2><div class="daftar">
     <button data-m="riwayat">Penjualan shift ini (detail, void, retur)</button>
     <button data-m="pesanan">${A.snap.lokasi.jenis === "gudang" ? "Ambil di kantor (pre-sale)" : "Pesanan pre-sale"}</button>
+    <button data-m="laporan">Laporan: kasir, kas, produk terjual</button>
     <button data-m="kas">Kas kasir</button>
     ${A.snap.lokasi.jenis === "event" ? '<button data-m="inventori">Inventori: terima kiriman, stok opname</button>' : ""}
     <button data-m="sinkron">Status sinkron</button>
+    <button data-m="riwayatmasuk">Riwayat masuk</button>
+    <button data-m="pengaturan">Pengaturan</button>
     ${owner ? '<button data-m="tempat">Ganti tempat jualan</button>' : ""}
+    ${owner && A.snap.lokasi.jenis === "event" ? '<button data-m="tutupevent">Tutup event</button>' : ""}
     <button data-m="pin">Ganti PIN</button>
     <button data-m="tutup">Tutup kasir</button>
     <button data-m="keluar">Keluar kasir (laci tetap terbuka)</button>
@@ -700,7 +706,8 @@ function lembarMenu() {
     if (!m) return;
     tutupLembar();
     ({
-      riwayat: layarRiwayat, pesanan: () => layarPesanan(gambarKasir), kas: layarKas, inventori: layarInventori, sinkron: layarSinkron,
+      riwayat: layarRiwayat, pesanan: () => layarPesanan(gambarKasir), kas: layarKas, inventori: () => layarInventori(), sinkron: layarSinkron,
+      laporan: () => layarLaporanPos(), riwayatmasuk: () => layarRiwayatMasuk(), pengaturan: layarPengaturanPos, tutupevent: () => layarTutupEventPos(),
       pin: () => (S.online ? gantiPin(false) : toast("Ganti PIN butuh sinyal")),
       tutup: layarTutupKasir, keluar: () => keluar(),
       tempat: async () => {
@@ -769,10 +776,20 @@ async function layarKas() {
         <label>Catatan</label><input name="catatan" placeholder="Misalnya: beli air minum" required maxlength="200">
         <button class="btn primary">Simpan</button>
       </form>
+      <div id="ringkasKas"></div>
       <h2 style="margin-top:16px">Dicatat dari HP ini</h2>
       <div class="daftar">${kasLokal.map((k) => `<div class="card small"><b>${k.jenis === "masuk" ? "+" : "−"}${rp(k.jumlah)}</b> · ${esc(k.catatan)} <span class="muted">${jam(k.waktu)}</span></div>`).join("") || '<p class="muted">Belum ada.</p>'}</div>
     </div>`, "kas");
   $("#kembali").onclick = gambarKasir;
+  // Ringkasan laci dari server (semua HP yang memakai laci ini).
+  if (S.online && A.sesi.sesi) api("GET", `/api/pos/shift/${A.sesi.shift_id}`).then(({ ringkasan: r }) => {
+    if (A.layar !== "kas") return;
+    const modal = A.sesi.shift?.modal ?? 0;
+    $("#ringkasKas").innerHTML = `<div class="card" style="margin-top:10px"><table class="rinci">
+      <tr><td>Pemasukan (modal + kas masuk)</td><td>${rp(modal + r.kas_masuk)}</td></tr><tr><td>Pengeluaran</td><td>${rp(r.kas_keluar + (r.retur_tunai ?? 0))}</td></tr>
+      <tr><td>Void (${r.void_n})</td><td>${rp(r.void_total)}</td></tr><tr class="tebal"><td>Uang di laci</td><td>${rp(r.seharusnya)}</td></tr>
+      <tr><td>Penjualan tunai</td><td>${rp(r.tunai)}</td></tr><tr><td>Penjualan QRIS</td><td>${rp(r.qris)}</td></tr><tr><td>Penjualan transfer</td><td>${rp(r.transfer)}</td></tr></table></div>`;
+  }).catch(() => {});
   let jenis = "masuk";
   $$("#fKas .metode button").forEach((b) => (b.onclick = () => { jenis = b.dataset.j; $$("#fKas .metode button").forEach((x) => x.classList.toggle("on", x === b)); }));
   $("#fKas").onsubmit = async (e) => {
@@ -826,7 +843,8 @@ async function layarInventori(tab = "kiriman") {
   const tgl = (iso) => (iso ? tglJam(iso) : "");
   const kartuMutasi = (m) => `<button data-mutasi="${m.id}" ${m.status === "Dikirim" ? "" : "disabled"}><span class="isi"><b>${esc(m.no)}</b>
     <br><span class="small muted">Dikirim ${esc(m.dikirim_oleh ?? "")} · ${tgl(m.dikirim_pada)} · ${m.items.reduce((a, i) => a + i.dikirim, 0)} pcs</span>
-    ${m.status === "Diterima" ? `<br><span class="small">${m.lokal ? "Diterima di HP, menunggu terkirim" : `Diterima ${esc(m.diterima_oleh ?? "")} · ${tgl(m.diterima_pada)}`}${m.items.some((i) => i.diterima < i.dikirim) ? ` · <span class="tag off">kurang ${m.items.reduce((a, i) => a + i.dikirim - i.diterima, 0)}</span>` : ""}</span>` : ""}</span></button>`;
+    ${m.status === "Diterima" ? `<br><span class="small">${m.lokal ? "Diterima di HP, menunggu terkirim" : `Diterima ${esc(m.diterima_oleh ?? "")} · ${tgl(m.diterima_pada)}`}${m.items.some((i) => i.diterima < i.dikirim) ? ` · <span class="tag off">kurang ${m.items.reduce((a, i) => a + i.dikirim - i.diterima, 0)}</span>` : ""}</span>` : ""}</span></button>
+    ${m.status === "Diterima" && !m.lokal ? `<button class="btn kecil" style="align-self:flex-end;margin-top:-4px" data-batalterima="${m.id}">Batalkan penerimaan</button>` : ""}`;
   const STATUS = { "Menunggu persetujuan": "warn", "Perlu opname ulang": "off", Disetujui: "ok", Diganti: "" };
   $("#app .wrap").innerHTML = `
     <div class="metode"><button data-tab="kiriman" class="${tab === "kiriman" ? "on" : ""}">Terima kiriman</button><button data-tab="opname" class="${tab === "opname" ? "on" : ""}">Stok opname</button></div>
@@ -838,11 +856,14 @@ async function layarInventori(tab = "kiriman") {
       ${inv.opname_lokal.length ? '<div class="warn">Hasil opname tersimpan di HP, menunggu terkirim.</div>' : ""}
       ${inv.opname.filter((o) => o.status !== "Diganti").slice(0, 5).map((o) => `<div class="card small" style="margin-top:8px"><b>${esc(o.no)}</b> <span class="tag ${STATUS[o.status]}">${esc(o.status)}</span>
         <br>Dihitung ${esc(o.dihitung_oleh)} · ${tgl(o.dihitung_pada)}${o.disetujui_oleh ? ` · disetujui ${esc(o.disetujui_oleh)}` : ""}
-        ${o.status === "Perlu opname ulang" ? `<div class="err">Diminta hitung ulang: ${esc(o.ulang_alasan)}</div>` : ""}</div>`).join("")}
+        ${o.status === "Perlu opname ulang" ? `<div class="err">Diminta hitung ulang: ${esc(o.ulang_alasan)}</div>` : ""}
+        ${o.status === "Menunggu persetujuan" && (A.sesi.staff.role.includes("owner") || A.sesi.staff.role.includes("admin")) ? `<button class="btn kecil" style="margin-top:8px" data-periksa="${o.id}">Periksa dan setujui</button>` : ""}</div>`).join("")}
       <button class="btn primary" id="hitung">Hitung stok sekarang</button>`}`;
   $$("[data-tab]").forEach((b) => (b.onclick = () => layarInventori(b.dataset.tab)));
   $$("[data-mutasi]").forEach((b) => (b.onclick = () => layarTerima(inv.mutasi.find((m) => m.id === b.dataset.mutasi))));
   if ($("#hitung")) $("#hitung").onclick = layarOpname;
+  $$("[data-batalterima]").forEach((b) => (b.onclick = () => batalTerima(inv.mutasi.find((m) => m.id === b.dataset.batalterima))));
+  $$("[data-periksa]").forEach((b) => (b.onclick = () => layarSetujuiOpname(b.dataset.periksa)));
 }
 
 function layarTerima(m) {
@@ -918,10 +939,13 @@ function layarOpname() {
 
 // ---------- Tutup kasir ----------
 
-async function layarTutupKasir() {
-  tampil(`${bar("Tutup kasir", esc(A.snap.lokasi.nama), '<button id="kembali">Kembali</button>')}<div class="wrap"><p class="muted">Mengirim data dan menghitung…</p></div>`, "tutup");
-  $("#kembali").onclick = gambarKasir;
-  const belum = A.orderDaftar.filter((o) => o.bayar.length);
+// lain: laci kasir lain yang ditutup Owner dari HP ({ id, kasir_id, kasir, modal, kembali }). Butuh sinyal.
+async function layarTutupKasir(lain) {
+  const sid = lain?.id ?? A.sesi.shift_id;
+  const modal = lain ? lain.modal : A.sesi.shift?.modal;
+  tampil(`${bar(lain ? "Tutup kasir " + esc(lain.kasir) : "Tutup kasir", esc(A.snap.lokasi.nama), '<button id="kembali">Kembali</button>')}<div class="wrap"><p class="muted">Mengirim data dan menghitung…</p></div>`, "tutup");
+  $("#kembali").onclick = lain ? lain.kembali : gambarKasir;
+  const belum = lain ? [] : A.orderDaftar.filter((o) => o.bayar.length);
   if (belum.length) {
     $("#app .wrap").innerHTML = `<div class="err">Masih ada pesanan di Daftar Order yang sudah dibayar sebagian: ${belum.map((o) => esc(o.no)).join(", ")}. Lunasi dulu sebelum menutup kasir.</div>`;
     return;
@@ -930,21 +954,22 @@ async function layarTutupKasir() {
   const sisa = (await isiAntrean()).length;
   let r = null;
   if (S.online && A.sesi.sesi && !sisa) {
-    try { r = (await api("GET", `/api/pos/shift/${A.sesi.shift_id}`)).ringkasan; } catch {}
+    try { r = (await api("GET", `/api/pos/shift/${sid}`)).ringkasan; } catch {}
   }
+  if (!r && lain) { $("#app .wrap").innerHTML = '<div class="err">Menutup laci kasir lain butuh sinyal dan semua data HP ini sudah terkirim.</div>'; return; }
   // Tanpa sinyal: hitung dari data di HP ini saja (laci yang dipakai beberapa HP bisa belum lengkap).
   if (!r) {
-    const trx = (await tx("trx", "readonly", (s) => s.index("shift").getAll(A.sesi.shift_id))).filter((t) => t.status === "Lunas");
-    const kas = (await kv.get("kas:" + A.sesi.shift_id)) ?? [];
+    const trx = (await tx("trx", "readonly", (s) => s.index("shift").getAll(sid))).filter((t) => t.status === "Lunas");
+    const kas = (await kv.get("kas:" + sid)) ?? [];
     const per = (m) => trx.flatMap((t) => t.pembayaran).filter((b) => b.metode === m).reduce((a, b) => a + b.jumlah, 0);
     const tunai = per("Tunai") - trx.reduce((a, t) => a + (t.kembalian ?? 0), 0);
     const km = kas.filter((k) => k.jenis === "masuk").reduce((a, k) => a + k.jumlah, 0), kk = kas.filter((k) => k.jenis === "keluar").reduce((a, k) => a + k.jumlah, 0);
-    const rt = (await kv.get("rtunai:" + A.sesi.shift_id)) ?? 0;
+    const rt = (await kv.get("rtunai:" + sid)) ?? 0;
     r = { transaksi: trx.length, total: trx.reduce((a, t) => a + t.total, 0), tunai, qris: per("QRIS"), transfer: per("Transfer"), kas_masuk: km, kas_keluar: kk, retur_tunai: rt,
-      seharusnya: (A.sesi.shift?.modal ?? 0) + tunai + km - kk - rt, lokal: true };
+      seharusnya: (modal ?? 0) + tunai + km - kk - rt, lokal: true };
   }
   const karyawan = (await kv.get("karyawan")) ?? [];
-  const pemilik = A.sesi.shift?.kasir_id ?? A.sesi.staff.id;
+  const pemilik = lain?.kasir_id ?? A.sesi.shift?.kasir_id ?? A.sesi.staff.id;
   $("#app .wrap").innerHTML = `
     ${r.lokal ? `<div class="warn">${sisa ? `${sisa} dokumen belum terkirim. ` : ""}Angka dihitung dari data di HP ini saja.</div>` : ""}
     <div class="card"><table class="rinci">
@@ -952,7 +977,7 @@ async function layarTutupKasir() {
       <tr><td>Tunai</td><td>${rp(r.tunai)}</td></tr><tr><td>QRIS</td><td>${rp(r.qris)}</td></tr><tr><td>Transfer</td><td>${rp(r.transfer)}</td></tr>
     </table></div>
     <div class="card" style="margin-top:10px"><h2>Uang di laci</h2><table class="rinci">
-      <tr><td>Modal awal</td><td>${rp(A.sesi.shift?.modal ?? r.seharusnya - r.tunai - r.kas_masuk + r.kas_keluar + (r.retur_tunai ?? 0))}</td></tr>
+      <tr><td>Modal awal</td><td>${rp(modal ?? r.seharusnya - r.tunai - r.kas_masuk + r.kas_keluar + (r.retur_tunai ?? 0))}</td></tr>
       <tr><td>+ Penjualan tunai</td><td>${rp(r.tunai)}</td></tr><tr><td>+ Kas masuk</td><td>${rp(r.kas_masuk)}</td></tr><tr><td>− Kas keluar</td><td>${rp(r.kas_keluar)}</td></tr>${r.retur_tunai ? `<tr><td>− Uang kembali retur</td><td>${rp(r.retur_tunai)}</td></tr>` : ""}
       <tr class="tebal"><td>Seharusnya</td><td>${rp(r.seharusnya)}</td></tr></table>
       <form id="fTutup">
@@ -979,10 +1004,10 @@ async function layarTutupKasir() {
     const hitung = Number(f.hitung.value || 0), s = hitung - r.seharusnya;
     if (s < 0 && (f.penjelasan.value.trim().length < 5)) { $(".err", f).textContent = "Uang kurang: isi penjelasan"; $(".err", f).hidden = false; return; }
     const setuju = karyawan.find((k) => k.id === f.setuju.value);
-    const data = { id: A.sesi.shift_id, tutup: sekarang(), kas_hitung: hitung, seharusnya: r.seharusnya, catatan: f.catatan.value.trim() || null,
+    const data = { id: sid, tutup: sekarang(), kas_hitung: hitung, seharusnya: r.seharusnya, catatan: f.catatan.value.trim() || null,
       ditutup_oleh: A.sesi.staff.id, disetujui_oleh: setuju.id, pj_id: s < 0 ? f.pj.value : null, penjelasan: s < 0 ? f.penjelasan.value.trim() : null };
     mintaPin({
-      judul: "Tutup kasir", info: `PIN ${setuju.nama}`, av: inisial(setuju.nama), batal: layarTutupKasir,
+      judul: "Tutup kasir", info: `PIN ${setuju.nama}`, av: inisial(setuju.nama), batal: () => layarTutupKasir(lain),
       selesai: async (pin) => {
         try {
           const ok = await api("POST", "/api/pos/setujui", { staff_id: setuju.id, pin, aksi: "tutup_kasir" });
@@ -994,6 +1019,7 @@ async function layarTutupKasir() {
           data.offline = true;
         }
         await antrekan("shift_tutup", data);
+        if (lain) { await sinkronSekarang(); toast(`Kasir ${lain.kasir} ditutup`); return lain.kembali(); }
         await catatLog(A.sesi.staff.id, "Tutup kasir", A.snap.lokasi.nama);
         A.sesi.lokasi_id = null; A.sesi.shift_id = null; A.sesi.shift = null; A.keranjang = [];
         await simpanSesi();

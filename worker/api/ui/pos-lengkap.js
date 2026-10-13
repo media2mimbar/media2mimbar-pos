@@ -281,13 +281,16 @@ function nilaiOrder(o) {
   return { n: o.keranjang.reduce((a, i) => a + i.qty, 0), sub, jenis: items.length, sudah: o.bayar.reduce((a, b) => a + b.jumlah, 0) };
 }
 
-function layarOrder() {
+function layarOrder(saring = "semua") {
+  const daftar = A.orderDaftar.filter((o) => saring === "semua" || (saring === "belum" ? !o.bayar.length : o.bayar.length > 0));
   tampil(`${bar("Daftar Order", esc(A.snap.lokasi.nama), '<button id="kembali">Kembali</button>')}
     <div class="wrap"><p class="small muted">Pesanan yang disimpan untuk dibayar nanti. Hanya ada di HP ini sampai dibayar.</p>
-      <div class="daftar">${A.orderDaftar.map((o) => { const v = nilaiOrder(o); return `<button data-o="${o.id}"><span class="isi"><b>${esc(o.no)}</b>${A.ord.order === o.id ? ' <span class="tag ok">dibuka</span>' : ""}
+      <div class="chips">${[["semua", "Semua"], ["belum", "Belum Bayar"], ["sebagian", "Bayar Sebagian"]].map(([k, n]) => `<button data-saring="${k}" class="${k === saring ? "on" : ""}">${n}</button>`).join("")}</div>
+      <div class="daftar">${daftar.map((o) => { const v = nilaiOrder(o); return `<button data-o="${o.id}"><span class="isi"><b>${esc(o.no)}</b>${A.ord.order === o.id ? ' <span class="tag ok">dibuka</span>' : ""}
         <br><span class="small muted">${jam(o.waktu)} · ${v.n} barang${o.ord?.pelanggan ? " · " + esc(o.ord.pelanggan.nama) : ""}</span></span>
-        <span><b>${rp(v.sub)}</b>${v.sudah ? `<br><span class="tag warn">dibayar ${rp(v.sudah)}</span>` : ""}</span></button>`; }).join("") || '<p class="muted">Belum ada pesanan tersimpan.</p>'}</div></div>`, "order");
+        <span><b>${rp(v.sub)}</b>${v.sudah ? `<br><span class="tag warn">dibayar ${rp(v.sudah)}</span>` : ""}</span></button>`; }).join("") || '<p class="muted">Tidak ada pesanan.</p>'}</div></div>`, "order");
   $("#kembali").onclick = gambarKasir;
+  $$("[data-saring]").forEach((b) => (b.onclick = () => layarOrder(b.dataset.saring)));
   $$("[data-o]").forEach((b) => (b.onclick = () => {
     const o = A.orderDaftar.find((x) => x.id === b.dataset.o);
     if (o.bayar.length) return bukaOrder(o);
@@ -473,6 +476,13 @@ function layarRetur(t) {
       const pesan = !items.length ? "Pilih barang yang diretur" : f.alasan.value.trim().length < 3 ? "Tulis kerusakannya" : !foto ? "Ambil foto barang cacat" : "";
       if (pesan) { err.textContent = pesan; err.hidden = false; return; }
       const alasan = f.alasan.value.trim();
+      // Uang kembali tunai diambil dari laci: cek dulu uangnya cukup (server memeriksa lagi saat menerima).
+      if (cara === "Uang kembali" && metode === "Tunai" && S.online && A.sesi.sesi) {
+        try {
+          const r = (await api("GET", `/api/pos/shift/${A.sesi.shift_id}`)).ringkasan;
+          if (r.seharusnya < nilai()) { err.textContent = `Uang di laci ${rp(r.seharusnya)}, tidak cukup untuk ${rp(nilai())}. Pakai transfer`; err.hidden = false; return; }
+        } catch {}
+      }
       const ok = await pilihAtasan("retur", "Setujui retur", () => layarRetur(t));
       if (!ok) return;
       const data = { id: ulid(), trx_id: t.id, lokasi_id: A.sesi.lokasi_id, shift_id: A.sesi.shift_id, oleh: A.sesi.staff.id, waktu: sekarang(),

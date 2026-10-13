@@ -2,7 +2,7 @@
 // Ditambah endpoint POS untuk cari pelanggan, daftar pesanan pre-sale, dan cari transaksi (scan QR).
 
 import { hariIniWib } from "./aturan.js";
-import { cekId, cekInt, cekStaff, cekTeks, cekWaktu, gerakStok, Hasil, pakaiPersetujuan, Tolak } from "./kasir.js";
+import { cekId, cekInt, cekStaff, cekTeks, cekWaktu, gerakStok, Hasil, pakaiPersetujuan, ringkasanShift, Tolak } from "./kasir.js";
 import { bacaPengaturan } from "./pengaturan.js";
 import { sha256 } from "./sandi.js";
 import { ambilRole, Perangkat, sesiPos } from "./sesi.js";
@@ -128,6 +128,8 @@ export async function prosesRetur(env: Env, p: Perangkat, d: Obj): Promise<Hasil
   });
   // Nilai uang kembali = harga × qty × (total ÷ subtotal), yaitu harga yang dibayar setelah promo.
   const nilai = cara === "Uang kembali" ? Math.round(items.reduce((a, i) => a + i.harga * i.qty, 0) * (t.subtotal ? t.total / t.subtotal : 1)) : 0;
+  // Uang kembali tunai diambil dari laci: tolak kalau uang di laci (menurut catatan) tidak cukup.
+  if (metode === "Tunai" && (await ringkasanShift(env.DB, shiftId!)).ringkasan.seharusnya < nilai) throw new Tolak("Uang di laci tidak cukup untuk uang kembali tunai. Pakai transfer");
   const ke = (await env.DB.prepare("SELECT COUNT(*) AS n FROM retur WHERE trx_id = ?").bind(t.id).first<{ n: number }>())?.n ?? 0;
   const no = `RTR-${t.no.slice(3)}-${ke + 1}`;
   const tulis = [

@@ -3,7 +3,7 @@
 import { hariIniWib } from "./aturan.js";
 import { denganNomor } from "./dokumen.js";
 import { kenaPenjaga, penjaga } from "./inventori.js";
-import { logAktivitas, sesiSiap } from "./sesi.js";
+import { logAktivitas, sesiSiap, Staff } from "./sesi.js";
 import { bacaJson, benar, bulat, daftar, Gagal, json, Obj, sekarang, tanggal, teks, ulid, wajibBulat, wajibTeks } from "./util.js";
 
 export type StatusEvent = "Akan Datang" | "Berlangsung" | "Perlu Ditutup" | "Selesai";
@@ -357,13 +357,13 @@ export async function siapTutup(req: Request, env: Env, id: string) {
   return json(await dataTutup(env.DB, e));
 }
 
-async function dataTutup(db: D1Database, e: BarisEvent) {
+export async function dataTutup(db: D1Database, e: BarisEvent) {
   const [stok, shift, kiriman, opname] = await Promise.all([
     db.prepare(
       `SELECT s.sku, s.qty, TRIM(p.nama || ' ' || v.nama) AS nama, p.hpp FROM stok s JOIN varian v ON v.sku = s.sku JOIN produk p ON p.id = v.produk_id
        WHERE s.lokasi_id = ? AND (s.qty <> 0 OR s.sku IN (SELECT sku FROM event_varian WHERE event_id = ?)) ORDER BY p.nama, v.urutan`,
     ).bind(e.id, e.id).all<{ sku: string; qty: number; nama: string; hpp: number }>(),
-    db.prepare("SELECT s.id, a.nama AS kasir, s.buka FROM shift s JOIN staff a ON a.id = s.kasir_id WHERE s.lokasi_id = ? AND s.status = 'buka'").bind(e.id).all(),
+    db.prepare("SELECT s.id, s.kasir_id, a.nama AS kasir, s.buka, s.modal FROM shift s JOIN staff a ON a.id = s.kasir_id WHERE s.lokasi_id = ? AND s.status = 'buka'").bind(e.id).all(),
     db.prepare("SELECT m.id, m.no, (SELECT SUM(dikirim) FROM mutasi_item WHERE mutasi_id = m.id) AS jumlah FROM mutasi m WHERE m.ke = ? AND m.status = 'Dikirim'").bind(e.id).all(),
     db.prepare(
       `SELECT o.id, o.no, o.dihitung_pada, o.catatan, a.nama AS dihitung_oleh FROM opname o JOIN staff a ON a.id = o.dihitung_oleh
@@ -380,11 +380,15 @@ async function dataTutup(db: D1Database, e: BarisEvent) {
 // POST /api/event/:id/tutup { fisik: {SKU: n}, pj_id, penjelasan, opname_id? }
 export async function tutupEvent(req: Request, env: Env, id: string) {
   const { staff } = await sesiSiap(env.DB, req, "owner", "admin");
+  return json(await tutupEventInti(env, staff, id, await bacaJson(req)));
+}
+
+// Dipakai dashboard dan POS (Owner di HP).
+export async function tutupEventInti(env: Env, staff: Staff, id: string, b: Obj) {
   const e = await ambilEvent(env.DB, id);
   if (e.ditutup) throw new Gagal(400, "Event sudah ditutup");
   const d = await dataTutup(env.DB, e);
   if (d.shift_terbuka.length) throw new Gagal(400, "Masih ada kasir terbuka. Tutup kasirnya dulu");
-  const b = await bacaJson(req);
   const opnameId = teks(b, "opname_id", "Opname", { max: 40, wajib: false });
   if (d.opname_menunggu && opnameId !== d.opname_menunggu.id) throw new Gagal(400, "Ada stok opname kasir yang menunggu persetujuan. Setujui atau minta opname ulang dulu");
   const fisik = (b.fisik ?? {}) as Obj;
@@ -453,5 +457,5 @@ export async function tutupEvent(req: Request, env: Env, id: string) {
     logAktivitas(env.DB, staff, "Tutup event", { tabel: "event", id, keterangan: `${e.nama}, kerugian ${kerugian}` }),
   );
   await env.DB.batch(tulis);
-  return json({ ok: true, kerugian, kembali: kembali.reduce((a, x) => a + x.qty, 0) });
+  return { ok: true, kerugian, kembali: kembali.reduce((a, x) => a + x.qty, 0) };
 }

@@ -18,6 +18,7 @@ import * as pengaturan from "./pengaturan.js";
 import * as penjualan from "./penjualan.js";
 import * as perangkat from "./perangkat.js";
 import * as pos from "./pos.js";
+import * as posLanjut from "./pos-lanjut.js";
 import { Gagal, json } from "./util.js";
 
 type Handler = (req: Request, env: Env, id: string) => Promise<Response>;
@@ -141,6 +142,14 @@ const RUTE: [string, string, Handler][] = [
   ["GET", "/api/pos/pelanggan", lengkap.cariPelangganPos],
   ["GET", "/api/pos/pesanan", lengkap.pesananPos],
   ["GET", "/api/pos/trx/:id", lengkap.cariTrxPos],
+  ["GET", "/api/pos/laporan", posLanjut.laporanPos],
+  ["GET", "/api/pos/riwayat", posLanjut.riwayatPos],
+  ["GET", "/api/pos/opname/:id", posLanjut.detailOpnamePos],
+  ["POST", "/api/pos/opname/:id/setujui", posLanjut.setujuiOpnamePos],
+  ["POST", "/api/pos/opname/:id/ulang", posLanjut.ulangOpnamePos],
+  ["POST", "/api/pos/mutasi/:id/batal-terima", posLanjut.batalTerimaPos],
+  ["GET", "/api/pos/event/:id/tutup", posLanjut.siapTutupPos],
+  ["POST", "/api/pos/event/:id/tutup", posLanjut.tutupEventPos],
   ["GET", "/api/pos/berkas/:id", pengaturan.ambilBerkasPos],
   ["POST", "/api/pos/berkas", pengaturan.unggahBerkasPos],
   ["GET", "/api/pos/perangkat", pos.infoPerangkat],

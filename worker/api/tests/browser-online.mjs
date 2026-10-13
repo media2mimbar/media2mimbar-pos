@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
+import { execFileSync } from "node:child_process";
 import { hariIniWib } from "../dist/aturan.js";
 import { jalankan } from "./server-lokal.mjs";
 
@@ -129,6 +130,25 @@ try {
   await d.locator("#kembali").click();
   await d.locator("#kembali").click();
   await d.locator("#kembali").click();
+
+  // Impor Excel (.xlsx): tanggal sebagai angka seri Excel, angka tanpa titik ribuan.
+  const xlsx = SHOTS + "pesanan_tiktok.xlsx";
+  const seri = String(Math.floor((Date.parse(hari) / 86_400_000) + 25569) + 0.5); // hari ini pukul 12.00
+  execFileSync("python3", [new URL("./buat-xlsx.py", import.meta.url).pathname, xlsx, "Order ID|Order Status|Created Time|Seller SKU|Quantity|Price|Buyer",
+    `TT-777|Completed|#${seri}|KB-S|1|130000|budi`]);
+  await d.locator("#imporFile").click();
+  await d.locator("#fImpor1 [name=saluran]").selectOption("lainnya");
+  await d.locator("#fImpor1 [name=file]").setInputFiles(xlsx);
+  await d.locator("#fImpor1 button.primary").click();
+  assert.equal(await d.locator("#fImpor2 [name=noPesanan]").inputValue(), "Order ID");
+  await d.locator("#fImpor2 button.primary").click();
+  await d.locator("#jalankanImpor", { hasText: "Impor 1 pesanan" }).waitFor();
+  assert.match(await d.locator("tr", { hasText: "TT-777" }).textContent(), new RegExp(`${hari} 12:00.*budi.*KB-S ×1 @Rp 130\\.000.*Siap`, "s"));
+  await d.locator("#jalankanImpor").click();
+  await d.getByText("Impor selesai").waitFor();
+  await d.locator("#tutupPopup").click();
+  assert.deepEqual(sql("SELECT no_pesanan, saluran_id, kotor, status FROM pesanan_online WHERE no_pesanan = 'TT-777'"), [{ no_pesanan: "TT-777", saluran_id: "lainnya", kotor: 130000, status: "Selesai" }]);
+  assert.equal(stok("KB-S"), 7);
 
   // 5. Batalkan pesanan impor: stok kembali.
   await d.locator("tr", { hasText: "2610020D3E4F" }).click();

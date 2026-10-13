@@ -23,7 +23,7 @@ async function daftarPesananOnline() {
   const q = new URLSearchParams(Object.entries(filterOnline).filter(([, v]) => v));
   const [{ saluran }, d] = await Promise.all([api("GET", "/api/saluran"), api("GET", "/api/online?" + q)]);
   const r = d.ringkasan.total;
-  $("#isi").innerHTML = `<main>${kepalaOnline('<div style="display:flex;gap:8px"><button class="btn" id="imporFile">Impor CSV</button><button class="btn primary" id="inputManual">+ Input Manual</button></div>')}
+  $("#isi").innerHTML = `<main>${kepalaOnline('<div style="display:flex;gap:8px"><button class="btn" id="imporFile">Impor CSV/Excel</button><button class="btn primary" id="inputManual">+ Input Manual</button></div>')}
     <div class="filters">${[["", "Semua"], ...saluran.map((s) => [s.id, s.nama])].map(([id, n]) => `<button class="btn small ${filterOnline.saluran === id ? "primary" : ""}" data-sal="${id}">${esc(n)}</button>`).join("")}</div>
     <form class="filters" id="fFilterOnline"><label style="margin:0">Dari</label><input type="date" name="dari" value="${filterOnline.dari}"><label style="margin:0">Sampai</label><input type="date" name="sampai" value="${filterOnline.sampai}">
       <input type="search" name="cari" placeholder="No. pesanan, pembeli, SKU" value="${esc(filterOnline.cari)}"><button class="btn small primary">Terapkan</button></form>
@@ -174,12 +174,70 @@ function bacaAngka(v) {
 // Tanggal dari file (jam WIB) → "YYYY-MM-DDTHH:MM".
 function bacaTanggal(v) {
   const s = String(v ?? "").trim(), p = (n) => String(n).padStart(2, "0");
+  // Tanggal Excel yang tersimpan sebagai angka seri (hari sejak 1899-12-30).
+  if (/^\d{5}(\.\d+)?$/.test(s)) {
+    const d = new Date(Math.round((Number(s) - 25569) * 86_400_000));
+    return d.toISOString().slice(0, 16);
+  }
   let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T](\d{1,2})[:.](\d{2}))?/);
   if (m) return `${m[1]}-${p(m[2])}-${p(m[3])}T${p(m[4] ?? 0)}:${m[5] ?? "00"}`;
   m = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})(?:[ ,]+(\d{1,2})[:.](\d{2}))?/);
   if (m) return `${m[3]}-${p(m[2])}-${p(m[1])}T${p(m[4] ?? 0)}:${m[5] ?? "00"}`;
   return "";
 }
+// Pembaca .xlsx tanpa pustaka: file xlsx adalah zip berisi XML. Lembar pertama yang dibaca.
+async function bacaXlsx(file) {
+  const buf = new Uint8Array(await file.arrayBuffer());
+  const dv = new DataView(buf.buffer);
+  let eocd = -1;
+  for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new Error("File Excel tidak terbaca. Simpan sebagai CSV lalu coba lagi");
+  const isi = {};
+  let p = dv.getUint32(eocd + 16, true);
+  for (let n = dv.getUint16(eocd + 10, true); n > 0; n--) {
+    const metode = dv.getUint16(p + 10, true), ukuran = dv.getUint32(p + 20, true), lnama = dv.getUint16(p + 28, true);
+    const lext = dv.getUint16(p + 30, true), lkom = dv.getUint16(p + 32, true), lokal = dv.getUint32(p + 42, true);
+    const nama = new TextDecoder().decode(buf.subarray(p + 46, p + 46 + lnama));
+    isi[nama] = { metode, ukuran, lokal };
+    p += 46 + lnama + lext + lkom;
+  }
+  const baca = async (nama) => {
+    const f = isi[nama];
+    if (!f) return null;
+    const mulai = f.lokal + 30 + dv.getUint16(f.lokal + 26, true) + dv.getUint16(f.lokal + 28, true);
+    const data = buf.subarray(mulai, mulai + f.ukuran);
+    if (f.metode === 0) return new TextDecoder().decode(data);
+    const s = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    return await new Response(s).text();
+  };
+  const xml = (t) => new DOMParser().parseFromString(t, "application/xml");
+  const strings = [...xml((await baca("xl/sharedStrings.xml")) ?? "<sst/>").getElementsByTagName("si")].map((si) => [...si.getElementsByTagName("t")].map((t) => t.textContent).join(""));
+  // Lembar pertama menurut workbook.xml; kalau tidak ketemu, sheet1.xml.
+  let jalur = "xl/worksheets/sheet1.xml";
+  const wb = await baca("xl/workbook.xml"), rel = await baca("xl/_rels/workbook.xml.rels");
+  if (wb && rel) {
+    const rid = xml(wb).getElementsByTagName("sheet")[0]?.getAttribute("r:id");
+    const t = [...xml(rel).getElementsByTagName("Relationship")].find((r) => r.getAttribute("Id") === rid)?.getAttribute("Target");
+    if (t) jalur = t.startsWith("/") ? t.slice(1) : "xl/" + t.replace(/^\.\//, "");
+  }
+  const lembar = await baca(jalur);
+  if (!lembar) throw new Error("Lembar pertama file Excel tidak ditemukan");
+  const kolom = (r) => [...r.replace(/\d+/g, "")].reduce((a, c) => a * 26 + c.charCodeAt(0) - 64, 0) - 1;
+  const baris = [];
+  for (const row of xml(lembar).getElementsByTagName("row")) {
+    const b = [];
+    for (const c of row.getElementsByTagName("c")) {
+      const t = c.getAttribute("t"), v = c.getElementsByTagName("v")[0]?.textContent ?? "";
+      b[kolom(c.getAttribute("r") ?? "A")] = t === "s" ? strings[Number(v)] ?? "" : t === "inlineStr" ? [...c.getElementsByTagName("t")].map((x) => x.textContent).join("") : v;
+    }
+    baris.push(Array.from(b, (x) => (x ?? "").trim()));
+  }
+  const bersih = baris.filter((r) => r.some((c) => c));
+  const lebar = Math.max(0, ...bersih.map((r) => r.length));
+  const rata = bersih.map((r) => [...r, ...Array(lebar - r.length).fill("")]);
+  return { judul: rata[0] ?? [], data: rata.slice(1) };
+}
+
 function tebakKolom(judul, preset) {
   if (preset && Object.values(preset).every((h) => !h || judul.includes(h))) return { ...preset };
   const peta = {}, dipakai = new Set(), J = judul.map(normal);
@@ -199,16 +257,16 @@ async function imporLangkah1() {
   $("#isi").innerHTML = `<div class="form"><button class="back" id="kembali">← Kembali</button><h1>Impor pesanan · 1. Pilih file</h1>
     <form class="card" id="fImpor1" style="margin-top:12px">
       <label>Saluran</label><select name="saluran">${saluran.filter((s) => s.aktif || !s.marketplace).map((s) => `<option value="${s.id}">${esc(s.nama)}</option>`).join("")}</select>
-      <label>File CSV hasil ekspor Seller Center</label><input type="file" name="file" accept=".csv,.txt,text/csv" required>
-      <p class="small muted">File Excel (.xlsx): buka di Excel atau Google Sheets, lalu simpan sebagai CSV.</p>
+      <label>File CSV atau Excel (.xlsx) hasil ekspor Seller Center</label><input type="file" name="file" accept=".csv,.txt,.xlsx,text/csv" required>
+      <p class="small muted">Untuk Excel, lembar pertama yang dibaca. File .xls lama: simpan ulang sebagai .xlsx atau CSV.</p>
       <div class="err" hidden></div>
       <div class="actions"><button class="btn primary">Lanjut</button></div></form></div>`;
   $("#kembali").onclick = () => halOnline("pesanan");
   formKirim($("#fImpor1"), async () => {
     const f = $("#fImpor1"), file = f.file.files[0];
     if (!file) throw new Error("Pilih file");
-    if (/\.xlsx?$/i.test(file.name)) throw new Error("Simpan file Excel sebagai CSV dulu");
-    const { judul, data } = bacaCsv(await file.text());
+    if (/\.xls$/i.test(file.name)) throw new Error("File .xls lama belum bisa dibaca. Simpan ulang sebagai .xlsx atau CSV");
+    const { judul, data } = /\.xlsx$/i.test(file.name) ? await bacaXlsx(file) : bacaCsv(await file.text());
     if (!judul.length || !data.length) throw new Error("File kosong atau tidak terbaca");
     const s = saluran.find((x) => x.id === f.saluran.value);
     imp = { ...imp, saluran: s, namaFile: file.name, judul, data, peta: tebakKolom(judul, s.preset_kolom), petaSku: { ...(s.peta_sku ?? {}) } };

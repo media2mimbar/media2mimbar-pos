@@ -1,7 +1,7 @@
 // Stok opname (dari POS dan Gudang Pusat) dan Selisih & Kerugian.
 
 import { denganNomor } from "./dokumen.js";
-import { logAktivitas, sesiSiap } from "./sesi.js";
+import { logAktivitas, sesiSiap, Staff } from "./sesi.js";
 import { bacaJson, Gagal, json, Obj, sekarang, teks, ulid, wajibBulat, wajibTeks } from "./util.js";
 import { rentang } from "./penjualan.js";
 
@@ -24,7 +24,7 @@ export async function daftarOpname(req: Request, env: Env) {
   return json({ opname: results });
 }
 
-async function ambilOpname(db: D1Database, id: string) {
+export async function ambilOpname(db: D1Database, id: string) {
   const o = await db.prepare(
     `SELECT o.*, l.nama AS lokasi, l.jenis AS jenis_lokasi, a.nama AS dihitung_oleh_nama, b.nama AS disetujui_oleh_nama, c.nama AS pj_nama
      FROM opname o JOIN lokasi l ON l.id = o.lokasi_id JOIN staff a ON a.id = o.dihitung_oleh LEFT JOIN staff b ON b.id = o.disetujui_oleh LEFT JOIN staff c ON c.id = o.pj_id WHERE o.id = ?`,
@@ -86,10 +86,14 @@ export async function opnameGudang(req: Request, env: Env) {
 // Setujui: stok = stok sekarang + (fisik − sistem saat dihitung). Penjualan setelah opname tetap diperhitungkan.
 export async function setujuiOpname(req: Request, env: Env, id: string) {
   const { staff } = await sesiSiap(env.DB, req, "owner", "admin");
+  return json(await setujuiOpnameInti(env, staff, id, await bacaJson(req)));
+}
+
+// Dipakai dashboard dan POS (Owner/Admin di HP).
+export async function setujuiOpnameInti(env: Env, staff: Staff, id: string, b: Obj) {
   const { o, item } = await ambilOpname(env.DB, id);
   if (o.status !== "Menunggu persetujuan") throw new Gagal(400, `Opname berstatus ${o.status}`);
   if (o.dihitung_oleh === staff.id && !staff.role.includes("owner")) throw new Gagal(403, "Orang yang menghitung tidak bisa menyetujui hitungannya sendiri. Minta Owner atau Admin lain");
-  const b = await bacaJson(req);
   const kerugian = item.reduce((a, i) => a + Math.max(0, i.sistem - i.fisik) * i.hpp, 0);
   const pj = teks(b, "pj_id", "Penanggung jawab", { max: 40, wajib: false });
   const penjelasan = teks(b, "penjelasan", "Penjelasan", { max: 1000, wajib: false });
@@ -116,20 +120,24 @@ export async function setujuiOpname(req: Request, env: Env, id: string) {
   }
   tulis.push(logAktivitas(env.DB, staff, "Setujui opname", { tabel: "opname", id, keterangan: `${o.no}, kerugian ${kerugian}` }));
   await env.DB.batch(tulis);
-  return json({ ok: true, kerugian });
+  return { ok: true, kerugian };
 }
 
 export async function ulangOpname(req: Request, env: Env, id: string) {
   const { staff } = await sesiSiap(env.DB, req, "owner", "admin");
+  return json(await ulangOpnameInti(env, staff, id, await bacaJson(req)));
+}
+
+export async function ulangOpnameInti(env: Env, staff: Staff, id: string, b: Obj) {
   const { o } = await ambilOpname(env.DB, id);
   if (o.status !== "Menunggu persetujuan") throw new Gagal(400, `Opname berstatus ${o.status}`);
-  const alasan = wajibTeks(await bacaJson(req), "alasan", "Alasan", { min: 5, max: 500 });
+  const alasan = wajibTeks(b, "alasan", "Alasan", { min: 5, max: 500 });
   const t = sekarang();
   await env.DB.batch([
     env.DB.prepare("UPDATE opname SET status = 'Perlu opname ulang', ulang_oleh = ?, ulang_pada = ?, ulang_alasan = ?, diubah_pada = ? WHERE id = ?").bind(staff.id, t, alasan, t, id),
     logAktivitas(env.DB, staff, "Minta opname ulang", { tabel: "opname", id, keterangan: alasan }),
   ]);
-  return json({ ok: true });
+  return { ok: true };
 }
 
 // ---------- Selisih & Kerugian ----------

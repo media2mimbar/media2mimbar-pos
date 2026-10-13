@@ -59,6 +59,7 @@ node tests/browser-event.mjs       # uji event tahap 4 (kirim, terima, opname, t
 node tests/browser-lengkap.mjs     # uji tahap 5 (promo, pelanggan, pisah bayar, void, retur, pre-sale, dashboard)
 node tests/browser-online.mjs      # uji tahap 6 (harga marketplace, input manual, impor CSV, pelanggan)
 node tests/browser-keuangan.mjs    # uji tahap 7 (dashboard, laporan, biaya, keuangan, hak akses Admin)
+node tests/browser-pos-lanjut.mjs  # uji menu POS tambahan (laporan, riwayat, opname, batal terima, tutup event dari HP)
 node tests/server-lokal.mjs        # jalan di http://localhost:8787, kode setup SETUP-LOKAL
 python3 deploy.py                  # deploy ke Cloudflare (butuh CLOUDFLARE_ACCOUNT_ID dan CLOUDFLARE_API_TOKEN)
 ```
