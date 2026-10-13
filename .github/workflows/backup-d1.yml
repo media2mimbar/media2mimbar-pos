@@ -1,0 +1,39 @@
+# Backup malam database D1 `hikayat`, sekaligus uji pemulihan.
+# Butuh secret repositori: CLOUDFLARE_API_TOKEN (izin Account › D1 › Edit), CLOUDFLARE_ACCOUNT_ID, BACKUP_KUNCI (kata sandi enkripsi).
+# Repositori ini publik, jadi file backup dienkripsi sebelum disimpan sebagai artifact.
+name: Backup D1
+
+on:
+  schedule:
+    - cron: "0 18 * * *" # 01.00 WIB
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ekspor dan uji pulihkan
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: python3 scripts/backup-d1.py backup
+      - name: Enkripsi
+        env:
+          BACKUP_KUNCI: ${{ secrets.BACKUP_KUNCI }}
+        run: |
+          test -n "$BACKUP_KUNCI" || { echo "Secret BACKUP_KUNCI belum diisi"; exit 1; }
+          for f in backup/*.sql.gz; do
+            openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$f" -out "$f.enc" -pass env:BACKUP_KUNCI
+            rm "$f"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backup-hikayat-${{ github.run_number }}
+          path: backup/*.enc
+          retention-days: 30
+          if-no-files-found: error

@@ -229,17 +229,20 @@ Ini angka perkiraan. Setelah 2 minggu berjalan, cek angka sebenarnya di halaman 
 
 ## 10. Daftar keamanan
 
-- [ ] Semua endpoint memeriksa sesi dan role di server.
-- [ ] Pepper, kunci HMAC, dan token API disimpan sebagai Worker secret, tidak di kode atau repositori.
-- [ ] Password dan PIN hanya disimpan sebagai hash.
-- [ ] Akun dan PIN dikunci setelah 5 kali salah.
-- [ ] Cookie sesi `HttpOnly`, `Secure`, `SameSite=Strict`.
-- [ ] Input divalidasi dengan Zod di server, termasuk jumlah, harga, dan stok.
-- [ ] Query D1 memakai parameter (`.bind()`), tidak pernah menyambung teks.
-- [ ] Foto hanya dilayani lewat Worker setelah cek hak akses.
-- [ ] Perangkat POS bisa dinonaktifkan dari dashboard.
-- [ ] Log aktivitas penting: login, ubah harga, void, retur, hapus biaya, batal faktur, persetujuan opname.
-- [ ] Backup malam berjalan dan pemulihannya sudah diuji.
+Diperiksa Oktober 2026 (tahap 8).
+
+- [x] Semua endpoint memeriksa sesi dan role di server. Diperiksa otomatis: semua rute di `src/index.ts` memanggil `sesiSiap`, `sesiPos`, atau `perangkatDari`, kecuali empat yang memang terbuka: status setup, setup Owner pertama (butuh kode setup dan hanya selama belum ada akun), login, dan pendaftaran HP (butuh kode sekali pakai, dikunci setelah 5 kali salah).
+- [x] Pepper dan token API disimpan sebagai Worker secret atau secret GitHub, tidak di kode atau repositori.
+- [x] Password (PBKDF2 + pepper) dan PIN (HMAC + pepper) hanya disimpan sebagai hash. Token sesi dan token perangkat juga disimpan sebagai hash.
+- [x] Akun, PIN, dan kode pendaftaran HP dikunci 15 menit setelah 5 kali salah.
+- [x] Cookie sesi `HttpOnly`, `Secure`, `SameSite=Strict`.
+- [x] Input divalidasi di server, termasuk jumlah, harga, stok, dan angka transaksi dari HP. Memakai fungsi validasi sendiri (`src/util.ts`), belum Zod.
+- [x] Query D1 memakai parameter (`.bind()`). Teks yang disambung ke SQL hanya tanda tanya placeholder dan nama kolom tetap.
+- [x] Foto hanya dilayani lewat Worker setelah cek sesi dashboard atau token HP, dengan `content-security-policy: default-src 'none'`.
+- [x] Perangkat POS bisa dinonaktifkan dari dashboard; HP itu langsung ditolak di semua endpoint POS.
+- [x] Log aktivitas penting: login dan semua aksi akun/HP (`log_masuk`), ubah harga, faktur, batal faktur, opname, biaya, promo, impor, kerugian (`log_aktivitas`). Void dan retur tercatat di transaksi beserta siapa yang melakukan dan menyetujui.
+- [x] Backup malam (`.github/workflows/backup-d1.yml`) menguji pemulihan setiap kali berjalan. Repositori publik, jadi file backup dienkripsi AES-256. Butuh tiga secret GitHub sebelum aktif; lihat `docs/Panduan-Siap-Pakai.md`.
+- [ ] Uji lapangan di satu event kecil (daftar periksa di `docs/Panduan-Siap-Pakai.md`).
 
 ---
 
@@ -260,7 +263,7 @@ Saran: jalankan tahap 3 di satu event kecil sebelum tahap 4 sampai 7 selesai. Ma
 
 ### Catatan pembangunan (Oktober 2026)
 
-Tahap 1 sampai 7 sudah dibangun di `worker/api` dan berjalan di `https://hikayat-api.media2mimbar.workers.dev`. Beberapa hal berbeda dari rancangan di atas karena lingkungan pengembangan saat itu tidak bisa mengunduh paket npm:
+Tahap 1 sampai 8 sudah dibangun di `worker/api` dan berjalan di `https://hikayat-api.media2mimbar.workers.dev`. Beberapa hal berbeda dari rancangan di atas karena lingkungan pengembangan saat itu tidak bisa mengunduh paket npm:
 
 | Rancangan | Yang dipakai sekarang | Rencana |
 |---|---|---|
