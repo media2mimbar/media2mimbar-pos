@@ -7,11 +7,11 @@ let filterStok = { cari: "", kategori: "", minimum: false, tab: "lokasi", dari: 
 
 function halInventori(sub) {
   if (sub) subInv = sub;
-  ({ faktur: daftarFaktur, pemasok: daftarPemasok, stok: daftarStok, opname: daftarOpname })[subInv]();
+  ({ faktur: daftarFaktur, pemasok: daftarPemasok, stok: daftarStok, opname: daftarOpname, terbuang: daftarTerbuang })[subInv]();
 }
 
 const kepalaInv = (tombol = "") => `<div class="head"><div><h1>Inventori</h1></div>${tombol}</div>
-  ${subtabs([["faktur", "Faktur Pembelian"], ["pemasok", "Daftar Pemasok"], ["stok", "Daftar Stok"], ["opname", "Stok Opname"]], subInv)}`;
+  ${subtabs([["faktur", "Faktur Pembelian"], ["pemasok", "Daftar Pemasok"], ["stok", "Daftar Stok"], ["opname", "Stok Opname"], ["terbuang", "Stok Terbuang"]], subInv)}`;
 
 const WARNA_STATUS = { Lunas: "aktif", "Belum lunas": "warn", "Lewat jatuh tempo": "off", Dibatalkan: "" };
 const tagStatus = (s) => `<span class="tag ${WARNA_STATUS[s]}">${esc(s)}</span>`;

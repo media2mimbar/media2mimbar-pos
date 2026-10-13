@@ -47,7 +47,8 @@ test("buat event: validasi dan harga event", async () => {
 test("tempat jualan per role", async () => {
   const nama = async (h) => ok(await tarikSebagai(h)).tempat.map((t) => [t.nama, t.label, t.boleh_jual]);
   assert.deepEqual(await nama(sariPos), [["Hikayat Fest Bandung", "Berlangsung", true]]);
-  assert.deepEqual(await nama(adminPos), [["Hikayat Fest Bandung", "Berlangsung", true]]);
+  // Admin mendapat Gudang Pusat hanya untuk serah terima pre-sale.
+  assert.deepEqual(await nama(adminPos), [["Gudang Pusat", "Serah terima pre-sale", true], ["Hikayat Fest Bandung", "Berlangsung", true]]);
   assert.deepEqual(await nama(posOwner), [
     ["Gudang Pusat", "Jual langsung", true], ["Hikayat Fest Bandung", "Berlangsung", true], ["Event Tutup Rapat", "Belum mulai · pre-sale nonaktif", false], ["Kajian Akbar", "Pre-sale · stok langsung", true],
   ]);

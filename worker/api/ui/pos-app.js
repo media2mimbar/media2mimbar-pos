@@ -7,7 +7,7 @@ const inisial = (n) => n.split(/\s+/).slice(0, 2).map((x) => x[0]).join("").toUp
 
 // A: keadaan aplikasi yang sedang berjalan.
 // sesi (disimpan di kv "sesi"): { staff, sesi, offline, lokasi_id, shift_id }
-const A = { sesi: null, umum: null, snap: null, stok: {}, keranjang: [], kategori: "semua", cari: "", layar: null };
+const A = { sesi: null, umum: null, snap: null, stok: {}, keranjang: [], ord: { promo: null, dilepas: false, pelanggan: null, order: null }, orderDaftar: [], kategori: "semua", cari: "", layar: null };
 
 function toast(pesan) {
   const el = document.createElement("div");
@@ -35,7 +35,7 @@ function tutupLembar() { $("#lapis").hidden = true; }
 $("#lapis").addEventListener("click", (e) => { if (e.target.id === "lapis") tutupLembar(); });
 
 async function simpanSesi() {
-  await kv.set("sesi", A.sesi ? { ...A.sesi, keranjang: A.keranjang } : null);
+  await kv.set("sesi", A.sesi ? { ...A.sesi, keranjang: A.keranjang, ord: A.ord } : null);
 }
 
 // ---------- Mulai ----------
@@ -56,7 +56,9 @@ async function mulai() {
   if (A.sesi) {
     S.sesi = A.sesi.sesi;
     A.keranjang = A.sesi.keranjang ?? [];
+    A.ord = A.sesi.ord ?? A.ord;
     if (A.sesi.lokasi_id && A.sesi.shift_id) return masukKasir();
+    if (A.sesi.lokasi_id && A.sesi.serah_saja) return masukSerahGudang({ id: A.sesi.lokasi_id });
     return layarTempat();
   }
   layarPilihNama();
@@ -217,6 +219,7 @@ async function keluar(pesan) {
   A.sesi = null;
   S.sesi = null;
   A.keranjang = [];
+  A.ord = { promo: null, dilepas: false, pelanggan: null, order: null };
   await simpanSesi();
   layarPilihNama(pesan);
 }
@@ -239,6 +242,7 @@ function layarTempat() {
 }
 
 async function pilihTempat(t) {
+  if (t.serah_saja) return masukSerahGudang(t);
   if (t.shift_terbuka) {
     A.sesi.lokasi_id = t.id;
     A.sesi.shift_id = t.shift_terbuka.id;
@@ -282,6 +286,7 @@ async function masukKasir() {
   }
   A.umum = (await kv.get("umum")) ?? A.umum;
   A.stok = await stokTersedia(A.snap);
+  A.orderDaftar = (await kv.get("order:" + A.sesi.shift_id)) ?? [];
   gambarKasir();
   segarkan();
 }
@@ -305,31 +310,55 @@ const produkAktif = () => Object.values(A.snap.produk).filter((p) => p.aktif && 
 const varianDari = (pid) => Object.values(A.snap.varian).filter((v) => v.produk_id === pid && v.aktif).sort((a, b) => a.urutan - b.urutan);
 const diKeranjang = (sku) => A.keranjang.find((i) => i.sku === sku)?.qty ?? 0;
 const namaBarang = (v) => { const p = A.snap.produk[v.produk_id]; return p.nama + (v.nama ? " · " + v.nama : ""); };
+const namaProduk = (id) => A.snap.produk[id]?.nama ?? "produk";
+
+// Pre-sale "ambil nanti": event belum mulai, pre-sale aktif mode ambil. Stok tidak dibatasi dan tidak berkurang saat transaksi.
+function modePresale() {
+  const e = A.snap?.lokasi?.event;
+  return !!e && e.presale_aktif === 1 && e.presale_mode === "ambil" && hariIniWib() < e.mulai;
+}
 
 function gambarKasir() {
   const t = A.sesi;
   const kat = (A.snap.kategori ?? []).filter((k) => k.tampil_menu);
+  const adaPromo = promoBerlakuSekarang().length > 0;
   tampil(`<div class="kasir">
     ${bar(esc(A.snap.lokasi.nama), `${esc(t.staff.nama)} · <span id="sinyal">${statusSinyal()}</span> <span id="antre"></span>`, '<button id="btnKunci">Kunci</button><button id="btnMenu">Menu</button>')}
     <div class="atas">
       ${pillTempat()}
+      <button id="pillPelanggan" class="card small" style="width:100%;text-align:left;margin-bottom:8px;padding:9px 12px"></button>
       <input type="search" id="cari" placeholder="Cari produk atau SKU" value="${esc(A.cari)}">
-      <div class="chips" id="chips"><button data-k="semua">Semua</button>${kat.map((k) => `<button data-k="${k.id}">${esc(k.nama)}</button>`).join("")}</div>
+      <div class="chips" id="chips"><button data-k="semua">Semua</button>${adaPromo ? '<button data-k="promo">Promo</button>' : ""}${kat.map((k) => `<button data-k="${k.id}">${esc(k.nama)}</button>`).join("")}</div>
     </div>
     <div class="grid" id="grid"></div>
-    <div class="aksi"><button id="btnHapus">••• Hapus pesanan</button></div>
+    <div class="aksi"><button id="btnHapus">••• Hapus</button><button id="btnPromo">Promosi</button><button id="btnSimpan">Simpan</button><button id="btnOrder">Daftar Order</button></div>
     <div class="bawah"><button class="total" id="btnTotal"><small id="jmlBarang"></small><b id="totalBelanja"></b></button><button class="btn primary" id="btnBayar">Bayar</button></div>
   </div>`, "kasir");
   if ($("#pillTempat")) $("#pillTempat").onclick = () => layarInventori("kiriman");
+  $("#pillPelanggan").onclick = lembarPelanggan;
   $("#chips").onclick = (e) => { if (e.target.dataset.k) { A.kategori = e.target.dataset.k; gambarKatalog(); } };
   $("#cari").oninput = (e) => { A.cari = e.target.value; gambarKatalog(); };
   $("#btnMenu").onclick = lembarMenu;
   $("#btnKunci").onclick = () => kunciLayar(false);
   $("#btnTotal").onclick = lembarKeranjang;
+  $("#btnPromo").onclick = lembarPromo;
+  $("#btnSimpan").onclick = () => simpanOrder();
+  $("#btnOrder").onclick = layarOrder;
   $("#btnBayar").onclick = () => (A.keranjang.length ? layarBayar() : toast("Keranjang masih kosong"));
-  $("#btnHapus").onclick = () => { if (A.keranjang.length && confirm("Hapus semua barang di keranjang?")) { A.keranjang = []; simpanSesi(); gambarKatalog(); } };
+  $("#btnHapus").onclick = () => {
+    if (!A.keranjang.length || !confirm("Hapus semua barang di keranjang?")) return;
+    // Pesanan dari Daftar Order yang dikosongkan tetap ada di Daftar Order.
+    kosongkanKeranjang();
+    gambarKatalog();
+  };
   gambarKatalog();
   gambarAntrean();
+}
+
+function kosongkanKeranjang() {
+  A.keranjang = [];
+  A.ord = { promo: null, dilepas: false, pelanggan: null, order: null };
+  simpanSesi();
 }
 
 // Info tempat di atas katalog: event, tanggal, dan pengingat kiriman yang belum diterima.
@@ -339,14 +368,23 @@ function pillTempat() {
   const tgl = (d) => new Date(d + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" });
   return `<button id="pillTempat" class="card small" style="width:100%;text-align:left;margin-bottom:8px;padding:10px 12px">
     <b>${esc(e.nama)}</b> · ${esc(e.venue ?? "")} · ${tgl(e.mulai)}${e.selesai !== e.mulai ? "–" + tgl(e.selesai) : ""}
+    ${modePresale() ? '<div class="warn" style="margin-top:6px;padding:6px 10px">Pre-sale · ambil nanti. Pembeli wajib punya no HP, stok berkurang saat barang diserahkan</div>' : ""}
     ${A.snap.kiriman_menunggu ? `<div class="warn" style="margin-top:6px;padding:6px 10px">${A.snap.kiriman_menunggu} kiriman stok belum diterima. Ketuk untuk menerima</div>` : ""}</button>`;
 }
 
 function gambarKatalog() {
   if (A.layar !== "kasir") return;
   $$("#chips button").forEach((b) => b.classList.toggle("on", b.dataset.k === A.kategori));
+  const pel = A.ord?.pelanggan;
+  $("#pillPelanggan").innerHTML = pel ? `Pelanggan: <b>${esc(pel.nama)}</b>${pel.telp ? " · " + esc(pel.telp) : ""}` : `<span class="muted">+ Pilih pelanggan${modePresale() ? " (wajib untuk pre-sale)" : ""}</span>`;
+  const t = tagihan();
+  $("#btnPromo").textContent = t.promo_nama ? "✓ " + t.promo_nama : "Promosi";
+  const n = (A.orderDaftar ?? []).length;
+  $("#btnOrder").textContent = n ? `Daftar Order (${n})` : "Daftar Order";
+  if (A.kategori === "promo") return gambarTabPromo();
   const q = A.cari.trim().toLowerCase();
   const tampilStok = pengaturan().tampil_stok !== false;
+  const pre = modePresale();
   const daftar = produkAktif().filter((p) => (A.kategori === "semua" || p.kategori_id === A.kategori)
     && (!q || (p.nama + " " + p.sku + " " + varianDari(p.id).map((v) => v.sku).join(" ")).toLowerCase().includes(q)))
     .sort((a, b) => a.nama.localeCompare(b.nama));
@@ -358,10 +396,10 @@ function gambarKatalog() {
     const min = Math.min(...harga), maks = Math.max(...harga);
     const jml = v.reduce((a, x) => a + diKeranjang(x.sku), 0);
     const khusus = v.some((x) => x.harga !== x.harga_normal);
-    return `<button class="kartu ${stok <= 0 ? "habis" : ""}" data-p="${p.id}">
+    return `<button class="kartu ${stok <= 0 && !pre ? "habis" : ""}" data-p="${p.id}">
       ${jml ? `<span class="jml">${jml}</span>` : ""}
       <b>${esc(p.nama)}</b>
-      <span class="stok">${p.punya_varian ? `${v.length} varian · ` : ""}${tampilStok ? (stok > 0 ? `sisa ${stok}` : "Habis") : ""}</span>
+      <span class="stok">${p.punya_varian ? `${v.length} varian · ` : ""}${pre ? "Pre-sale · ambil saat event" : tampilStok ? (stok > 0 ? `sisa ${stok}` : "Habis") : ""}</span>
       <span class="harga">${min === maks ? rp(min) : `${rp(min)}+`}${khusus ? ' <span class="tag warn">harga khusus</span>' : ""}</span></button>`;
   }).join("") || '<p class="muted" style="grid-column:1/-1">Tidak ada produk.</p>';
   $$("#grid .kartu").forEach((b) => (b.onclick = () => ketukProduk(A.snap.produk[b.dataset.p])));
@@ -369,10 +407,9 @@ function gambarKatalog() {
 }
 
 function gambarTotal() {
-  const items = barisKeranjang();
-  const t = hitungTagihan(items, pengaturan());
-  const n = items.reduce((a, i) => a + i.qty, 0);
-  $("#jmlBarang").textContent = n ? `${n} barang · ketuk untuk lihat` : "Keranjang kosong";
+  const t = tagihan();
+  const n = t.items.reduce((a, i) => a + i.qty, 0);
+  $("#jmlBarang").textContent = n ? `${n} barang${t.diskon ? " · hemat " + rp(t.diskon) : ""} · ketuk untuk lihat` : "Keranjang kosong";
   $("#totalBelanja").textContent = rp(t.total);
 }
 
@@ -395,23 +432,25 @@ pendengarSinkron.push(async () => {
 });
 pendengarOnline.push(gambarAntrean);
 
-function tambah(sku, n = 1) {
+function tambah(sku, n = 1, diam = false) {
   const ada = diKeranjang(sku);
   const sisa = A.stok[sku] ?? 0;
-  if (ada + n > sisa) return toast(sisa > 0 ? `Stok tinggal ${sisa}` : "Stok habis di tempat ini");
+  if (n > 0 && !modePresale() && ada + n > sisa) return toast(sisa > 0 ? `Stok tinggal ${sisa}` : "Stok habis di tempat ini");
   const i = A.keranjang.find((x) => x.sku === sku);
   if (i) i.qty += n; else A.keranjang.push({ sku, qty: n });
   A.keranjang = A.keranjang.filter((x) => x.qty > 0);
+  cekPromoOtomatis(diam);
   simpanSesi();
   gambarKatalog();
 }
 
-function ketukProduk(p) {
+function ketukProduk(p, judul) {
   const v = varianDari(p.id);
-  if (!p.punya_varian && v.length === 1) return tambah(v[0].sku);
-  const gambar = () => bukaLembar(`<h2>${esc(p.nama)}</h2><div class="muted small">Ketuk ukuran untuk menambah. Ketuk lagi untuk menambah jumlah.</div>
-    ${v.map((x) => { const s = A.stok[x.sku] ?? 0; return `<div class="baris"><div class="isi"><b>${esc(x.nama)}</b><div class="small muted">${rp(x.harga)} · ${s > 0 ? "sisa " + s : "habis"}</div></div>
-      <div class="qty"><button data-k="-" data-sku="${esc(x.sku)}">−</button><span>${diKeranjang(x.sku)}</span><button data-k="+" data-sku="${esc(x.sku)}" ${s - diKeranjang(x.sku) <= 0 ? "disabled" : ""}>+</button></div></div>`; }).join("")}
+  if (!judul && !p.punya_varian && v.length === 1) return tambah(v[0].sku);
+  const pre = modePresale();
+  const gambar = () => bukaLembar(`<h2>${esc(p.nama)}</h2><div class="muted small">${esc(judul ?? "Ketuk ukuran untuk menambah. Ketuk lagi untuk menambah jumlah.")}</div>
+    ${v.map((x) => { const s = A.stok[x.sku] ?? 0; return `<div class="baris"><div class="isi"><b>${esc(x.nama || p.nama)}</b><div class="small muted">${rp(x.harga)} · ${pre ? "pre-sale" : s > 0 ? "sisa " + s : "habis"}</div></div>
+      <div class="qty"><button data-k="-" data-sku="${esc(x.sku)}">−</button><span>${diKeranjang(x.sku)}</span><button data-k="+" data-sku="${esc(x.sku)}" ${!pre && s - diKeranjang(x.sku) <= 0 ? "disabled" : ""}>+</button></div></div>`; }).join("")}
     <button class="btn primary" id="selesaiVarian">Selesai</button>`);
   gambar();
   $("#lembar").onclick = (e) => {
@@ -422,18 +461,43 @@ function ketukProduk(p) {
 }
 
 function barisKeranjang() {
-  return A.keranjang.map((i) => { const v = A.snap.varian[i.sku]; return v ? { sku: i.sku, nama: namaBarang(v), qty: i.qty, harga: v.harga } : null; }).filter(Boolean);
+  return A.keranjang.map((i) => { const v = A.snap.varian[i.sku]; return v ? { sku: i.sku, produk_id: v.produk_id, nama: namaBarang(v), qty: i.qty, harga: v.harga } : null; }).filter(Boolean);
+}
+
+// Tagihan lengkap: barang, promo (satu per pesanan), barang gratis, PPN, pembulatan, dan pembayaran sebagian dari Daftar Order.
+function tagihan() {
+  const items = barisKeranjang();
+  const pr = A.ord?.promo;
+  let diskon = 0, promo = null, nama = null;
+  if (pr?.id === "manual") {
+    const dk = pengaturan().diskon_kasir ?? {};
+    const maks = dk.aktif ? dk.maks_persen ?? 0 : 0;
+    const persen = Math.min(pr.persen ?? 0, maks);
+    const sub = items.reduce((a, i) => a + i.qty * i.harga, 0);
+    diskon = Math.round((sub * persen) / 100);
+    nama = `Diskon manual kasir ${persen}%`;
+  } else if (pr) {
+    promo = promoBerlakuSekarang().find((p) => p.id === pr.id) ?? null;
+    if (promo && HkPromo.memenuhi(promo, items)) { diskon = HkPromo.potongan(promo, items, pr.persen); nama = promo.nama; }
+  }
+  // Barang gratis dari promo Bonus Produk: tandai pcs termurah sebanyak hak bonus.
+  const bonus = {};
+  if (promo?.jenis === "bonus" && diskon) for (const u of HkPromo.infoBonus(promo, items).gratis) bonus[u.sku] = (bonus[u.sku] ?? 0) + 1;
+  const isi = items.map((i) => ({ ...i, bonus: Math.min(bonus[i.sku] ?? 0, i.qty) }));
+  const t = hitungTagihan(isi, pengaturan(), diskon);
+  const order = A.ord?.order ? (A.orderDaftar ?? []).find((o) => o.id === A.ord.order) : null;
+  const sudah = (order?.bayar ?? []).reduce((a, b) => a + b.jumlah, 0);
+  return { ...t, items: isi, promo_id: diskon ? pr.id : null, promo_nama: diskon ? nama : null, promo_persen: pr?.persen, sudah_dibayar: sudah, sisa: Math.max(0, t.total - sudah), order };
 }
 
 function lembarKeranjang() {
   const gambar = () => {
-    const items = barisKeranjang();
-    const t = hitungTagihan(items, pengaturan());
-    bukaLembar(`<h2>Keranjang</h2>
-      ${items.length ? items.map((i) => `<div class="baris"><div class="isi"><b>${esc(i.nama)}</b><div class="small muted">${rp(i.harga)} × ${i.qty} = ${rp(i.harga * i.qty)}</div></div>
+    const t = tagihan();
+    bukaLembar(`<h2>Keranjang${t.order ? " · " + esc(t.order.no) : ""}</h2>
+      ${t.items.length ? t.items.map((i) => `<div class="baris"><div class="isi"><b>${esc(i.nama)}</b><div class="small muted">${rp(i.harga)} × ${i.qty} = ${rp(i.harga * i.qty)}${i.bonus ? ` · 🎁 gratis ${i.bonus}` : ""}</div></div>
         <div class="qty"><button data-k="-" data-sku="${esc(i.sku)}">−</button><span>${i.qty}</span><button data-k="+" data-sku="${esc(i.sku)}">+</button></div></div>`).join("") : '<p class="muted">Keranjang kosong.</p>'}
       ${rincianTagihan(t)}
-      <button class="btn primary" id="keBayar" ${items.length ? "" : "disabled"}>Bayar ${rp(t.total)}</button>`);
+      <button class="btn primary" id="keBayar" ${t.items.length ? "" : "disabled"}>Bayar ${rp(t.sisa)}</button>`);
   };
   gambar();
   $("#lembar").onclick = (e) => {
@@ -445,55 +509,60 @@ function lembarKeranjang() {
 
 function rincianTagihan(t) {
   return `<table class="rinci"><tr><td>Subtotal</td><td>${rp(t.subtotal)}</td></tr>
-    ${t.diskon ? `<tr><td>Diskon</td><td>−${rp(t.diskon)}</td></tr>` : ""}
-    ${t.pajak ? `<tr><td>PPN ${pengaturan().pajak.persen}%</td><td>${rp(t.pajak)}</td></tr>` : ""}
+    ${t.diskon ? `<tr><td>${esc(t.promo_nama ?? t.promo ?? "Diskon")}</td><td>−${rp(t.diskon)}</td></tr>` : ""}
+    ${(t.items ?? []).filter((i) => i.bonus).map((i) => `<tr><td class="small">🎁 Gratis ${esc(i.nama)} ×${i.bonus}</td><td></td></tr>`).join("")}
+    ${t.pajak ? `<tr><td>PPN ${pengaturan().pajak?.persen ?? ""}%</td><td>${rp(t.pajak)}</td></tr>` : ""}
     ${t.pembulatan ? `<tr><td>Pembulatan</td><td>−${rp(t.pembulatan)}</td></tr>` : ""}
-    <tr class="tebal"><td>Total</td><td>${rp(t.total)}</td></tr></table>`;
+    <tr class="tebal"><td>Total</td><td>${rp(t.total)}</td></tr>
+    ${t.sudah_dibayar ? `<tr><td>Sudah dibayar</td><td>−${rp(t.sudah_dibayar)}</td></tr><tr class="tebal"><td>Sisa tagihan</td><td>${rp(t.sisa)}</td></tr>` : ""}</table>`;
 }
 
 // ---------- Pembayaran ----------
 
-function layarBayar() {
-  const items = barisKeranjang();
-  if (!items.length) return;
-  for (const i of items) if (i.qty > (A.stok[i.sku] ?? 0)) return toast(`Stok ${i.nama} tinggal ${A.stok[i.sku] ?? 0}`);
+// bagian: nominal pisah bayar (Daftar Order). Tanpa bagian = lunasi sisa tagihan.
+function layarBayar(bagian) {
+  const t = tagihan();
+  if (!t.items.length) return;
+  if (!modePresale()) for (const i of t.items) if (i.qty > (A.stok[i.sku] ?? 0)) return toast(`Stok ${i.nama} tinggal ${A.stok[i.sku] ?? 0}`);
+  if (modePresale() && !A.ord?.pelanggan?.telp) { toast("Pre-sale wajib pelanggan dengan no HP"); return lembarPelanggan(); }
   const p = pengaturan();
-  const t = hitungTagihan(items, p);
+  const tagih = bagian ?? t.sisa;
   const metode = ["tunai", "qris", "transfer"].filter((m) => p.metode?.[m] !== false);
   let pilih = metode[0], tunai = 0, ref = "";
   const gambar = async () => {
     const qris = pilih === "qris" ? await kv.get("qris_gambar") : null;
-    tampil(`${bar("Pembayaran", esc(A.snap.lokasi.nama), '<button id="kembali">Kembali</button>')}
+    tampil(`${bar(bagian ? "Pisah bayar" : "Pembayaran", esc(A.snap.lokasi.nama), '<button id="kembali">Kembali</button>')}
       <div class="wrap">
-        <div class="card">${rincianTagihan(t)}</div>
+        <div class="card">${rincianTagihan(t)}${bagian ? `<div class="warn">Bayar sebagian: ${rp(bagian)}. Sisanya dilunasi nanti dari Daftar Order.</div>` : ""}</div>
         <div class="metode">${metode.map((m) => `<button data-m="${m}" class="${m === pilih ? "on" : ""}">${{ tunai: "Tunai", qris: "QRIS", transfer: "Transfer" }[m]}</button>`).join("")}</div>
         <div class="card" id="isiBayar">${pilih === "tunai" ? `
           <label>Uang diterima</label><input id="uang" type="number" inputmode="numeric" min="0" value="${tunai || ""}" placeholder="0">
-          <div class="cepat">${nominalCepat(t.total, p.nominal_cepat).map((n) => `<button data-n="${n}">${n === t.total ? "Uang pas" : rp(n)}</button>`).join("")}</div>
+          <div class="cepat">${nominalCepat(tagih, p.nominal_cepat).map((n) => `<button data-n="${n}">${n === tagih ? "Uang pas" : rp(n)}</button>`).join("")}</div>
           <div class="ok" id="kembalian" hidden></div>
           <button class="btn primary" id="lunas" disabled>Selesaikan</button>`
         : pilih === "qris" ? `
           <div class="qris">${qris ? `<img src="${URL.createObjectURL(qris.blob)}" alt="QRIS">` : '<span class="contoh"><img src="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27240%27 height=%27240%27%3E%3Crect width=%27240%27 height=%27240%27 fill=%27%23eee%27/%3E%3C/svg%3E" alt=""></span><div class="err">Gambar QRIS belum diunggah. Minta Admin mengunggahnya di Dashboard › Pengaturan POS.</div>'}
             <div><b>${esc(p.qris?.nama ?? "")}</b>${p.qris?.nmid ? ` · NMID ${esc(p.qris.nmid)}` : ""}</div>
-            <h1 style="margin-top:8px">${rp(t.total)}</h1><p class="muted small">Pembeli mengetik nominal ini sendiri di aplikasinya.</p></div>
+            <h1 style="margin-top:8px">${rp(tagih)}</h1><p class="muted small">Pembeli mengetik nominal ini sendiri di aplikasinya.</p></div>
           <label>4 digit terakhir no. referensi (dari notifikasi aplikasi merchant)</label>
           <input id="ref" inputmode="numeric" maxlength="4" value="${esc(ref)}" placeholder="0000">
           <button class="btn primary" id="lunas" ${/^\d{4}$/.test(ref) ? "" : "disabled"}>Dana Sudah Masuk</button>`
         : `
           ${(p.rekening ?? []).map((r) => `<div class="baris"><div class="isi"><b>${esc(r.bank)} ${esc(r.no)}</b><div class="small muted">a.n. ${esc(r.nama)}</div></div><button class="btn kecil" data-salin="${esc(r.no)}">Salin</button></div>`).join("")}
-          <h1 style="margin-top:12px">${rp(t.total)}</h1>
+          <h1 style="margin-top:12px">${rp(tagih)}</h1>
           <button class="btn primary" id="lunas">Dana Sudah Masuk</button>`}
         </div>
+        ${bagian ? "" : '<button class="btn" id="pisah">Pisah Bayar (sebagian tagihan)</button>'}
       </div>`, "bayar");
     $("#kembali").onclick = () => { gambarKasir(); };
+    if ($("#pisah")) $("#pisah").onclick = lembarPisahBayar;
     $$(".metode button").forEach((b) => (b.onclick = () => { pilih = b.dataset.m; gambar(); }));
     const uang = $("#uang");
     const cekTunai = () => {
       tunai = Number(uang.value || 0);
-      const kb = tunai - t.total;
-      $("#kembalian").hidden = tunai < t.total;
-      $("#kembalian").textContent = `Kembalian ${rp(kb)}`;
-      $("#lunas").disabled = tunai < t.total;
+      $("#kembalian").hidden = tunai < tagih;
+      $("#kembalian").textContent = `Kembalian ${rp(tunai - tagih)}`;
+      $("#lunas").disabled = tunai < tagih;
     };
     if (uang) {
       uang.oninput = cekTunai;
@@ -503,28 +572,40 @@ function layarBayar() {
     const r = $("#ref");
     if (r) r.oninput = () => { r.value = r.value.replace(/\D/g, "").slice(0, 4); ref = r.value; $("#lunas").disabled = !/^\d{4}$/.test(ref); };
     $$("[data-salin]").forEach((b) => (b.onclick = () => navigator.clipboard?.writeText(b.dataset.salin.replace(/\s/g, "")).then(() => toast("Nomor rekening disalin"))));
-    $("#lunas").onclick = () => selesaikan(items, t, pilih === "tunai"
-      ? [{ metode: "Tunai", jumlah: tunai }]
-      : pilih === "qris" ? [{ metode: "QRIS", jumlah: t.total, ref }] : [{ metode: "Transfer", jumlah: t.total }]);
+    $("#lunas").onclick = () => {
+      const bayar = pilih === "tunai" ? { metode: "Tunai", jumlah: tunai } : pilih === "qris" ? { metode: "QRIS", jumlah: tagih, ref } : { metode: "Transfer", jumlah: tagih };
+      if (bagian) return bayarSebagian(t, { ...bayar, jumlah: bagian, diterima: bayar.jumlah });
+      selesaikan(t, bayar);
+    };
   };
   gambar();
 }
 
 let sedangBayar = false;
-async function selesaikan(items, t, pembayaran) {
+async function selesaikan(t, bayarAkhir) {
   if (sedangBayar) return;
   sedangBayar = true;
   try {
+    // Pembayaran sebagian dari Daftar Order ikut tercatat; kembalian hanya dari tunai terakhir.
+    const pembayaran = [...(t.order?.bayar ?? []).map(({ metode, jumlah, ref }) => ({ metode, jumlah, ...(ref ? { ref } : {}) })), bayarAkhir];
     const dibayar = pembayaran.reduce((a, b) => a + b.jumlah, 0);
+    const pel = A.ord?.pelanggan;
+    const pre = modePresale();
     const trx = {
       id: ulid(), no: await nomorBaru(), shift_id: A.sesi.shift_id, lokasi_id: A.sesi.lokasi_id, kasir_id: A.sesi.staff.id, waktu: sekarang(),
-      items, ...t, pembayaran, offline: !S.online,
+      items: t.items.map(({ sku, nama, qty, harga, bonus }) => ({ sku, nama, qty, harga, bonus })),
+      subtotal: t.subtotal, diskon: t.diskon, pajak: t.pajak, pembulatan: t.pembulatan, total: t.total,
+      promo: t.promo_nama, promo_id: t.promo_id, ...(t.promo_id && t.promo_persen !== undefined ? { promo_persen: t.promo_persen } : {}),
+      pembayaran, pelanggan_id: pel?.id ?? null, pelanggan_nama: pel?.nama ?? null, pelanggan_telp: pel?.telp ?? null,
+      no_pesanan: t.order?.no ?? null, presale: pre, offline: !S.online,
     };
     await antrekan("trx", trx);
-    const lokal = { ...trx, kasir_nama: A.sesi.staff.nama, lokasi_nama: A.snap.lokasi.nama, dibayar, kembalian: dibayar - t.total, metode: pembayaran[0].metode, status: "Lunas", terkirim: false };
+    const metodes = [...new Set(pembayaran.map((b) => b.metode))];
+    const lokal = { ...trx, kasir_nama: A.sesi.staff.nama, lokasi_nama: A.snap.lokasi.nama, event: A.snap.lokasi.event ?? null, dibayar, kembalian: dibayar - t.total,
+      metode: metodes.length > 1 ? "Campuran" : metodes[0], status: "Lunas", ambil: pre ? "Menunggu" : null, retur: [], terkirim: false };
     await tx("trx", "readwrite", (s) => s.put(lokal));
-    A.keranjang = [];
-    await simpanSesi();
+    if (t.order) await hapusOrder(t.order.id);
+    kosongkanKeranjang();
     A.stok = await stokTersedia(A.snap);
     layarSukses(lokal);
   } finally {
@@ -534,18 +615,33 @@ async function selesaikan(items, t, pembayaran) {
 
 // ---------- Struk ----------
 
+const isiQr = (t) => `HKPS|${t.id}|${t.no}`;
+function svgQr(teks, sel = 4) {
+  const q = qrcode(0, "M");
+  q.addData(teks);
+  q.make();
+  return q.createSvgTag(sel, 8);
+}
+const catatanPresale = (t) => {
+  const e = t.event;
+  const mulai = e?.mulai ? new Date(e.mulai + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "";
+  return `PRE-SALE · barang diambil di booth ${e?.nama ?? t.lokasi_nama}${mulai ? " mulai " + mulai : ""}. Tunjukkan QR ini. Ukuran tidak bisa ditukar.`;
+};
+
 function htmlStruk(t) {
   const st = pengaturan().struk ?? {};
   return `<div class="struk">
     <div class="tengah"><b>${esc(st.nama)}</b>${st.info ? `<div>${esc(st.info)}</div>` : ""}${st.tampil_event ? `<div>${esc(t.lokasi_nama)}</div>` : ""}</div>
-    <table class="rinci"><tr><td>No.</td><td>${esc(t.no)}</td></tr><tr><td>Waktu</td><td>${tglJam(t.waktu)}</td></tr>${st.tampil_kasir ? `<tr><td>Kasir</td><td>${esc(t.kasir_nama)}</td></tr>` : ""}</table>
+    <table class="rinci"><tr><td>No.</td><td>${esc(t.no)}</td></tr><tr><td>Waktu</td><td>${tglJam(t.waktu)}</td></tr>${st.tampil_kasir ? `<tr><td>Kasir</td><td>${esc(t.kasir_nama)}</td></tr>` : ""}
+      ${t.pelanggan_nama ? `<tr><td>Pembeli</td><td>${esc(t.pelanggan_nama)}</td></tr>` : ""}${t.status !== "Lunas" ? `<tr><td>Status</td><td><b>${esc(t.status)}</b></td></tr>` : ""}</table>
     <table class="rinci">${t.items.map((i) => `<tr><td>${esc(i.nama)}<br><span class="muted">${i.qty} × ${rp(i.harga)}</span></td><td>${rp(i.qty * i.harga)}</td></tr>`).join("")}</table>
     ${rincianTagihan(t)}
     <table class="rinci">${t.pembayaran.map((b) => `<tr><td>${esc(b.metode)}${b.ref ? ` (ref ${esc(b.ref)})` : ""}</td><td>${rp(b.jumlah)}</td></tr>`).join("")}${t.kembalian ? `<tr><td>Kembalian</td><td>${rp(t.kembalian)}</td></tr>` : ""}</table>
+    ${t.presale ? `<div class="tengah" style="margin-top:10px"><b>PRE-SALE · QR PENGAMBILAN</b><div class="qr-struk">${svgQr(isiQr(t))}</div><div class="small">${esc(catatanPresale(t))}</div></div>` : ""}
     ${st.footer ? `<div class="tengah muted" style="margin-top:8px">${esc(st.footer)}</div>` : ""}</div>`;
 }
 
-const pdfStruk = (t) => strukPdf(t, { nama: t.lokasi_nama }, pengaturan().struk ?? {});
+const pdfStruk = (t) => strukPdf({ ...t, qr: t.presale ? isiQr(t) : null, catatan_presale: t.presale ? catatanPresale(t) : null }, { nama: t.lokasi_nama }, pengaturan().struk ?? {});
 const waNorm = (n) => { let d = String(n || "").replace(/\D/g, ""); if (d.startsWith("0")) d = "62" + d.slice(1); return d.length >= 10 ? d : ""; };
 
 // Belum ada layanan WhatsApp API: PDF dibagikan lewat menu share HP, atau diunduh lalu chat WA pembeli dibuka.
@@ -553,7 +649,7 @@ async function bagikanStruk(t, nomor) {
   const wa = waNorm(nomor);
   const blob = pdfStruk(t).output("blob");
   const file = new File([blob], `Struk-${t.no}.pdf`, { type: "application/pdf" });
-  const pesan = `Struk ${pengaturan().struk?.nama ?? "Hikayat"} ${t.no}`;
+  const pesan = `Struk ${pengaturan().struk?.nama ?? "Hikayat"} ${t.no}${t.presale ? ". Tunjukkan QR di PDF saat mengambil barang." : ""}`;
   if (navigator.canShare?.({ files: [file] })) {
     try { await navigator.share({ files: [file], text: pesan }); } catch {}
     return;
@@ -571,12 +667,13 @@ function layarSukses(t) {
     <div class="wrap">
       <div class="ok center"><b>Lunas ${rp(t.total)}</b>${t.kembalian ? `<br>Kembalian ${rp(t.kembalian)}` : ""}</div>
       ${t.offline ? '<div class="warn">Tersimpan di HP. Dikirim ke server saat ada sinyal.</div>' : ""}
+      ${t.presale ? '<div class="warn">Pre-sale: kirim struk PDF berisi QR ke WhatsApp pembeli. QR ini dipakai saat mengambil barang.</div>' : ""}
       <div style="margin-top:12px">${htmlStruk(t)}</div>
       <label>Kirim struk PDF ke WhatsApp</label>
       <input id="wa" inputmode="tel" placeholder="08xx atau +62" value="${esc(t.pelanggan_telp ?? "")}">
-      <button class="btn" id="kirimWa">Kirim dari WhatsApp HP ini</button>
+      <button class="btn ${t.presale ? "primary" : ""}" id="kirimWa">Kirim dari WhatsApp HP ini</button>
       <button class="btn" id="unduh">Unduh PDF</button>
-      <button class="btn primary" id="baru">Transaksi baru</button>
+      <button class="btn ${t.presale ? "" : "primary"}" id="baru">Transaksi baru</button>
     </div>`, "sukses");
   $("#kirimWa").onclick = () => bagikanStruk(t, $("#wa").value);
   $("#unduh").onclick = () => pdfStruk(t).save(`Struk-${t.no}.pdf`);
@@ -588,7 +685,8 @@ function layarSukses(t) {
 function lembarMenu() {
   const owner = A.sesi.staff.role.includes("owner");
   bukaLembar(`<h2>Menu</h2><div class="daftar">
-    <button data-m="riwayat">Penjualan shift ini</button>
+    <button data-m="riwayat">Penjualan shift ini (detail, void, retur)</button>
+    <button data-m="pesanan">${A.snap.lokasi.jenis === "gudang" ? "Ambil di kantor (pre-sale)" : "Pesanan pre-sale"}</button>
     <button data-m="kas">Kas kasir</button>
     ${A.snap.lokasi.jenis === "event" ? '<button data-m="inventori">Inventori: terima kiriman, stok opname</button>' : ""}
     <button data-m="sinkron">Status sinkron</button>
@@ -602,7 +700,8 @@ function lembarMenu() {
     if (!m) return;
     tutupLembar();
     ({
-      riwayat: layarRiwayat, kas: layarKas, inventori: layarInventori, sinkron: layarSinkron, pin: () => (S.online ? gantiPin(false) : toast("Ganti PIN butuh sinyal")),
+      riwayat: layarRiwayat, pesanan: () => layarPesanan(gambarKasir), kas: layarKas, inventori: layarInventori, sinkron: layarSinkron,
+      pin: () => (S.online ? gantiPin(false) : toast("Ganti PIN butuh sinyal")),
       tutup: layarTutupKasir, keluar: () => keluar(),
       tempat: async () => {
         if (A.keranjang.length) return toast("Kosongkan keranjang dulu");
@@ -621,7 +720,10 @@ async function transaksiShift() {
   if (S.online && A.sesi.sesi) {
     try {
       for (const t of (await api("GET", `/api/pos/penjualan?shift=${A.sesi.shift_id}`)).trx) {
-        if (!per.has(t.id)) per.set(t.id, { ...t, kasir_nama: t.kasir, lokasi_nama: A.snap.lokasi.nama, terkirim: true, dariServer: true });
+        const l = per.get(t.id);
+        // Data server lebih baru untuk status dan retur, kecuali ada perubahan di HP yang belum terkirim.
+        if (!l) per.set(t.id, { ...t, kasir_nama: t.kasir, lokasi_nama: A.snap.lokasi.nama, event: A.snap.lokasi.event ?? null, terkirim: true, dariServer: true });
+        else if (!l.ubahLokal) per.set(t.id, { ...l, status: t.status, retur: t.retur, ambil: t.ambil, terkirim: true });
       }
     } catch {}
   }
@@ -629,20 +731,30 @@ async function transaksiShift() {
 }
 
 async function layarRiwayat() {
-  tampil(`${bar("Penjualan shift ini", esc(A.snap.lokasi.nama), '<button id="kembali">Kembali</button>')}<div class="wrap"><p class="muted">Memuat…</p></div>`, "riwayat");
+  tampil(`${bar("Penjualan shift ini", esc(A.snap.lokasi.nama), '<button id="cariTrx">Cari struk</button><button id="kembali">Kembali</button>')}<div class="wrap"><p class="muted">Memuat…</p></div>`, "riwayat");
   $("#kembali").onclick = gambarKasir;
+  $("#cariTrx").onclick = lembarCariTrx;
   const daftar = await transaksiShift();
   const total = daftar.filter((t) => t.status === "Lunas").reduce((a, t) => a + t.total, 0);
   $("#app .wrap").innerHTML = `<div class="card"><b>${daftar.length} transaksi · ${rp(total)}</b></div><div class="daftar">${daftar.map((t) => `<button data-id="${t.id}">
-    <span class="isi"><b>${esc(t.no)}</b><br><span class="small muted">${jam(t.waktu)} · ${esc(t.kasir_nama)} · ${esc(t.metode)}</span></span>
+    <span class="isi"><b>${esc(t.no)}</b>${t.status !== "Lunas" ? ` <span class="tag off">${esc(t.status)}</span>` : ""}${t.presale ? ' <span class="tag warn">pre-sale</span>' : ""}<br><span class="small muted">${jam(t.waktu)} · ${esc(t.kasir_nama)} · ${esc(t.metode)}</span></span>
     <span><b>${rp(t.total)}</b><br>${t.ditolak ? '<span class="tag off">Ditolak server</span>' : t.terkirim ? '<span class="tag ok">Terkirim</span>' : '<span class="tag warn">Belum terkirim</span>'}</span></button>`).join("") || '<p class="muted">Belum ada transaksi.</p>'}</div>`;
-  $$(".daftar button").forEach((b) => (b.onclick = () => {
-    const t = daftar.find((x) => x.id === b.dataset.id);
-    bukaLembar(`${htmlStruk(t)}${t.ditolak ? `<div class="err">Ditolak server: ${esc(t.ditolak)}</div>` : ""}
-      <button class="btn" id="kirimUlang">Kirim struk dari WhatsApp HP ini</button><button class="btn" id="unduhUlang">Unduh PDF</button>`);
-    $("#kirimUlang").onclick = () => bagikanStruk(t, t.pelanggan_telp);
-    $("#unduhUlang").onclick = () => pdfStruk(t).save(`Struk-${t.no}.pdf`);
-  }));
+  $$(".daftar button").forEach((b) => (b.onclick = () => lembarDetailTrx(daftar.find((x) => x.id === b.dataset.id))));
+}
+
+function lembarDetailTrx(t) {
+  const sisaRetur = sisaBisaRetur(t);
+  const bisaVoid = t.status === "Lunas" && !(t.retur ?? []).length && t.shift_id === A.sesi.shift_id;
+  const bisaRetur = t.status === "Lunas" && sisaRetur.some((x) => x.maks > 0) && (!t.presale || t.ambil === "Diambil");
+  bukaLembar(`${htmlStruk(t)}${t.ditolak ? `<div class="err">Ditolak server: ${esc(t.ditolak)}</div>` : ""}
+    ${(t.retur ?? []).map((r) => `<div class="warn small">Retur ${esc(r.no ?? "")}: ${esc(r.cara)}${r.nilai ? " " + rp(r.nilai) : ""} · disetujui ${esc(r.disetujui ?? r.disetujui_nama ?? "")}</div>`).join("")}
+    <button class="btn" id="kirimUlang">Kirim struk dari WhatsApp HP ini</button><button class="btn" id="unduhUlang">Unduh PDF</button>
+    ${bisaRetur ? '<button class="btn" id="retur">Retur barang cacat</button>' : ""}
+    ${bisaVoid ? '<button class="btn danger" id="void">Void transaksi</button>' : ""}`);
+  $("#kirimUlang").onclick = () => bagikanStruk(t, t.pelanggan_telp);
+  $("#unduhUlang").onclick = () => pdfStruk(t).save(`Struk-${t.no}.pdf`);
+  if ($("#void")) $("#void").onclick = () => lembarVoid(t);
+  if ($("#retur")) $("#retur").onclick = () => layarRetur(t);
 }
 
 // Kas masuk/keluar laci. Kas keluar nanti otomatis menjadi biaya event (tahap 7).
@@ -809,6 +921,11 @@ function layarOpname() {
 async function layarTutupKasir() {
   tampil(`${bar("Tutup kasir", esc(A.snap.lokasi.nama), '<button id="kembali">Kembali</button>')}<div class="wrap"><p class="muted">Mengirim data dan menghitung…</p></div>`, "tutup");
   $("#kembali").onclick = gambarKasir;
+  const belum = A.orderDaftar.filter((o) => o.bayar.length);
+  if (belum.length) {
+    $("#app .wrap").innerHTML = `<div class="err">Masih ada pesanan di Daftar Order yang sudah dibayar sebagian: ${belum.map((o) => esc(o.no)).join(", ")}. Lunasi dulu sebelum menutup kasir.</div>`;
+    return;
+  }
   await sinkronSekarang();
   const sisa = (await isiAntrean()).length;
   let r = null;
@@ -822,8 +939,9 @@ async function layarTutupKasir() {
     const per = (m) => trx.flatMap((t) => t.pembayaran).filter((b) => b.metode === m).reduce((a, b) => a + b.jumlah, 0);
     const tunai = per("Tunai") - trx.reduce((a, t) => a + (t.kembalian ?? 0), 0);
     const km = kas.filter((k) => k.jenis === "masuk").reduce((a, k) => a + k.jumlah, 0), kk = kas.filter((k) => k.jenis === "keluar").reduce((a, k) => a + k.jumlah, 0);
-    r = { transaksi: trx.length, total: trx.reduce((a, t) => a + t.total, 0), tunai, qris: per("QRIS"), transfer: per("Transfer"), kas_masuk: km, kas_keluar: kk,
-      seharusnya: (A.sesi.shift?.modal ?? 0) + tunai + km - kk, lokal: true };
+    const rt = (await kv.get("rtunai:" + A.sesi.shift_id)) ?? 0;
+    r = { transaksi: trx.length, total: trx.reduce((a, t) => a + t.total, 0), tunai, qris: per("QRIS"), transfer: per("Transfer"), kas_masuk: km, kas_keluar: kk, retur_tunai: rt,
+      seharusnya: (A.sesi.shift?.modal ?? 0) + tunai + km - kk - rt, lokal: true };
   }
   const karyawan = (await kv.get("karyawan")) ?? [];
   const pemilik = A.sesi.shift?.kasir_id ?? A.sesi.staff.id;
@@ -834,8 +952,8 @@ async function layarTutupKasir() {
       <tr><td>Tunai</td><td>${rp(r.tunai)}</td></tr><tr><td>QRIS</td><td>${rp(r.qris)}</td></tr><tr><td>Transfer</td><td>${rp(r.transfer)}</td></tr>
     </table></div>
     <div class="card" style="margin-top:10px"><h2>Uang di laci</h2><table class="rinci">
-      <tr><td>Modal awal</td><td>${rp(A.sesi.shift?.modal ?? r.seharusnya - r.tunai - r.kas_masuk + r.kas_keluar)}</td></tr>
-      <tr><td>+ Penjualan tunai</td><td>${rp(r.tunai)}</td></tr><tr><td>+ Kas masuk</td><td>${rp(r.kas_masuk)}</td></tr><tr><td>− Kas keluar</td><td>${rp(r.kas_keluar)}</td></tr>
+      <tr><td>Modal awal</td><td>${rp(A.sesi.shift?.modal ?? r.seharusnya - r.tunai - r.kas_masuk + r.kas_keluar + (r.retur_tunai ?? 0))}</td></tr>
+      <tr><td>+ Penjualan tunai</td><td>${rp(r.tunai)}</td></tr><tr><td>+ Kas masuk</td><td>${rp(r.kas_masuk)}</td></tr><tr><td>− Kas keluar</td><td>${rp(r.kas_keluar)}</td></tr>${r.retur_tunai ? `<tr><td>− Uang kembali retur</td><td>${rp(r.retur_tunai)}</td></tr>` : ""}
       <tr class="tebal"><td>Seharusnya</td><td>${rp(r.seharusnya)}</td></tr></table>
       <form id="fTutup">
         <label>Uang dihitung</label><input name="hitung" type="number" inputmode="numeric" min="0" required>

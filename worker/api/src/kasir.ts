@@ -2,6 +2,9 @@
 // HP bisa bekerja tanpa sinyal: semua dokumen punya ID tetap dari HP, jadi kiriman ulang tidak tercatat dua kali.
 
 import { hariIniWib } from "./aturan.js";
+import { ItemPromo, potongan } from "./promo.js";
+import { bacaPromo, promoUntukTempat } from "./promosi.js";
+import { lengkapiTrx, prosesPelanggan, prosesRetur, prosesSerah, prosesVoid } from "./kasir-lengkap.js";
 import { statusEvent } from "./event.js";
 import { tulisOpnameBaru } from "./opname.js";
 import { denganNomor } from "./dokumen.js";
@@ -18,6 +21,7 @@ export interface Tempat {
   nama: string;
   label: string;
   boleh_jual: boolean;
+  serah_saja?: boolean; // Admin di Gudang Pusat: hanya menyerahkan pesanan pre-sale
   shift_terbuka: { id: string; kasir_id: string; kasir: string; buka: string; modal: number } | null;
 }
 
@@ -44,9 +48,11 @@ export async function daftarTempat(db: D1Database, role: Role[], staffId = ""): 
   for (const r of results) {
     if (tempat.has(r.id)) continue; // satu laci per tempat: ambil shift terbuka yang paling awal
     let label: string, boleh = true;
+    let serah = false;
     if (r.jenis === "gudang") {
-      if (!owner) continue;
-      label = "Jual langsung";
+      if (!owner && !admin) continue;
+      serah = !owner;
+      label = owner ? "Jual langsung" : "Serah terima pre-sale";
     } else {
       const st = statusEvent(r, hari);
       if (st === "Selesai") continue;
@@ -58,7 +64,7 @@ export async function daftarTempat(db: D1Database, role: Role[], staffId = ""): 
       } else label = st;
     }
     tempat.set(r.id, {
-      id: r.id, jenis: r.jenis, nama: r.nama, label, boleh_jual: boleh,
+      id: r.id, jenis: r.jenis, nama: r.nama, label, boleh_jual: boleh, ...(serah ? { serah_saja: true } : {}),
       shift_terbuka: r.shift_id ? { id: r.shift_id, kasir_id: r.kasir_id, kasir: r.kasir, buka: r.buka, modal: r.modal } : null,
     });
   }
@@ -117,8 +123,9 @@ async function bacaKatalog(env: Env, p: Perangkat, lokasi: { id: string; jenis: 
   const awalan = `HK-${hariIniWib().slice(2).replace(/-/g, "")}-${p.kode}-`;
   const terakhir = await env.DB.prepare("SELECT MAX(no) AS no FROM trx WHERE perangkat_id = ? AND no LIKE ?").bind(p.id, awalan + "%").first<{ no: string | null }>();
   const kiriman = await env.DB.prepare("SELECT COUNT(*) AS n FROM mutasi WHERE ke = ? AND status = 'Dikirim'").bind(lokasiId).first<{ n: number }>();
+  const promo = await promoUntukTempat(env.DB, lokasiId);
   return { ...hasil, lokasi: { ...lokasi, event: ev }, penuh: !sejak, kategori: kategori.results, produk: produk.results, varian: varian.results, stok: stok.results,
-    nomor_terakhir: terakhir?.no ? Number(terakhir.no.slice(awalan.length)) : 0, kiriman_menunggu: kiriman?.n ?? 0 };
+    nomor_terakhir: terakhir?.no ? Number(terakhir.no.slice(awalan.length)) : 0, kiriman_menunggu: kiriman?.n ?? 0, promo };
 }
 
 // ---------- Ringkasan shift (dipakai Tutup Kasir dan dashboard) ----------
@@ -141,11 +148,13 @@ export async function ringkasanShift(db: D1Database, shiftId: string) {
     ).bind(shiftId).first<{ n: number; total: number; kembalian: number; void_n: number; void_total: number }>(),
     db.prepare("SELECT jenis, SUM(jumlah) AS jumlah FROM kas_laci WHERE shift_id = ? GROUP BY jenis").bind(shiftId).all<{ jenis: string; jumlah: number }>(),
   ]);
+  const retur = await db.prepare("SELECT COALESCE(SUM(nilai), 0) AS n FROM retur WHERE shift_id = ? AND cara = 'Uang kembali' AND metode = 'Tunai'").bind(shiftId).first<{ n: number }>();
   const per = (m: string) => bayar.results.find((b) => b.metode === m)?.jumlah ?? 0;
   const kasJ = (j: string) => kas.results.find((k) => k.jenis === j)?.jumlah ?? 0;
   // Pembayaran tunai yang tercatat adalah uang yang diterima; kembalian keluar lagi dari laci.
   const tunai = per("Tunai") - (trx?.kembalian ?? 0);
-  const seharusnya = s.modal + tunai + kasJ("masuk") - kasJ("keluar");
+  // Uang laci seharusnya = modal + tunai + kas masuk − kas keluar − retur uang kembali tunai (PRD bagian 7).
+  const seharusnya = s.modal + tunai + kasJ("masuk") - kasJ("keluar") - (retur?.n ?? 0);
   return {
     shift: s,
     ringkasan: {
@@ -158,6 +167,7 @@ export async function ringkasanShift(db: D1Database, shiftId: string) {
       void_total: trx?.void_total ?? 0,
       kas_masuk: kasJ("masuk"),
       kas_keluar: kasJ("keluar"),
+      retur_tunai: retur?.n ?? 0,
       seharusnya,
       selisih: s.kas_hitung === null ? null : s.kas_hitung - seharusnya,
     },
@@ -174,17 +184,12 @@ export async function penjualanPos(req: Request, env: Env) {
   await sesiPos(env.DB, req);
   const shift = new URL(req.url).searchParams.get("shift");
   if (!shift) throw new Gagal(400, "Shift wajib diisi");
-  const [t, i, b] = await Promise.all([
-    env.DB.prepare(
-      `SELECT t.id, t.no, t.waktu, t.subtotal, t.diskon, t.promo, t.pajak, t.pembulatan, t.total, t.metode, t.dibayar, t.kembalian,
-        t.pelanggan_nama, t.pelanggan_telp, t.status, s.nama AS kasir FROM trx t JOIN staff s ON s.id = t.kasir_id WHERE t.shift_id = ? ORDER BY t.waktu DESC LIMIT 300`,
-    ).bind(shift).all<{ id: string }>(),
-    env.DB.prepare("SELECT i.trx_id, i.sku, i.nama, i.qty, i.harga FROM trx_item i JOIN trx t ON t.id = i.trx_id WHERE t.shift_id = ? ORDER BY i.urutan").bind(shift).all<{ trx_id: string }>(),
-    env.DB.prepare("SELECT b.trx_id, b.metode, b.jumlah, b.ref FROM trx_bayar b JOIN trx t ON t.id = b.trx_id WHERE t.shift_id = ? ORDER BY b.urutan").bind(shift).all<{ trx_id: string }>(),
-  ]);
-  return json({
-    trx: t.results.map((x) => ({ ...x, items: i.results.filter((y) => y.trx_id === x.id), pembayaran: b.results.filter((y) => y.trx_id === x.id) })),
-  });
+  const { results } = await env.DB.prepare(
+    `SELECT t.id, t.no, t.waktu, t.subtotal, t.diskon, t.promo, t.pajak, t.pembulatan, t.total, t.metode, t.dibayar, t.kembalian, t.lokasi_id,
+      t.pelanggan_nama, t.pelanggan_telp, t.status, t.void_alasan, t.presale, t.ambil_status, t.ambil_batas, t.shift_id, s.nama AS kasir
+     FROM trx t JOIN staff s ON s.id = t.kasir_id WHERE t.shift_id = ? ORDER BY t.waktu DESC LIMIT 300`,
+  ).bind(shift).all<Obj>();
+  return json({ trx: await lengkapiTrx(env.DB, results) });
 }
 
 // ---------- Persetujuan atasan ----------
@@ -225,25 +230,25 @@ export function pakaiPersetujuan(db: D1Database, idToken: string, staffId: strin
 
 // ---------- Sinkron antrean dari HP ----------
 
-class Tolak extends Error {}
-type Hasil = { id: string; status: "ok" | "sudah" | "ditolak"; alasan?: string };
+export class Tolak extends Error {}
+export type Hasil = { id: string; status: "ok" | "sudah" | "ditolak"; alasan?: string };
 
 const ID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
-const cekId = (v: unknown, label: string) => {
+export const cekId = (v: unknown, label: string) => {
   if (typeof v !== "string" || !ID_RE.test(v)) throw new Tolak(`${label} bukan ULID`);
   return v;
 };
-const cekInt = (v: unknown, label: string, min = 0, max = 1_000_000_000) => {
+export const cekInt = (v: unknown, label: string, min = 0, max = 1_000_000_000) => {
   if (typeof v !== "number" || !Number.isInteger(v) || v < min || v > max) throw new Tolak(`${label} tidak valid`);
   return v;
 };
-const cekWaktu = (v: unknown, label: string) => {
+export const cekWaktu = (v: unknown, label: string) => {
   if (typeof v !== "string" || Number.isNaN(Date.parse(v))) throw new Tolak(`${label} tidak valid`);
   // Jam HP bisa salah; waktu lebih dari 1 hari di depan server ditolak.
   if (Date.parse(v) > Date.now() + 86_400_000) throw new Tolak(`${label} di masa depan. Periksa jam HP`);
   return new Date(v).toISOString();
 };
-const cekTeks = (v: unknown, label: string, max: number, wajib = false) => {
+export const cekTeks = (v: unknown, label: string, max: number, wajib = false) => {
   if (v === undefined || v === null || v === "") {
     if (wajib) throw new Tolak(`${label} wajib`);
     return null;
@@ -252,7 +257,7 @@ const cekTeks = (v: unknown, label: string, max: number, wajib = false) => {
   return v.trim();
 };
 
-async function cekStaff(db: D1Database, id: unknown) {
+export async function cekStaff(db: D1Database, id: unknown) {
   const s = await db.prepare("SELECT id, nama FROM staff WHERE id = ?").bind(cekId(id, "Karyawan")).first<{ id: string; nama: string }>();
   if (!s) throw new Tolak("Karyawan tidak dikenal");
   return s;
@@ -264,6 +269,7 @@ async function prosesShiftBuka(env: Env, p: Perangkat, d: Obj): Promise<Hasil["s
   const kasir = await cekStaff(env.DB, d.kasir_id);
   const lokasi = await env.DB.prepare("SELECT id FROM lokasi WHERE id = ?").bind(typeof d.lokasi_id === "string" ? d.lokasi_id : "").first();
   if (!lokasi) throw new Tolak("Tempat jualan tidak dikenal");
+  if (d.lokasi_id === "gudang" && !(await ambilRole(env.DB, kasir.id)).includes("owner")) throw new Tolak("Jual langsung dari Gudang Pusat khusus Owner");
   const buka = cekWaktu(d.buka, "Waktu buka");
   const modal = cekInt(d.modal, "Modal awal", 0, 100_000_000);
   const t = sekarang();
@@ -298,20 +304,25 @@ async function prosesTrx(env: Env, p: Perangkat, d: Obj): Promise<Hasil["status"
   if (!shift) throw new Tolak("Shift belum diterima server");
   const kasir = await cekStaff(env.DB, d.kasir_id);
   const waktu = cekWaktu(d.waktu, "Waktu");
+  if (shift.lokasi_id === "gudang" && !(await ambilRole(env.DB, kasir.id)).includes("owner")) throw new Tolak("Jual langsung dari Gudang Pusat khusus Owner");
 
   if (!Array.isArray(d.items) || d.items.length === 0 || d.items.length > 80) throw new Tolak("Daftar barang tidak valid");
-  const items = (d.items as Obj[]).map((x, i) => ({
-    sku: cekTeks(x?.sku, `SKU baris ${i + 1}`, 40, true)!,
-    nama: cekTeks(x?.nama, `Nama baris ${i + 1}`, 140, true)!,
-    qty: cekInt(x?.qty, `Jumlah baris ${i + 1}`, 1, 10_000),
-    harga: cekInt(x?.harga, `Harga baris ${i + 1}`, 0, 100_000_000),
-  }));
+  const items = (d.items as Obj[]).map((x, i) => {
+    const qty = cekInt(x?.qty, `Jumlah baris ${i + 1}`, 1, 10_000);
+    return {
+      sku: cekTeks(x?.sku, `SKU baris ${i + 1}`, 40, true)!,
+      nama: cekTeks(x?.nama, `Nama baris ${i + 1}`, 140, true)!,
+      qty,
+      harga: cekInt(x?.harga, `Harga baris ${i + 1}`, 0, 100_000_000),
+      bonus: cekInt(x?.bonus ?? 0, `Bonus baris ${i + 1}`, 0, qty),
+    };
+  });
   const skus = [...new Set(items.map((i) => i.sku))];
   const { results: kenal } = await env.DB
-    .prepare(`SELECT v.sku, p.hpp FROM varian v JOIN produk p ON p.id = v.produk_id WHERE v.sku IN (${skus.map(() => "?").join(",")})`)
-    .bind(...skus).all<{ sku: string; hpp: number }>();
-  const hpp = new Map(kenal.map((k) => [k.sku, k.hpp]));
-  for (const s of skus) if (!hpp.has(s)) throw new Tolak(`SKU ${s} tidak dikenal`);
+    .prepare(`SELECT v.sku, v.produk_id, p.hpp FROM varian v JOIN produk p ON p.id = v.produk_id WHERE v.sku IN (${skus.map(() => "?").join(",")})`)
+    .bind(...skus).all<{ sku: string; produk_id: string; hpp: number }>();
+  const info = new Map(kenal.map((k) => [k.sku, k]));
+  for (const s of skus) if (!info.has(s)) throw new Tolak(`SKU ${s} tidak dikenal`);
 
   if (!Array.isArray(d.pembayaran) || d.pembayaran.length === 0 || d.pembayaran.length > 10) throw new Tolak("Pembayaran tidak valid");
   const bayar = (d.pembayaran as Obj[]).map((x, i) => {
@@ -336,27 +347,32 @@ async function prosesTrx(env: Env, p: Perangkat, d: Obj): Promise<Hasil["status"
   if (kembalian > tunai) throw new Tolak("Kembalian lebih besar dari uang tunai");
   const metodes = [...new Set(bayar.map((b) => b.metode))];
 
+  // Promo dihitung ulang di server. Kalau berbeda (misalnya promo diubah saat HP offline), transaksi tetap diterima dan ditandai.
+  const promoId = cekTeks(d.promo_id, "Promo", 40);
+  const potonganCek = diskon || promoId ? await cekPotongan(env.DB, promoId, d, items.map((i) => ({ ...i, produk_id: info.get(i.sku)!.produk_id })), subtotal) : null;
+
+  // Pre-sale "ambil nanti": stok belum berkurang, pembeli wajib punya no HP.
+  const presale = d.presale === true;
+  const telp = cekTeks(d.pelanggan_telp, "No HP pelanggan", 20);
+  if (presale && !telp) throw new Tolak("Pre-sale wajib no HP pembeli");
+  const pelangganId = d.pelanggan_id ? cekId(d.pelanggan_id, "Pelanggan") : null;
+
   const t = sekarang();
   const tulis = [
     env.DB.prepare(
-      `INSERT INTO trx (id, no, shift_id, lokasi_id, perangkat_id, kasir_id, waktu, subtotal, diskon, promo, pajak, pembulatan, total, metode, dibayar, kembalian,
-        pelanggan_nama, pelanggan_telp, catatan, offline, diterima_pada, diubah_pada) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(id, no, shift.id, shift.lokasi_id, p.id, kasir.id, waktu, subtotal, diskon, cekTeks(d.promo, "Promo", 80), pajak, pembulatan, total,
-      metodes.length > 1 ? "Campuran" : metodes[0], dibayar, kembalian, cekTeks(d.pelanggan_nama, "Nama pelanggan", 80), cekTeks(d.pelanggan_telp, "No HP pelanggan", 20),
-      cekTeks(d.catatan, "Catatan", 300), d.offline ? 1 : 0, t, t),
-    ...items.map((i, n) => env.DB.prepare("INSERT INTO trx_item (id, trx_id, sku, nama, qty, harga, hpp, urutan) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-      .bind(ulid(), id, i.sku, i.nama, i.qty, i.harga, hpp.get(i.sku), n)),
+      `INSERT INTO trx (id, no, shift_id, lokasi_id, perangkat_id, kasir_id, waktu, subtotal, diskon, promo, promo_id, pajak, pembulatan, total, metode, dibayar, kembalian,
+        pelanggan_id, pelanggan_nama, pelanggan_telp, catatan, no_pesanan, presale, ambil_status, potongan_cek, offline, diterima_pada, diubah_pada)
+        VALUES (${Array(28).fill("?").join(", ")})`,
+    ).bind(id, no, shift.id, shift.lokasi_id, p.id, kasir.id, waktu, subtotal, diskon, cekTeks(d.promo, "Promo", 80), promoId, pajak, pembulatan, total,
+      metodes.length > 1 ? "Campuran" : metodes[0], dibayar, kembalian, pelangganId, cekTeks(d.pelanggan_nama, "Nama pelanggan", 80), telp,
+      cekTeks(d.catatan, "Catatan", 300), cekTeks(d.no_pesanan, "Nomor pesanan", 30), presale ? 1 : 0, presale ? "Menunggu" : null,
+      potonganCek !== null && potonganCek !== diskon ? potonganCek : null, d.offline ? 1 : 0, t, t),
+    ...items.map((i, n) => env.DB.prepare("INSERT INTO trx_item (id, trx_id, sku, nama, qty, harga, hpp, bonus, urutan) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(ulid(), id, i.sku, i.nama, i.qty, i.harga, info.get(i.sku)!.hpp, i.bonus, n)),
     ...bayar.map((b, n) => env.DB.prepare("INSERT INTO trx_bayar (id, trx_id, metode, jumlah, ref, urutan) VALUES (?, ?, ?, ?, ?, ?)")
       .bind(ulid(), id, b.metode, b.jumlah, b.ref, n)),
-    // Stok tempat jualan berkurang. Penjualan tetap dicatat walau stok jadi minus (arsitektur bagian 5).
-    ...items.flatMap((i) => [
-      env.DB.prepare(
-        `INSERT INTO stok (sku, lokasi_id, qty, transit, diubah_pada) VALUES (?, ?, ?, 0, ?)
-         ON CONFLICT (sku, lokasi_id) DO UPDATE SET qty = qty + excluded.qty, diubah_pada = excluded.diubah_pada`,
-      ).bind(i.sku, shift.lokasi_id, -i.qty, t),
-      env.DB.prepare("INSERT INTO stok_gerak (id, sku, lokasi_id, jumlah, jenis, ref_tabel, ref_id, waktu, oleh) VALUES (?, ?, ?, ?, 'jual', 'trx', ?, ?, ?)")
-        .bind(ulid(), i.sku, shift.lokasi_id, -i.qty, id, waktu, kasir.id),
-    ]),
+    // Stok tempat jualan berkurang (kecuali pre-sale ambil nanti). Penjualan tetap dicatat walau stok jadi minus (arsitektur bagian 5).
+    ...(presale ? [] : items.flatMap((i) => gerakStok(env.DB, i.sku, shift.lokasi_id, -i.qty, "jual", "trx", id, waktu, kasir.id))),
   ];
   try {
     await env.DB.batch(tulis);
@@ -367,6 +383,31 @@ async function prosesTrx(env: Env, p: Perangkat, d: Obj): Promise<Hasil["status"
     throw e;
   }
   return "ok";
+}
+
+// Ubah stok satu lokasi dan catat di buku besar.
+export function gerakStok(db: D1Database, sku: string, lokasi: string, jumlah: number, jenis: string, refTabel: string, refId: string, waktu: string, oleh: string) {
+  return [
+    db.prepare(
+      `INSERT INTO stok (sku, lokasi_id, qty, transit, diubah_pada) VALUES (?, ?, ?, 0, ?)
+       ON CONFLICT (sku, lokasi_id) DO UPDATE SET qty = qty + excluded.qty, diubah_pada = excluded.diubah_pada`,
+    ).bind(sku, lokasi, jumlah, sekarang()),
+    db.prepare("INSERT INTO stok_gerak (id, sku, lokasi_id, jumlah, jenis, ref_tabel, ref_id, waktu, oleh) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(ulid(), sku, lokasi, jumlah, jenis, refTabel, refId, waktu, oleh),
+  ];
+}
+
+// Potongan menurut server: promo dari database atau diskon manual kasir (dibatasi pengaturan).
+async function cekPotongan(db: D1Database, promoId: string | null, d: Obj, items: ItemPromo[], subtotal: number): Promise<number> {
+  if (promoId === "manual") {
+    const p = await bacaPengaturan(db);
+    const persen = Math.min(cekInt(d.promo_persen ?? 0, "Persen diskon", 0, 100), p.diskon_kasir.aktif ? p.diskon_kasir.maks_persen : 0);
+    return Math.round((subtotal * persen) / 100);
+  }
+  if (!promoId) return 0;
+  const [promo] = await bacaPromo(db, "id = ?", promoId);
+  if (!promo) return 0;
+  return potongan(promo, items, typeof d.promo_persen === "number" ? d.promo_persen : undefined);
 }
 
 async function prosesShiftTutup(env: Env, p: Perangkat, d: Obj): Promise<Hasil["status"]> {
@@ -524,6 +565,10 @@ const PROSES: Record<string, (env: Env, p: Perangkat, d: Obj, req: Request) => P
   shift_tutup: prosesShiftTutup,
   terima: prosesTerima,
   opname: prosesOpname,
+  pelanggan: prosesPelanggan,
+  void: prosesVoid,
+  retur: prosesRetur,
+  serah: prosesSerah,
   log: prosesLog,
 };
 

@@ -50,11 +50,17 @@ export async function detailTransaksi(req: Request, env: Env, id: string) {
      JOIN staff s ON s.id = t.kasir_id LEFT JOIN perangkat p ON p.id = t.perangkat_id WHERE t.id = ?`,
   ).bind(id).first();
   if (!t) throw new Gagal(404, "Transaksi tidak ditemukan");
-  const [items, bayar] = await Promise.all([
-    env.DB.prepare("SELECT sku, nama, qty, harga, hpp FROM trx_item WHERE trx_id = ? ORDER BY urutan").bind(id).all(),
+  const [items, bayar, retur, vo] = await Promise.all([
+    env.DB.prepare("SELECT sku, nama, qty, harga, hpp, bonus FROM trx_item WHERE trx_id = ? ORDER BY urutan").bind(id).all(),
     env.DB.prepare("SELECT metode, jumlah, ref FROM trx_bayar WHERE trx_id = ? ORDER BY urutan").bind(id).all(),
+    env.DB.prepare(
+      `SELECT r.no, r.waktu, r.cara, r.metode, r.nilai, r.alasan, r.foto, a.nama AS oleh, s.nama AS disetujui,
+        (SELECT group_concat(sku || ' ×' || qty, ', ') FROM retur_item WHERE retur_id = r.id) AS barang
+       FROM retur r JOIN staff a ON a.id = r.oleh JOIN staff s ON s.id = r.disetujui_oleh WHERE r.trx_id = ? ORDER BY r.waktu`,
+    ).bind(id).all(),
+    env.DB.prepare("SELECT a.nama AS oleh, s.nama AS disetujui FROM trx t LEFT JOIN staff a ON a.id = t.void_oleh LEFT JOIN staff s ON s.id = t.void_disetujui WHERE t.id = ?").bind(id).first(),
   ]);
-  return json({ transaksi: t, items: items.results, pembayaran: bayar.results });
+  return json({ transaksi: t, items: items.results, pembayaran: bayar.results, retur: retur.results, void: vo });
 }
 
 // Setoran kasir: semua shift dalam rentang, seharusnya dihitung ulang dari transaksi yang sudah masuk.
@@ -70,14 +76,15 @@ export async function daftarShift(req: Request, env: Env) {
       COALESCE((SELECT SUM(total) FROM trx WHERE shift_id = s.id AND status = 'Lunas'), 0) AS penjualan,
       (SELECT COUNT(*) FROM trx WHERE shift_id = s.id AND status = 'Lunas') AS transaksi,
       COALESCE((SELECT SUM(jumlah) FROM kas_laci WHERE shift_id = s.id AND jenis = 'masuk'), 0) AS kas_masuk,
-      COALESCE((SELECT SUM(jumlah) FROM kas_laci WHERE shift_id = s.id AND jenis = 'keluar'), 0) AS kas_keluar
+      COALESCE((SELECT SUM(jumlah) FROM kas_laci WHERE shift_id = s.id AND jenis = 'keluar'), 0) AS kas_keluar,
+      COALESCE((SELECT SUM(nilai) FROM retur WHERE shift_id = s.id AND cara = 'Uang kembali' AND metode = 'Tunai'), 0) AS retur_tunai
      FROM shift s JOIN lokasi l ON l.id = s.lokasi_id JOIN staff a ON a.id = s.kasir_id LEFT JOIN staff b ON b.id = s.ditutup_oleh LEFT JOIN staff c ON c.id = s.pj_id
      WHERE (s.status = 'buka' OR (s.buka >= ? AND s.buka < ?)) ORDER BY s.buka DESC LIMIT 500`,
-  ).bind(r.mulai, r.akhir).all<{ modal: number; tunai: number; kas_masuk: number; kas_keluar: number; kas_hitung: number | null }>();
+  ).bind(r.mulai, r.akhir).all<{ modal: number; tunai: number; kas_masuk: number; kas_keluar: number; retur_tunai: number; kas_hitung: number | null }>();
   return json({
     ...r,
     shift: results.map((s) => {
-      const seharusnya = s.modal + s.tunai + s.kas_masuk - s.kas_keluar;
+      const seharusnya = s.modal + s.tunai + s.kas_masuk - s.kas_keluar - s.retur_tunai;
       return { ...s, seharusnya, selisih: s.kas_hitung === null ? null : s.kas_hitung - seharusnya };
     }),
   });

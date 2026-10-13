@@ -38,7 +38,7 @@ async function daftarTransaksi() {
 }
 
 async function detailTransaksi(id) {
-  const { transaksi: t, items, pembayaran } = await api("GET", "/api/transaksi/" + id);
+  const { transaksi: t, items, pembayaran, retur, void: vo } = await api("GET", "/api/transaksi/" + id);
   popup(`<h2>${esc(t.no)}</h2><div class="muted small">${waktu(t.waktu)} · ${esc(t.lokasi)} · ${esc(t.kasir)} · HP ${esc(t.perangkat || "—")}</div>
     <table style="margin-top:10px">${items.map((i) => `<tr><td>${esc(i.nama)}<div class="small muted">${i.qty} × ${rp(i.harga)} · HPP ${rp(i.hpp)}</div></td><td class="num">${rp(i.qty * i.harga)}</td></tr>`).join("")}
       <tr><td>Subtotal</td><td class="num">${rp(t.subtotal)}</td></tr>${t.diskon ? `<tr><td>${esc(t.promo || "Diskon")}</td><td class="num">−${rp(t.diskon)}</td></tr>` : ""}
@@ -46,6 +46,11 @@ async function detailTransaksi(id) {
       <tr><td><b>Total</b></td><td class="num"><b>${rp(t.total)}</b></td></tr>
       ${pembayaran.map((b) => `<tr><td>${esc(b.metode)}${b.ref ? ` · ref ${esc(b.ref)}` : ""}</td><td class="num">${rp(b.jumlah)}</td></tr>`).join("")}
       ${t.kembalian ? `<tr><td>Kembalian</td><td class="num">${rp(t.kembalian)}</td></tr>` : ""}</table>
+    ${t.pelanggan_nama ? `<p class="small">Pembeli: <b>${esc(t.pelanggan_nama)}</b> ${esc(t.pelanggan_telp ?? "")}</p>` : ""}
+    ${t.potongan_cek !== null && t.potongan_cek !== undefined ? `<p class="small" style="color:var(--warn-text)">Potongan menurut server ${rp(t.potongan_cek)}, berbeda dengan di HP. Periksa promonya.</p>` : ""}
+    ${t.presale ? `<p class="small">Pre-sale · status ambil: <b>${esc(t.ambil_status ?? "")}</b>${t.ambil_pada ? " · " + waktu(t.ambil_pada) : ""}</p>` : ""}
+    ${t.status === "Void" ? `<p class="small" style="color:var(--danger-text)">Void ${waktu(t.void_pada)} · ${esc(t.void_alasan)} · oleh ${esc(vo?.oleh)}${vo?.disetujui && vo.disetujui !== vo.oleh ? ", disetujui " + esc(vo.disetujui) : ""}</p>` : ""}
+    ${retur.map((r) => `<p class="small">Retur ${esc(r.no)} · ${waktu(r.waktu)} · ${esc(r.barang)} · ${esc(r.cara)}${r.nilai ? ` ${rp(r.nilai)} (${esc(r.metode)})` : ""} · ${esc(r.alasan)} · disetujui ${esc(r.disetujui)}${r.foto ? ` · <a href="/api/berkas/${r.foto}" target="_blank">foto</a>` : ""}</p>`).join("")}
     ${t.offline ? '<p class="small muted">Dibuat saat HP offline, diterima server ' + waktu(t.diterima_pada) + ".</p>" : ""}`);
 }
 
@@ -55,7 +60,7 @@ async function daftarSetoran() {
   const selisih = (s) => s.selisih === null ? '<span class="tag warn">Masih buka</span>' : s.selisih === 0 ? '<span class="tag aktif">Kas pas</span>'
     : s.selisih < 0 ? `<span class="tag off">Kurang ${rp(-s.selisih)}</span>` : `<span class="tag warn">Lebih ${rp(s.selisih)}</span>`;
   $("#isi").innerHTML = `<main>${kepalaJual()}
-    <p class="muted small">Seharusnya = modal + penjualan tunai + kas masuk − kas keluar, dihitung ulang dari transaksi yang sudah masuk server.</p>
+    <p class="muted small">Seharusnya = modal + penjualan tunai + kas masuk − kas keluar − uang kembali retur tunai, dihitung ulang dari transaksi yang sudah masuk server.</p>
     <div class="tablewrap"><table><thead><tr><th>Buka</th><th>Tempat</th><th>Kasir</th><th class="num">Transaksi</th><th class="num">Penjualan</th><th class="num">Modal</th><th class="num">Seharusnya</th><th class="num">Dihitung</th><th>Selisih</th></tr></thead><tbody>
     ${d.shift.length ? d.shift.map((s) => `<tr class="klik" data-id="${s.id}"><td>${waktu(s.buka)}${s.tutup ? `<div class="small muted">tutup ${waktu(s.tutup)}</div>` : ""}</td><td>${esc(s.lokasi)}</td>
       <td>${esc(s.kasir)}${s.ditutup_oleh && s.ditutup_oleh !== s.kasir ? `<div class="small muted">ditutup ${esc(s.ditutup_oleh)}</div>` : ""}</td><td class="num">${s.transaksi}</td><td class="num">${rp(s.penjualan)}</td>

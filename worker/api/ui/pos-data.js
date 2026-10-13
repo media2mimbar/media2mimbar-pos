@@ -100,27 +100,33 @@ function sinkronSekarang() {
         const semua = await isiAntrean();
         if (!semua.length) break;
         const kirim = semua.slice(0, 20);
+        // Foto retur yang diambil saat offline diunggah dulu, lalu ID-nya ikut dokumen.
+        for (const d of kirim.filter((d) => d.jenis === "retur" && d.data.foto_lokal)) {
+          await unggahFotoAntrean(d);
+          await tx("antrean", "readwrite", (s) => s.put(d));
+        }
         const r = await api("POST", "/api/pos/sinkron", { dokumen: kirim.map(({ jenis, data }) => ({ jenis, data })) }, { tanpaSesi: true, batas: 30000 });
         const ditolak = [];
         r.hasil.forEach((h, i) => {
           if (h.status === "ditolak") ditolak.push({ ...kirim[i], alasan: h.alasan, waktu: sekarang() });
         });
         for (const [i, d] of kirim.entries()) {
-          if (d.jenis === "terima" && r.hasil[i].status === "ok") {
-            const snap = await kv.get("snap:" + d.data.lokasi_id);
-            if (snap && snap.waktu < r.waktu) {
-              for (const it of d.data.items) snap.stok[it.sku] = (snap.stok[it.sku] ?? 0) + it.diterima;
-              await kv.set("snap:" + d.data.lokasi_id, snap);
-            }
+          const ok = r.hasil[i].status === "ok";
+          if (d.jenis === "trx") {
+            const t = await tx("trx", "readonly", (s) => s.get(d.data.id));
+            if (t) await tx("trx", "readwrite", (s) => s.put({ ...t, terkirim: r.hasil[i].status !== "ditolak", ditolak: r.hasil[i].alasan ?? null }));
           }
-          if (d.jenis !== "trx") continue;
-          const t = await tx("trx", "readonly", (s) => s.get(d.data.id));
-          if (t) await tx("trx", "readwrite", (s) => s.put({ ...t, terkirim: r.hasil[i].status !== "ditolak", ditolak: r.hasil[i].alasan ?? null }));
-          // Server sudah mengurangi stoknya. Kurangi juga stok di katalog HP kalau katalog itu ditarik sebelum transaksi ini masuk.
-          const snap = r.hasil[i].status !== "ditolak" && (await kv.get("snap:" + d.data.lokasi_id));
+          if (["void", "retur", "serah"].includes(d.jenis) && r.hasil[i].status !== "ditolak") {
+            const id = d.jenis === "retur" ? d.data.trx_id : d.data.id;
+            const t = await tx("trx", "readonly", (s) => s.get(id));
+            if (t) await tx("trx", "readwrite", (s) => s.put({ ...t, ubahLokal: false }));
+          }
+          // Server sudah mengubah stoknya. Ubah juga stok di katalog HP kalau katalog itu ditarik sebelum dokumen ini masuk.
+          const g = ok && gerakDok(d);
+          const snap = g && (await kv.get("snap:" + g.lokasi));
           if (snap && snap.waktu < r.waktu) {
-            for (const it of d.data.items) snap.stok[it.sku] = (snap.stok[it.sku] ?? 0) - it.qty;
-            await kv.set("snap:" + d.data.lokasi_id, snap);
+            for (const [sku, n] of Object.entries(g.ubah)) snap.stok[sku] = (snap.stok[sku] ?? 0) + n;
+            await kv.set("snap:" + g.lokasi, snap);
           }
         }
         if (ditolak.length) await kv.set("ditolak", [...((await kv.get("ditolak")) ?? []), ...ditolak].slice(-100));
@@ -149,6 +155,7 @@ async function tarikData(lokasiId) {
   snap.lokasi = r.lokasi;
   snap.kategori = r.kategori;
   snap.kiriman_menunggu = r.kiriman_menunggu ?? 0;
+  snap.promo = r.promo ?? [];
   for (const p of r.produk) snap.produk[p.id] = p;
   for (const v of r.varian) snap.varian[v.sku] = v;
   for (const s of r.stok) snap.stok[s.sku] = s.qty;
@@ -178,17 +185,30 @@ async function simpanGambarQris(id) {
   } catch {}
 }
 
-// Stok yang tampil = stok server − penjualan di antrean yang belum terkirim.
+// Perubahan stok dari satu dokumen antrean: { lokasi, ubah: { sku: +/- } }, atau null.
+// Pre-sale "ambil nanti" tidak mengurangi stok saat transaksi; stok berkurang saat barang diserahkan.
+function gerakDok(d) {
+  const x = d.data, ubah = {};
+  const tambah = (sku, n) => (ubah[sku] = (ubah[sku] ?? 0) + n);
+  if (d.jenis === "trx" && !x.presale) x.items.forEach((i) => tambah(i.sku, -i.qty));
+  else if (d.jenis === "terima") x.items.forEach((i) => tambah(i.sku, i.diterima));
+  else if (d.jenis === "void" && x.stok_kembali) x.items.forEach((i) => tambah(i.sku, i.qty));
+  else if (d.jenis === "retur" && x.cara === "Tukar barang") x.items.forEach((i) => tambah(i.sku, -i.qty));
+  else if (d.jenis === "serah") x.items.forEach((i) => tambah(i.sku, -i.qty));
+  else return null;
+  return { lokasi: x.lokasi_id, ubah };
+}
+
+// Stok yang tampil = stok server + perubahan dari dokumen di antrean yang belum terkirim.
 async function stokTersedia(snap) {
-  const kurang = {};
+  const ubah = {};
   for (const d of await isiAntrean()) {
-    if (d.data.lokasi_id !== snap.lokasi.id) continue;
-    // Penjualan yang belum terkirim mengurangi stok; kiriman yang sudah diterima di HP tapi belum terkirim menambah.
-    if (d.jenis === "trx") for (const i of d.data.items) kurang[i.sku] = (kurang[i.sku] ?? 0) + i.qty;
-    if (d.jenis === "terima") for (const i of d.data.items) kurang[i.sku] = (kurang[i.sku] ?? 0) - i.diterima;
+    const g = gerakDok(d);
+    if (!g || g.lokasi !== snap.lokasi.id) continue;
+    for (const [sku, n] of Object.entries(g.ubah)) ubah[sku] = (ubah[sku] ?? 0) + n;
   }
   const hasil = {};
-  for (const sku of Object.keys(snap.varian)) hasil[sku] = (snap.stok[sku] ?? 0) - (kurang[sku] ?? 0);
+  for (const sku of Object.keys(snap.varian)) hasil[sku] = (snap.stok[sku] ?? 0) + (ubah[sku] ?? 0);
   return hasil;
 }
 

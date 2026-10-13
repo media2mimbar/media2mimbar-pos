@@ -1,5 +1,8 @@
 import * as akun from "./akun.js";
 import * as event from "./event.js";
+import * as lengkap from "./kasir-lengkap.js";
+import * as presale from "./presale.js";
+import * as promosi from "./promosi.js";
 import * as opname from "./opname.js";
 import * as inventori from "./inventori.js";
 import * as katalog from "./katalog.js";
@@ -81,6 +84,14 @@ const RUTE: [string, string, Handler][] = [
   ["POST", "/api/opname/:id/ulang", opname.ulangOpname],
   ["GET", "/api/kerugian", opname.daftarKerugian],
   ["POST", "/api/kerugian/:id/selesaikan", opname.selesaikanKerugian],
+  ["GET", "/api/promo", promosi.daftarPromo],
+  ["POST", "/api/promo", promosi.tambahPromo],
+  ["GET", "/api/promo/:id", promosi.detailPromo],
+  ["PATCH", "/api/promo/:id", promosi.ubahPromo],
+  ["GET", "/api/presale", presale.daftarPresale],
+  ["POST", "/api/presale/:id/refund", presale.refundPresale],
+  ["GET", "/api/terbuang", presale.daftarTerbuang],
+  ["POST", "/api/terbuang", presale.catatTerbuang],
   ["GET", "/api/dokumen-ditolak", penjualan.daftarDitolak],
   ["POST", "/api/dokumen-ditolak/:id/selesai", penjualan.selesaiDitolak],
 
@@ -91,7 +102,11 @@ const RUTE: [string, string, Handler][] = [
   ["GET", "/api/pos/shift/:id", kasir.shiftPos],
   ["GET", "/api/pos/penjualan", kasir.penjualanPos],
   ["GET", "/api/pos/inventori", kasir.inventoriPos],
+  ["GET", "/api/pos/pelanggan", lengkap.cariPelangganPos],
+  ["GET", "/api/pos/pesanan", lengkap.pesananPos],
+  ["GET", "/api/pos/trx/:id", lengkap.cariTrxPos],
   ["GET", "/api/pos/berkas/:id", pengaturan.ambilBerkasPos],
+  ["POST", "/api/pos/berkas", pengaturan.unggahBerkasPos],
   ["GET", "/api/pos/perangkat", pos.infoPerangkat],
   ["GET", "/api/pos/karyawan", pos.daftarKaryawan],
   ["POST", "/api/pos/masuk", pos.masuk],
@@ -122,7 +137,7 @@ function cocokkan(method: string, path: string): { h: Handler; id: string } | "s
 
 const HEADER_HALAMAN = {
   "cache-control": "no-cache",
-  "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'",
+  "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'",
   "x-content-type-options": "nosniff",
   "referrer-policy": "same-origin",
 };
@@ -133,7 +148,7 @@ export default {
     const path = url.pathname.replace(/\/+$/, "") || "/";
 
     if (!path.startsWith("/api/")) {
-      const html = HALAMAN[path as keyof typeof HALAMAN];
+      const html = HALAMAN[path];
       const jenis = path.endsWith(".js") ? "text/javascript; charset=utf-8"
         : path.endsWith(".webmanifest") ? "application/manifest+json"
         : path.endsWith(".svg") ? "image/svg+xml" : "text/html; charset=utf-8";

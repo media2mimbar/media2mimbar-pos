@@ -1,7 +1,7 @@
 // Service worker POS: simpan file aplikasi supaya POS tetap terbuka tanpa sinyal.
 // Data (katalog, antrean) tidak lewat sini; itu urusan IndexedDB di pos-data.js.
 const VERSI = "__VERSI__";
-const FILE = ["/pos", "/pos-app.js", "/pos-data.js", "/pos-struk.js", "/pos-qrcode.js", "/pos.webmanifest", "/pos-ikon.svg"];
+const FILE = ["/pos", "/pos-app.js", "/pos-data.js", "/pos-struk.js", "/pos-qrcode.js", "/pos-promo.js", "/pos-lengkap.js", "/pos-jsqr.js", "/pos.webmanifest", "/pos-ikon.svg"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open("pos-" + VERSI).then((c) => c.addAll(FILE)).then(() => self.skipWaiting()));

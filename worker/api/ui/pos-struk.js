@@ -29,7 +29,7 @@ const HkPdf=(()=>{
 // t: transaksi lokal; tempat: {nama}; st: pengaturan.struk
 function strukPdf(t, tempat, st) {
   const W = 80, L = 5, R = W - 5;
-  const tinggi = 70 + t.items.length * 9 + t.pembayaran.length * 5 + (t.diskon ? 5 : 0) + (t.pajak ? 5 : 0) + (t.pembulatan ? 5 : 0);
+  const tinggi = 70 + t.items.length * 9 + t.pembayaran.length * 5 + (t.diskon ? 5 : 0) + (t.pajak ? 5 : 0) + (t.pembulatan ? 5 : 0) + (t.qr ? 70 : 0);
   const doc = new HkPdf(W, Math.max(120, tinggi));
   let y = 8;
   const tx = (s, x, o) => doc.text(String(s), x, y, o || {});
@@ -56,6 +56,20 @@ function strukPdf(t, tempat, st) {
   t.pembayaran.forEach((b) => row(b.metode + (b.ref ? " (ref " + b.ref + ")" : ""), fmt(b.jumlah)));
   if (t.kembalian) row("Kembalian", fmt(t.kembalian));
   y += 2; garis();
+  // Pre-sale: QR pengambilan digambar kotak per kotak (modul QR dari pos-qrcode.js).
+  if (t.qr) {
+    doc.setFont("helvetica", "bold"); tx("PRE-SALE - QR PENGAMBILAN", W / 2, { align: "center" }); y += 3;
+    const q = qrcode(0, "M");
+    q.addData(t.qr);
+    q.make();
+    const n = q.getModuleCount(), sisi = 42, m = sisi / n, x0 = (W - sisi) / 2;
+    doc.setFillColor(0);
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) doc.rect(x0 + c * m, y + r * m, m + 0.02, m + 0.02);
+    y += sisi + 5;
+    doc.setFont("helvetica", "normal");
+    doc.splitTextToSize(t.catatan_presale || "", R - L).forEach((l) => { tx(l, W / 2, { align: "center" }); y += 4; });
+    y += 2; garis();
+  }
   doc.splitTextToSize(st.footer || "", R - L).forEach((l) => { tx(l, W / 2, { align: "center" }); y += 4; });
   return doc;
 }

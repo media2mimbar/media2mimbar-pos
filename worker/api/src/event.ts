@@ -372,7 +372,9 @@ async function dataTutup(db: D1Database, e: BarisEvent) {
   ]);
   let opnameItem: { sku: string; sistem: number; fisik: number }[] = [];
   if (opname) opnameItem = (await db.prepare("SELECT sku, sistem, fisik FROM opname_item WHERE opname_id = ?").bind(opname.id).all<{ sku: string; sistem: number; fisik: number }>()).results;
-  return { event: { ...e, status: statusEvent(e) }, stok: stok.results, shift_terbuka: shift.results, kiriman: kiriman.results, opname_menunggu: opname ? { ...opname, item: opnameItem } : null };
+  const presale = await db.prepare("SELECT COUNT(*) AS n FROM trx WHERE lokasi_id = ? AND presale = 1 AND ambil_status = 'Menunggu' AND status = 'Lunas'").bind(e.id).first<{ n: number }>();
+  return { event: { ...e, status: statusEvent(e) }, stok: stok.results, shift_terbuka: shift.results, kiriman: kiriman.results, opname_menunggu: opname ? { ...opname, item: opnameItem } : null,
+    presale_menunggu: presale?.n ?? 0 };
 }
 
 // POST /api/event/:id/tutup { fisik: {SKU: n}, pj_id, penjelasan, opname_id? }
@@ -445,6 +447,9 @@ export async function tutupEvent(req: Request, env: Env, id: string) {
     env.DB.prepare("UPDATE event SET ditutup = 1, tutup_pada = ?, tutup_oleh = ?, tutup_catatan = ?, diubah_pada = ? WHERE id = ? AND ditutup = 0")
       .bind(t, staff.id, `${oleh}${kerugian ? ` Kerugian Rp${kerugian.toLocaleString("id-ID")}.` : ""}`, t, id),
     env.DB.prepare("UPDATE lokasi SET aktif = 0, diubah_pada = ? WHERE id = ?").bind(t, id),
+    // Pre-sale yang belum diambil boleh diambil di Gudang Pusat 7 hari, lalu menjadi Perlu Refund.
+    env.DB.prepare("UPDATE trx SET ambil_batas = ?, diubah_pada = ? WHERE lokasi_id = ? AND presale = 1 AND ambil_status = 'Menunggu' AND status = 'Lunas'")
+      .bind(new Date(Date.parse(hariIniWib()) + 7 * 86_400_000).toISOString().slice(0, 10), t, id),
     logAktivitas(env.DB, staff, "Tutup event", { tabel: "event", id, keterangan: `${e.nama}, kerugian ${kerugian}` }),
   );
   await env.DB.batch(tulis);

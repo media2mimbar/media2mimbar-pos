@@ -167,3 +167,11 @@ export async function ambilBerkasPos(req: Request, env: Env, id: string) {
   if (!r) throw new Gagal(404, "Berkas tidak ditemukan");
   return kirimBerkas(r);
 }
+
+// Foto dari HP (barang cacat saat retur). Cukup token perangkat; dikecilkan di HP sebelum diunggah.
+export async function unggahBerkasPos(req: Request, env: Env) {
+  await perangkatDari(env.DB, req);
+  const panjang = Number(req.headers.get("content-length") ?? 0);
+  if (panjang > MAKS_BYTE) throw new Gagal(413, "Foto maksimal 1 MB. Kecilkan dulu");
+  return json(await simpanBerkas(env.DB, new Uint8Array(await req.arrayBuffer()), "retur", null), 201);
+}
