@@ -260,7 +260,7 @@ Saran: jalankan tahap 3 di satu event kecil sebelum tahap 4 sampai 7 selesai. Ma
 
 ### Catatan pembangunan (Oktober 2026)
 
-Tahap 1 sampai 4 sudah dibangun di `worker/api` dan berjalan di `https://hikayat-api.media2mimbar.workers.dev`. Beberapa hal berbeda dari rancangan di atas karena lingkungan pengembangan saat itu tidak bisa mengunduh paket npm:
+Tahap 1 sampai 7 sudah dibangun di `worker/api` dan berjalan di `https://hikayat-api.media2mimbar.workers.dev`. Beberapa hal berbeda dari rancangan di atas karena lingkungan pengembangan saat itu tidak bisa mengunduh paket npm:
 
 | Rancangan | Yang dipakai sekarang | Rencana |
 |---|---|---|
@@ -281,6 +281,12 @@ Tahap 3 menambah migrasi `0003_pos.sql`: `shift`, `kas_laci`, `trx`, `trx_item`,
 - Setoran kasir di dashboard menghitung ulang "seharusnya" dari transaksi yang sudah masuk server, jadi tetap benar walau ada HP yang mengirim belakangan.
 
 Tahap 4 menambah migrasi `0004_event.sql`: `event`, `event_kasir`, `event_varian` (produk yang dijual + harga event), `mutasi`, `mutasi_item`, `opname`, `opname_item`, `kerugian`, `kerugian_riwayat`. Setiap event juga punya baris `lokasi` dengan ID yang sama, jadi stok dan transaksi menempel ke ID dan ikut "pindah" saat nama event diganti. Kirim stok mengurangi gudang dan menambah `transit` di event; diterima di POS lewat dokumen antrean `terima`. Opname dari POS lewat dokumen `opname`. Tutup event membatalkan kiriman yang belum diterima, menyesuaikan stok ke hitungan fisik, mencatat kerugian, lalu memindahkan sisa ke gudang dalam satu `db.batch`. Kerugian kas laci dicatat otomatis saat tutup kasir kurang.
+
+Tahap 5 menambah migrasi `0005_pos_lengkap.sql`: `promo`, `pelanggan`, `retur`, `retur_item`, `terbuang`, `terbuang_item`, dan kolom pre-sale, void, dan refund di `trx`. Rumus promo ada di `src/promo.ts` dan dipakai server dan HP (dikompilasi menjadi `/pos-promo.js`), jadi potongan di HP dan di server selalu sama. Dokumen antrean baru: `pelanggan`, `void`, `retur`, `serah`. Foto retur diunggah ke `berkas` (D1); kalau HP offline, foto disimpan di IndexedDB dan diunggah saat sinkron. Daftar Order dan pisah bayar hanya disimpan di HP sampai lunas, jadi tutup kasir ditolak selama masih ada pesanan yang dibayar sebagian.
+
+Tahap 6 menambah migrasi `0006_online.sql`: `saluran` (Shopee, Tokopedia, TikTok Shop, Lainnya, beserta biaya), `saluran_varian` (harga marketplace per SKU), `pesanan_online`, `pesanan_item`, `impor_batch`. File CSV dibaca di browser; server memeriksa ulang dan menyimpan per kiriman maksimal 100 pesanan dalam satu `db.batch`. Excel perlu disimpan sebagai CSV karena belum ada pustaka pembaca Excel.
+
+Tahap 7 menambah migrasi `0007_keuangan.sql`: `biaya` (dihapus = ditandai, bukan dibuang), `rekap_harian`, dan pengaturan `keuangan`. Semua laporan memakai satu sumber angka, `sqlFakta` di `src/laporan.ts`: baris jual per barang dari POS, retur, dan pesanan online, dengan diskon dan potongan marketplace dibagi rata ke barang menurut nilainya. Laporan penjualan menghitung pre-sale pada tanggal transaksi; laporan keuangan menghitungnya saat barang diserahkan. Cron `10 17 * * *` (00.10 WIB) menghitung ulang rekap harian 7 hari terakhir, jadi transaksi dari HP yang lama offline tetap masuk. Laporan lain masih dihitung langsung dari tabel transaksi karena datanya masih kecil.
 
 Batas yang perlu diingat: satu query D1 maksimal 100 parameter, jadi satu faktur dibatasi 90 baris barang dan satu produk 40 varian.
 

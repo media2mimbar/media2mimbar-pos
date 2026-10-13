@@ -101,6 +101,12 @@ def siapkan_secret(db_id):
         print(f"Kode setup Owner pertama: {kode}")
 
 
+def pasang_cron():
+    # 17:10 UTC = 00:10 WIB.
+    req("PUT", f"/accounts/{ACCOUNT}/workers/scripts/{NAMA_WORKER}/schedules", [{"cron": "10 17 * * *"}])
+    print("Cron rekap harian: 00:10 WIB")
+
+
 def nyalakan_alamat():
     req("POST", f"/accounts/{ACCOUNT}/workers/scripts/{NAMA_WORKER}/subdomain", {"enabled": True, "previews_enabled": False})
     sub = req("GET", f"/accounts/{ACCOUNT}/workers/subdomain")["subdomain"]
@@ -111,4 +117,5 @@ if __name__ == "__main__":
     db_id = siapkan_db()
     unggah_worker(db_id)
     siapkan_secret(db_id)
+    pasang_cron()
     nyalakan_alamat()

@@ -127,8 +127,10 @@ async function detailEvent(id) {
     <h2 class="section">Transaksi</h2>
     <div class="tablewrap"><table><thead><tr><th>Waktu</th><th>No.</th><th>Kasir</th><th>Metode</th><th class="num">Total</th><th>Status</th></tr></thead><tbody>
       ${d.transaksi.map((t) => `<tr class="klik" data-trx="${t.id}"><td>${waktu(t.waktu)}</td><td>${esc(t.no)}</td><td>${esc(t.kasir)}</td><td>${esc(t.metode)}</td><td class="num">${rp(t.total)}</td><td>${esc(t.status)}</td></tr>`).join("") || '<tr><td colspan="6" class="muted">Belum ada.</td></tr>'}</tbody></table></div>
+    <div id="biayaEv"></div>
   </main>`;
   $("#kembali").onclick = halEvent;
+  kartuBiayaEvent(id, $("#biayaEv"));
   if ($("#ubahEv")) {
     $("#ubahEv").onclick = () => formEvent(id);
     $("#kirimEv").onclick = () => formKirimTarik(d, "kirim");
@@ -313,11 +315,11 @@ async function formOpnameGudang() {
 
 // ---------- Laporan › Selisih & Kerugian ----------
 
-let subLaporan = "kerugian";
+let subLaporan = "saluran";
 
 function halLaporan(sub) {
   if (sub) subLaporan = sub;
-  ({ kerugian: halKerugian })[subLaporan]();
+  ({ saluran: halLaporanSaluran, event: halLaporanEvent, kasir: halLaporanKasir, produk: halLaporanProduk, harian: halLaporanHarian, kerugian: halKerugian })[subLaporan]();
 }
 
 async function halKerugian() {
@@ -325,8 +327,7 @@ async function halKerugian() {
   const { kerugian, ringkasan: r } = await api("GET", "/api/kerugian");
   const JENIS = { stok: "Stok (opname)", kas: "Kas laci", terbuang: "Barang terbuang", kiriman: "Kiriman kurang" };
   const WARNA = { "Belum diselesaikan": "off", "Diganti sebagian": "warn", Diganti: "aktif", "Dibebankan perusahaan": "" };
-  $("#isi").innerHTML = `<main><div class="head"><div><h1>Laporan</h1></div></div>
-    ${subtabs([["kerugian", "Selisih & Kerugian"]], subLaporan)}
+  $("#isi").innerHTML = `<main>${kepalaLaporan()}
     <div class="kpis"><div class="kpi"><span class="muted small">Total kerugian</span><b>${rp(r.total)}</b></div>
       <div class="kpi"><span class="muted small">Belum diselesaikan</span><b style="color:var(--danger-text)">${rp(r.belum)}</b></div>
       <div class="kpi"><span class="muted small">Sudah diganti</span><b>${rp(r.diganti)}</b></div><div class="kpi"><span class="muted small">Dibebankan perusahaan</span><b>${rp(r.dibebankan)}</b></div></div>

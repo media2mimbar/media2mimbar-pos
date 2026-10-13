@@ -1,4 +1,7 @@
 import * as akun from "./akun.js";
+import * as biaya from "./biaya.js";
+import * as keuangan from "./keuangan.js";
+import * as laporan from "./laporan.js";
 import * as event from "./event.js";
 import * as lengkap from "./kasir-lengkap.js";
 import * as presale from "./presale.js";
@@ -110,6 +113,21 @@ const RUTE: [string, string, Handler][] = [
   ["POST", "/api/pelanggan", pelanggan.tambahPelanggan],
   ["GET", "/api/pelanggan/:id", pelanggan.detailPelanggan],
   ["PATCH", "/api/pelanggan/:id", pelanggan.ubahPelanggan],
+  ["GET", "/api/biaya", biaya.daftarBiaya],
+  ["GET", "/api/biaya/kategori", biaya.kategoriBiaya],
+  ["POST", "/api/biaya", biaya.tambahBiaya],
+  ["PATCH", "/api/biaya/:id", biaya.ubahBiaya],
+  ["DELETE", "/api/biaya/:id", biaya.hapusBiaya],
+  ["GET", "/api/ringkasan", laporan.ringkasan],
+  ["GET", "/api/laporan/saluran", laporan.laporanSaluran],
+  ["GET", "/api/laporan/event", laporan.laporanEvent],
+  ["GET", "/api/laporan/kasir", laporan.laporanKasir],
+  ["GET", "/api/laporan/produk", laporan.laporanProduk],
+  ["GET", "/api/laporan/harian", laporan.laporanHarian],
+  ["POST", "/api/laporan/rekap", laporan.hitungUlangRekap],
+  ["GET", "/api/keuangan", keuangan.keuanganKeseluruhan],
+  ["GET", "/api/keuangan/event/:id", keuangan.keuanganEvent],
+  ["PUT", "/api/pengaturan/keuangan", keuangan.simpanPengaturanKeuangan],
   ["GET", "/api/dokumen-ditolak", penjualan.daftarDitolak],
   ["POST", "/api/dokumen-ditolak/:id/selesai", penjualan.selesaiDitolak],
 
@@ -185,5 +203,10 @@ export default {
       console.error(e);
       return json({ error: "Terjadi kesalahan di server" }, 500);
     }
+  },
+
+  // Cron 00:10 WIB: hitung ulang rekap harian 7 hari terakhir.
+  async scheduled(_c: unknown, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }) {
+    ctx.waitUntil(laporan.cronRekap(env));
   },
 };

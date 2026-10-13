@@ -161,6 +161,7 @@ try {
 
   // ---------- Laporan › Selisih & Kerugian ----------
   await lap.getByRole("button", { name: "Laporan", exact: true }).click();
+  await lap.locator('[data-sub="kerugian"]').click();
   await lap.getByText("Kiriman kurang").waitFor();
   assert.match(await lap.locator(".kpis").textContent(), /Total kerugian\s*Rp 110\.000/);
   await lap.locator("tr", { hasText: "Kiriman kurang" }).locator("[data-selesai]").click();

@@ -24,6 +24,16 @@ input:focus{outline:2px solid var(--accent-bg);border-color:var(--accent)}
 .btn:disabled{opacity:.5;cursor:default}
 .err{background:var(--danger-bg);color:var(--danger-text);padding:10px 12px;border-radius:8px;margin-top:14px}
 .ok{background:var(--success-bg);color:var(--success-text);padding:10px 12px;border-radius:8px;margin-top:14px}
+.grafik-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;margin-top:6px}
+.card.grafik{padding:16px 18px}.grafik h3{font-size:14px;margin:0 0 10px}
+.gb-baris{display:grid;grid-template-columns:minmax(80px,34%) 1fr auto;gap:10px;align-items:center;padding:4px 0;position:relative;outline:none}
+.gb-label{font-size:13px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gb-jalur{height:14px;display:block}.gb-batang{display:block;height:14px;background:#2a78d6;border-radius:0 4px 4px 0}
+.gb-nilai{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap}
+.gb-baris:hover .gb-batang,.gb-baris:focus .gb-batang{filter:brightness(.9)}
+.gb-baris:hover::after,.gb-baris:focus::after{content:attr(data-tip);position:absolute;left:34%;bottom:100%;background:#1E2321;color:#fff;font-size:12px;padding:5px 8px;border-radius:6px;white-space:nowrap;z-index:5;pointer-events:none}
+tr.total td{border-top:2px solid var(--border)}
+@media print{.top,.ku-noprint,.subtabs,.back,#popup{display:none!important}body{background:#fff}.card{break-inside:avoid;box-shadow:none}main{max-width:none;padding:0}}
 .warn{background:var(--warn-bg);color:var(--warn-text);padding:10px 12px;border-radius:8px;margin-top:14px}
 .top{background:var(--accent);color:#fff;display:flex;align-items:center;gap:20px;padding:0 20px;height:56px;flex-wrap:wrap}
 .top b{font-size:16px}
@@ -141,6 +151,7 @@ tfoot td{font-weight:700;background:#FAFAF8}
 <script src="/dash-event.js"></script>
 <script src="/dash-promo.js"></script>
 <script src="/dash-online.js"></script>
+<script src="/dash-laporan.js"></script>
 <script>
 const $ = (s, el = document) => el.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -242,7 +253,7 @@ function mulai(staff) {
   $("#akunNama").textContent = staff.nama;
   $("#akunRole").textContent = staff.role.map((r) => NAMA_ROLE[r]).join(", ");
   const owner = staff.role.includes("owner");
-  const tabs = [["penjualan", "Penjualan"], ["event", "Event"], ["presale", "Pre-sale"], ["online", "Online"], ["produk", "Produk"], ["pelanggan", "Pelanggan"], ["promosi", "Promosi"], ["inventori", "Inventori"], ["laporan", "Laporan"], ["pengaturan", "Pengaturan POS"], owner && ["karyawan", "Karyawan"], ["perangkat", "Perangkat POS"], owner && ["riwayat", "Riwayat Masuk"]].filter(Boolean);
+  const tabs = [["dashboard", "Dashboard"], ["penjualan", "Penjualan"], ["event", "Event"], ["presale", "Pre-sale"], ["online", "Online"], ["produk", "Produk"], ["pelanggan", "Pelanggan"], ["promosi", "Promosi"], ["inventori", "Inventori"], ["laporan", "Laporan"], owner && ["keuangan", "Keuangan"], ["pengaturan", "Pengaturan POS"], owner && ["karyawan", "Karyawan"], ["perangkat", "Perangkat POS"], owner && ["riwayat", "Riwayat Masuk"]].filter(Boolean);
   $("#nav").innerHTML = tabs.map(([k, n]) => `<button data-tab="${k}">${n}</button>`).join("");
   $("#nav").onclick = (e) => e.target.dataset.tab && buka(e.target.dataset.tab);
   tampil("layarApp");
@@ -252,7 +263,7 @@ function mulai(staff) {
 function buka(t) {
   tab = t;
   for (const b of $("#nav").children) b.classList.toggle("on", b.dataset.tab === t);
-  ({ online: halOnline, pelanggan: halPelanggan, presale: halPresale, promosi: halPromosi, event: halEvent, laporan: halLaporan, penjualan: halPenjualan, pengaturan: halPengaturan, produk: halProduk, inventori: halInventori, karyawan: halKaryawan, perangkat: halPerangkat, riwayat: halRiwayat })[t]();
+  ({ dashboard: halDashboard, keuangan: halKeuangan, online: halOnline, pelanggan: halPelanggan, presale: halPresale, promosi: halPromosi, event: halEvent, laporan: halLaporan, penjualan: halPenjualan, pengaturan: halPengaturan, produk: halProduk, inventori: halInventori, karyawan: halKaryawan, perangkat: halPerangkat, riwayat: halRiwayat })[t]();
 }
 
 // ---------- Karyawan ----------

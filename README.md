@@ -4,7 +4,7 @@ Sistem kasir (POS di HP) dan dashboard untuk penjualan merchandise Hikayat di ev
 
 Status:
 - **Prototipe** (`prototipe/`): data tersimpan di browser (`localStorage`), jadi HP kasir dan dashboard belum saling terhubung. Demo: https://hikayat-pos-demo.pages.dev/dashboard dan https://hikayat-pos-demo.pages.dev/pos
-- **Versi produksi** (`worker/api/`): tahap 1 sampai 6 dari `docs/Arsitektur-Cloudflare.md` sudah jalan di https://hikayat-api.media2mimbar.workers.dev (login dashboard, karyawan, pendaftaran HP, masuk POS dengan PIN, produk dan varian, kategori, pemasok, faktur pembelian ke Gudang Pusat, HPP rata-rata tertimbang, daftar stok, POS di HP dengan mode offline, pengaturan POS, setoran kasir, event, kirim/terima/tarik stok, stok opname, tutup event, selisih & kerugian, promosi, pelanggan, Daftar Order dan pisah bayar, void, retur barang cacat dengan foto, pre-sale dengan struk ber-QR dan serah barang, stok terbuang, penjualan online lewat input manual dan impor CSV, harga dan biaya marketplace, halaman pelanggan).
+- **Versi produksi** (`worker/api/`): tahap 1 sampai 7 dari `docs/Arsitektur-Cloudflare.md` sudah jalan di https://hikayat-api.media2mimbar.workers.dev (login dashboard, karyawan, pendaftaran HP, masuk POS dengan PIN, produk dan varian, kategori, pemasok, faktur pembelian ke Gudang Pusat, HPP rata-rata tertimbang, daftar stok, POS di HP dengan mode offline, pengaturan POS, setoran kasir, event, kirim/terima/tarik stok, stok opname, tutup event, selisih & kerugian, promosi, pelanggan, Daftar Order dan pisah bayar, void, retur barang cacat dengan foto, pre-sale dengan struk ber-QR dan serah barang, stok terbuang, penjualan online lewat input manual dan impor CSV, harga dan biaya marketplace, halaman pelanggan, dashboard ringkasan, laporan per saluran/event/kasir/produk/rekap harian, biaya, laporan keuangan per event dan keseluruhan).
 
 ## Isi
 
@@ -57,6 +57,7 @@ node tests/browser-pos.mjs         # uji POS tahap 3 (online, offline, sinkron, 
 node tests/browser-event.mjs       # uji event tahap 4 (kirim, terima, opname, tutup event, kerugian)
 node tests/browser-lengkap.mjs     # uji tahap 5 (promo, pelanggan, pisah bayar, void, retur, pre-sale, dashboard)
 node tests/browser-online.mjs      # uji tahap 6 (harga marketplace, input manual, impor CSV, pelanggan)
+node tests/browser-keuangan.mjs    # uji tahap 7 (dashboard, laporan, biaya, keuangan, hak akses Admin)
 node tests/server-lokal.mjs        # jalan di http://localhost:8787, kode setup SETUP-LOKAL
 python3 deploy.py                  # deploy ke Cloudflare (butuh CLOUDFLARE_ACCOUNT_ID dan CLOUDFLARE_API_TOKEN)
 ```
