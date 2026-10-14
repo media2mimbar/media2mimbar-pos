@@ -62,7 +62,7 @@ async function halDashboard() {
     <div class="filters">${pil([["harian", "Harian"], ["mingguan", "Mingguan"], ["bulanan", "Bulanan"]], dashPer.periode, "p")}
       <div class="rentang"><button class="btn small" id="mundur" aria-label="Periode sebelumnya" style="border:0;padding:4px 8px">‹</button><b style="min-width:130px;text-align:center;color:var(--text)">${label}</b><button class="btn small" id="maju" aria-label="Periode berikutnya" style="border:0;padding:4px 8px" ${d.periode.sampai >= hariIni() ? "disabled" : ""}>›</button></div>
       <span style="flex:1"></span><button class="btn" id="keLaporan">Buka laporan lengkap →</button></div>
-    <div class="banner"><div class="banner-total"><div class="lbl">Total Penjualan</div><div class="val">${rp(r.bersih)}</div><div class="sub">Offline (event) + online (marketplace), bersih setelah diskon, retur, dan potongan</div></div>
+    <div class="banner"><div class="banner-total"><div class="lbl">Total Penjualan</div><div class="val">${rp(r.bersih)}</div><div class="sub">Offline (event) + online (marketplace), bersih</div></div>
       <div class="banner-mini">${mini("Transaksi", r.transaksi)}${mini("Rata-rata per Transaksi", rp(r.rata))}${mini("Produk Terjual", r.qty + " pcs")}${mini("Laba Kotor", rp(r.laba))}</div></div>
     <div class="kartu4">${kartu("Penjualan Offline (Event)", rp(r.offline), `${r.offline_n ?? 0} transaksi POS`)}${kartu("Penjualan Online", rp(r.online), `${r.online_n ?? 0} pesanan marketplace`)}
       ${kartu("Potongan Marketplace", rp(r.mp), "Admin, layanan, dan biaya pesanan", true)}${kartu("Belum Cair dari Marketplace", rp(r.belum_cair.nilai), `${r.belum_cair.n} pesanan berstatus Diproses`)}</div>

@@ -11,7 +11,7 @@
 /* Warna, ukuran, dan bentuk mengikuti prototipe (prototipe/dashboard.html). */
 :root{--accent:#FF6100;--accent-dark:#E5570A;--accent-bg:#FFF0E5;--accent-text:#E5570A;--bg:#F4F5F3;--card:#fff;--border:#E7E8E4;--border-strong:#D6D8D1;--text:#1E2321;--text-2:#5B615C;--text-mut:#93988F;--danger-bg:#FDECEA;--danger-text:#C0392B;--success-bg:#E4F7EF;--success-text:#00734E;--warn-bg:#FDF2DD;--warn-text:#B7791F;--info-bg:#E8F0FE;--info-text:#1F57C3}
 *{box-sizing:border-box}
-body{margin:0;font:13px/1.45 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text)}
+body{margin:0;font:13px/normal Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text)}
 button,input,select,textarea{font-family:inherit;font-size:13px}
 input[type=radio],input[type=checkbox]{accent-color:var(--accent);cursor:pointer}
 [hidden]{display:none!important}
@@ -77,7 +77,7 @@ input[type=checkbox].sakelar:focus{box-shadow:0 0 0 3px var(--accent-bg)}
 .app{display:flex;min-height:calc(100vh - 56px)}
 .side{width:300px;flex:none;background:var(--accent)}
 #nav{display:flex;flex-direction:column;position:sticky;top:56px;max-height:calc(100vh - 56px);overflow-y:auto;padding:12px 0}
-#nav::-webkit-scrollbar{width:6px}#nav::-webkit-scrollbar-thumb{background:rgba(255,255,255,.3);border-radius:4px}
+#nav{scrollbar-width:none}#nav::-webkit-scrollbar{display:none}
 .nav-group{margin-bottom:1px}
 .nav-head{display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;background:none;border:0;color:#fff;font-weight:600;font-size:14px;text-align:left;cursor:pointer;position:relative}
 .nav-head:hover,.nav-child:hover{background:rgba(0,0,0,.1);color:#fff}
@@ -104,7 +104,7 @@ main{padding:20px}
 .head>div>.muted,.head>div>p{font-size:13px;color:var(--text-mut);margin:4px 0 0}
 .head-aksi{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .head-aksi .subtabs{margin:0}
-.ket{color:var(--text-mut);margin:-6px 0 14px}
+.ket{color:var(--text-mut);margin:-6px 0 14px;line-height:1.45}
 .judul-baris{display:flex;align-items:center;gap:10px}.judul-baris .tag{margin:0}
 .dua-kolom{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:14px;align-items:start}
 .set{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}.set .card{margin-bottom:14px}.set>div:last-child{position:sticky;top:76px}
@@ -154,9 +154,9 @@ td input,td select{padding:7px 9px}
 
 /* Ringkasan Dashboard (prototipe: .summary-banner) */
 .banner{background:var(--accent);border-radius:8px;padding:18px 20px;display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap}
-.banner-total{color:#fff;min-width:220px;flex-shrink:0}
+.banner-total{color:#fff;flex:1 1 220px;max-width:420px}
 .banner-total .lbl{font-size:12.5px;opacity:.92}.banner-total .val{font-size:30px;font-weight:800;margin:2px 0}.banner-total .sub{font-size:11.5px;opacity:.85}
-.banner-mini{display:flex;flex:0 1 790px;background:#fff;border-radius:8px;overflow:hidden;margin-left:auto}
+.banner-mini{display:flex;flex:1 1 560px;max-width:790px;background:#fff;border-radius:8px;overflow:hidden;margin-left:auto}
 .banner-mini>div{padding:11px 14px;flex:1;border-right:1px solid var(--border);min-width:0}.banner-mini>div:last-child{border-right:0}
 .banner-mini .lbl{font-size:10.5px;color:var(--text-mut);margin-bottom:4px;line-height:1.3}.banner-mini .val{font-size:17px;font-weight:700}
 .kartu4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
@@ -439,7 +439,8 @@ function gambarNav() {
 
 function buka(t, sub) {
   tab = t;
-  if (t !== "karyawan") { tabTerakhir = t; if (MENU.find((m) => m.tab === t)?.sub) grupBuka = t; }
+  // Hanya grup halaman yang sedang dibuka yang terbuka, seperti prototipe.
+  if (t !== "karyawan") { tabTerakhir = t; grupBuka = MENU.find((m) => m.tab === t)?.sub ? t : null; }
   for (const b of $("#area").children) b.classList.toggle("on", (b.dataset.area === "karyawan") === (t === "karyawan"));
   gambarNav();
   window.scrollTo(0, 0);
