@@ -124,7 +124,7 @@ async function halPengaturan() {
   const rek = [...p.rekening];
   let qrisId = p.qris.berkas_id;
   const gambar = () => {
-    $("#isi").innerHTML = `<div class="form"><h1>Pengaturan POS</h1><p class="muted">Tersimpan di server dan terbaca HP kasir saat tarik data berikutnya (paling lama 2 menit saat online).</p>
+    $("#isi").innerHTML = `<div class="form"><h1>Pengaturan POS</h1><p class="muted">Setiap perubahan tersimpan otomatis dan terbaca HP kasir saat tarik data berikutnya (paling lama 2 menit saat online).</p>
     <form class="card" id="fPos" style="margin-top:12px">
       <h2>Metode pembayaran</h2>
       <div class="checks">${["tunai", "qris", "transfer"].map((m) => `<label><input type="checkbox" name="m_${m}" ${p.metode[m] ? "checked" : ""}> ${{ tunai: "Tunai", qris: "QRIS", transfer: "Transfer" }[m]}</label>`).join("")}</div>
@@ -155,25 +155,46 @@ async function halPengaturan() {
       <div class="grid2"><div><label>Kunci layar otomatis</label><select name="kunci">${[0, 5, 10, 20, 30].map((n) => `<option value="${n}" ${p.kunci_menit === n ? "selected" : ""}>${n ? n + " menit" : "Mati"}</option>`).join("")}</select></div></div>
       <div class="checks" style="margin-top:10px"><label><input type="checkbox" name="void_pin" ${p.void_pin ? "checked" : ""}> Void perlu PIN atasan</label>
         <label><input type="checkbox" name="tampil_stok" ${p.tampil_stok ? "checked" : ""}> Tampilkan sisa stok di kartu produk</label></div>
+      <div class="grid2"><div><label>Tampilan katalog awal di POS</label><select name="tampilan"><option value="grid" ${p.tampilan !== "sku" ? "selected" : ""}>Grid (kartu per produk)</option><option value="sku" ${p.tampilan === "sku" ? "selected" : ""}>SKU (daftar per varian)</option></select></div></div>
+      <p class="small muted">Masuk POS selalu memakai PIN 6 angka.</p>
       <h2 class="section">Struk</h2>
       <div class="grid2"><div><label>Nama</label><input type="text" name="s_nama" value="${esc(p.struk.nama)}"></div><div><label>Baris info</label><input type="text" name="s_info" value="${esc(p.struk.info)}" placeholder="IG, WA, alamat"></div></div>
       <label>Pesan penutup</label><input type="text" name="s_footer" value="${esc(p.struk.footer)}">
       <div class="checks" style="margin-top:10px"><label><input type="checkbox" name="s_kasir" ${p.struk.tampil_kasir ? "checked" : ""}> Tampilkan nama kasir</label>
         <label><input type="checkbox" name="s_event" ${p.struk.tampil_event ? "checked" : ""}> Tampilkan nama tempat/event</label></div>
+      <h3 style="margin:14px 0 6px">Pratinjau struk</h3><div id="pratinjau"></div>
       <div class="err" hidden></div><div class="ok" id="tersimpan" hidden>Tersimpan.</div>
-      <div class="actions"><button class="btn primary">Simpan pengaturan</button></div>
+      <div class="actions"><button class="btn primary">Simpan sekarang</button></div>
     </form></div>`;
     const f = $("#fPos");
     f.querySelectorAll("[data-r]").forEach((el) => (el.oninput = () => { rek[+el.dataset.r][el.dataset.k] = el.value; }));
-    f.querySelectorAll("[data-hapusrek]").forEach((b) => (b.onclick = () => { rek.splice(+b.dataset.hapusrek, 1); gambar(); }));
+    f.querySelectorAll("[data-hapusrek]").forEach((b) => (b.onclick = () => { rek.splice(+b.dataset.hapusrek, 1); gambar(); $("#fPos").requestSubmit(); }));
     $("#tambahRek").onclick = () => { rek.push({ bank: "", no: "", nama: "" }); gambar(); };
-    if ($("#hapusQris")) $("#hapusQris").onclick = () => { qrisId = null; gambar(); };
+    if ($("#hapusQris")) $("#hapusQris").onclick = () => { qrisId = null; gambar(); $("#fPos").requestSubmit(); };
     $("#fileQris").onchange = async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      try { qrisId = (await unggah(await kecilkanGambar(file), "qris")).id; gambar(); } catch (x) { alert(x.message); }
+      try { qrisId = (await unggah(await kecilkanGambar(file), "qris")).id; gambar(); $("#fPos").requestSubmit(); } catch (x) { alert(x.message); }
     };
+    // Pratinjau struk mengikuti isian.
+    const pratinjau = () => {
+      const fmt = (n) => "Rp " + n.toLocaleString("id-ID");
+      $("#pratinjau").innerHTML = `<div style="max-width:300px;border:1px dashed var(--border-strong);border-radius:8px;padding:12px;font:13px ui-monospace,monospace;background:#fff">
+        <div style="text-align:center"><b>${esc(f.s_nama.value || "Hikayat")}</b>${f.s_info.value ? `<div>${esc(f.s_info.value)}</div>` : ""}${f.s_event.checked ? "<div>Hikayat Fest Bandung</div>" : ""}</div>
+        <div style="margin-top:8px">No. HK-261020-A1-0001<br>20 Okt 2026 14.05${f.s_kasir.checked ? "<br>Kasir: Sari" : ""}</div><hr>
+        <div>Kaos Burtuqol M<br>&nbsp;2 x ${fmt(125000)} <span style="float:right">${fmt(250000)}</span></div><hr>
+        ${f.pajak_aktif.checked ? `<div>PPN ${esc(f.pajak_persen.value)}% <span style="float:right">${fmt(Math.round(250000 * Number(f.pajak_persen.value || 0) / 100))}</span></div>` : ""}
+        <div><b>TOTAL</b><span style="float:right"><b>${fmt(250000 + (f.pajak_aktif.checked ? Math.round(250000 * Number(f.pajak_persen.value || 0) / 100) : 0))}</b></span></div><hr>
+        <div style="text-align:center">${esc(f.s_footer.value)}</div></div>`;
+    };
+    pratinjau();
+    // Simpan otomatis: setiap perubahan dikirim setelah jeda singkat.
+    let tunda;
+    const simpanOtomatis = () => { clearTimeout(tunda); tunda = setTimeout(() => f.requestSubmit(), 800); };
+    f.addEventListener("input", (e) => { pratinjau(); if (e.target.type !== "file") simpanOtomatis(); });
+    f.addEventListener("change", (e) => { pratinjau(); if (e.target.type !== "file") simpanOtomatis(); });
     formKirim(f, async (d) => {
+      $("#tersimpan").hidden = true;
       const nilai = {
         metode: { tunai: f.m_tunai.checked, qris: f.m_qris.checked, transfer: f.m_transfer.checked },
         nominal_cepat: d.nominal.split(",").map((x) => angka(x.trim())).filter((x) => x),
@@ -182,11 +203,12 @@ async function halPengaturan() {
         pembulatan: Number(d.pembulatan),
         pajak: { aktif: f.pajak_aktif.checked, persen: Number(d.pajak_persen) },
         diskon_kasir: { aktif: f.diskon_aktif.checked, maks_persen: Number(d.diskon_maks) },
-        kunci_menit: Number(d.kunci), void_pin: f.void_pin.checked, tampil_stok: f.tampil_stok.checked,
+        kunci_menit: Number(d.kunci), void_pin: f.void_pin.checked, tampil_stok: f.tampil_stok.checked, tampilan: d.tampilan,
         struk: { nama: d.s_nama, info: d.s_info, footer: d.s_footer, tampil_kasir: f.s_kasir.checked, tampil_event: f.s_event.checked },
       };
       const r = await api("PUT", "/api/pengaturan/pos", nilai);
       Object.assign(p, r.pengaturan);
+      $("#tersimpan").textContent = "Tersimpan otomatis " + new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
       $("#tersimpan").hidden = false;
     });
   };

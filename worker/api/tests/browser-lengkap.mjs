@@ -209,6 +209,7 @@ try {
   await hp.locator('[data-m="tempat"]').click();
   await hp.getByRole("button", { name: /Kajian Akbar/ }).click();
   await hp.locator("#pillTempat").click();
+  await hp.locator("#keTerima").click();
   await hp.locator("[data-mutasi]").first().click();
   await hp.getByRole("button", { name: "Terima barang" }).click();
   await hp.getByText("Sudah diterima").waitFor();
@@ -255,6 +256,7 @@ try {
   await dash.getByText("Beli 2 Totebag gratis Topi").waitFor();
   assert.match(await dash.locator("tr", { hasText: "Beli 2 Totebag" }).textContent(), /Aktif.*1.*Rp 35\.000/s);
   await dash.locator("#tambahPromo").click();
+  await dash.locator('[data-cak="total"]').click();
   await dash.locator("#fPromo [name=nama]").fill("Belanja 100 ribu potong 10 ribu");
   await dash.locator("#fPromo [name=cakupan]").selectOption("total");
   await dash.locator("#fPromo [name=jenis]").selectOption("nominal");
@@ -273,7 +275,7 @@ try {
 
   await dash.locator('#nav [data-tab="inventori"]').click();
   await dash.locator('[data-sub="terbuang"]').click();
-  await dash.getByText("Retur barang cacat").waitFor();
+  await dash.getByRole("cell", { name: /Retur barang cacat/ }).waitFor();
   await dash.locator("#catatTerbuang").click();
   await dash.locator("#tambahSku").selectOption("TP");
   await dash.locator("[data-qty]").fill("1");

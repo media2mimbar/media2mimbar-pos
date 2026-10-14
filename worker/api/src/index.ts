@@ -37,6 +37,7 @@ const RUTE: [string, string, Handler][] = [
   ["POST", "/api/karyawan/:id/reset-password", karyawan.resetPassword],
   ["POST", "/api/karyawan/:id/reset-pin", karyawan.resetPin],
   ["GET", "/api/riwayat-masuk", karyawan.riwayatMasuk],
+  ["GET", "/api/karyawan/bertugas", karyawan.bertugasHariIni],
   ["GET", "/api/staf", karyawan.daftarRingkas],
 
   ["GET", "/api/perangkat", perangkat.daftar],
@@ -102,6 +103,7 @@ const RUTE: [string, string, Handler][] = [
   ["PATCH", "/api/saluran/:id", online.ubahSaluran],
   ["GET", "/api/saluran/:id/katalog", online.katalogSaluran],
   ["GET", "/api/produk/:id/saluran", online.hargaMarketplaceProduk],
+  ["PATCH", "/api/produk/:id/tampil", katalog.ubahTampilPos],
   ["PUT", "/api/produk/:id/saluran", online.simpanHargaMarketplace],
   ["GET", "/api/online", online.daftarPesanan],
   ["POST", "/api/online", online.tambahPesanan],

@@ -14,6 +14,7 @@ export interface PengaturanPos {
   kunci_menit: 0 | 5 | 10 | 20 | 30;
   void_pin: boolean;
   tampil_stok: boolean;
+  tampilan: "grid" | "sku"; // tampilan katalog awal di POS
   struk: { nama: string; info: string; footer: string; tampil_kasir: boolean; tampil_event: boolean };
 }
 
@@ -29,6 +30,7 @@ export const BAWAAN: PengaturanPos = {
   kunci_menit: 20,
   void_pin: true,
   tampil_stok: true,
+  tampilan: "grid",
   struk: { nama: "Hikayat Merchandise", info: "", footer: "Terima kasih sudah mendukung Hikayat!", tampil_kasir: true, tampil_event: true },
 };
 
@@ -80,6 +82,7 @@ function periksa(b: Obj): PengaturanPos {
     kunci_menit: kunci,
     void_pin: bool(b.void_pin, "Void perlu PIN atasan"),
     tampil_stok: bool(b.tampil_stok, "Tampilkan sisa stok"),
+    tampilan: b.tampilan === "sku" ? "sku" : "grid",
     struk: {
       nama: str(s.nama, "Nama di struk", 60) || BAWAAN.struk.nama,
       info: str(s.info, "Baris info struk", 120),

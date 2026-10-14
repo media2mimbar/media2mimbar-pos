@@ -3,6 +3,7 @@
 import { hariIniWib } from "./aturan.js";
 import { denganNomor } from "./dokumen.js";
 import { kenaPenjaga, penjaga } from "./inventori.js";
+import { ringkasanShift } from "./kasir.js";
 import { logAktivitas, sesiSiap, Staff } from "./sesi.js";
 import { bacaJson, benar, bulat, daftar, Gagal, json, Obj, sekarang, tanggal, teks, ulid, wajibBulat, wajibTeks } from "./util.js";
 
@@ -197,6 +198,10 @@ export async function detailEvent(req: Request, env: Env, id: string) {
   ]);
   const g = new Map(gerak.results.map((x) => [x.sku, x]));
   const j = new Map(terjual.results.map((x) => [x.sku, x]));
+  // Setoran per shift: tunai masuk, kas masuk/keluar, seharusnya (sama dengan Tutup Kasir).
+  const setoran = await Promise.all((shift.results as { id: string }[]).map((s) => ringkasanShift(db, s.id)));
+  const presale = await db.prepare("SELECT COUNT(*) AS n, COALESCE(SUM(total), 0) AS nilai FROM trx WHERE lokasi_id = ? AND presale = 1 AND status = 'Lunas' AND COALESCE(ambil_status, 'Menunggu') = 'Menunggu'")
+    .bind(id).first<{ n: number; nilai: number }>();
   const skuSemua = [...new Set([...varian.results.map((v) => v.sku), ...stokEv.keys()])];
   const info = new Map(varian.results.map((v) => [v.sku, v]));
   const hppTerjual = terjual.results.reduce((a, x) => a + x.hpp, 0);
@@ -212,7 +217,9 @@ export async function detailEvent(req: Request, env: Env, id: string) {
     ringkasan: { ...ringkas, laba_kotor: (ringkas?.penjualan ?? 0) - hppTerjual, produk_terjual: terjual.results.reduce((a, x) => a + x.qty, 0) },
     metode: bayar.results,
     mutasi: mutasi.results,
-    shift: shift.results,
+    shift: (shift.results as Obj[]).map((s, i) => ({ ...s, tunai: setoran[i].ringkasan.tunai, kas_masuk: setoran[i].ringkasan.kas_masuk, kas_keluar: setoran[i].ringkasan.kas_keluar,
+      retur_tunai: setoran[i].ringkasan.retur_tunai, seharusnya: setoran[i].ringkasan.seharusnya })),
+    presale_menunggu: presale,
     transaksi: trx.results,
     opname: opname.results,
   });

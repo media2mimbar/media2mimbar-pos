@@ -364,7 +364,7 @@ async function formBiaya(lama, lokasiTetap, kembali) {
     $("#kembali").onclick = $("#batal").onclick = kembali;
     formKirim(f, async (d) => {
       const file = f.bukti.files[0];
-      const bukti = file ? (await unggah(file, "bukti_biaya")).id : lama?.bukti ?? undefined;
+      const bukti = file ? (await unggah(await kecilkanGambar(file, 1600, "image/jpeg", 0.8), "bukti_biaya")).id : lama?.bukti ?? undefined;
       const b = { lokasi_id: lokasi || undefined, tanggal: d.tanggal, kategori: d.kategori, jumlah: angka(d.jumlah), cara: d.cara, keterangan: d.keterangan, bukti };
       if (lama) await api("PATCH", "/api/biaya/" + lama.id, b); else await api("POST", "/api/biaya", b);
       kembali();

@@ -124,8 +124,13 @@ async function bacaKatalog(env: Env, p: Perangkat, lokasi: { id: string; jenis: 
   const terakhir = await env.DB.prepare("SELECT MAX(no) AS no FROM trx WHERE perangkat_id = ? AND no LIKE ?").bind(p.id, awalan + "%").first<{ no: string | null }>();
   const kiriman = await env.DB.prepare("SELECT COUNT(*) AS n FROM mutasi WHERE ke = ? AND status = 'Dikirim'").bind(lokasiId).first<{ n: number }>();
   const promo = await promoUntukTempat(env.DB, lokasiId);
+  // Terlaris: 4 produk paling laku di tempat ini (30 hari terakhir).
+  const { results: laris } = await env.DB.prepare(
+    `SELECT v.produk_id, SUM(i.qty) AS qty FROM trx_item i JOIN trx t ON t.id = i.trx_id JOIN varian v ON v.sku = i.sku
+     WHERE t.lokasi_id = ? AND t.status = 'Lunas' AND t.waktu >= ? GROUP BY v.produk_id ORDER BY qty DESC LIMIT 4`,
+  ).bind(lokasiId, new Date(Date.now() - 30 * 86_400_000).toISOString()).all<{ produk_id: string }>();
   return { ...hasil, lokasi: { ...lokasi, event: ev }, penuh: !sejak, kategori: kategori.results, produk: produk.results, varian: varian.results, stok: stok.results,
-    nomor_terakhir: terakhir?.no ? Number(terakhir.no.slice(awalan.length)) : 0, kiriman_menunggu: kiriman?.n ?? 0, promo };
+    nomor_terakhir: terakhir?.no ? Number(terakhir.no.slice(awalan.length)) : 0, kiriman_menunggu: kiriman?.n ?? 0, promo, terlaris: laris.map((x) => x.produk_id) };
 }
 
 // ---------- Ringkasan shift (dipakai Tutup Kasir dan dashboard) ----------

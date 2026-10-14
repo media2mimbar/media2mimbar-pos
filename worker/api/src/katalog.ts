@@ -128,11 +128,33 @@ export async function daftarProduk(req: Request, env: Env) {
   const [p, v, mp] = await Promise.all([
     env.DB.prepare(`${SELECT_PRODUK} ORDER BY p.aktif DESC, k.urutan, p.nama`).all<BarisProduk>(),
     env.DB.prepare(`${SELECT_VARIAN} ORDER BY v.produk_id, v.aktif DESC, v.urutan`).all<BarisVarian>(),
-    env.DB.prepare("SELECT DISTINCT v.produk_id, s.nama, s.aktif FROM saluran_varian x JOIN varian v ON v.sku = x.sku JOIN saluran s ON s.id = x.saluran_id ORDER BY s.urutan")
-      .all<{ produk_id: string; nama: string; aktif: number }>(),
+    env.DB.prepare("SELECT v.produk_id, x.sku, s.nama, s.aktif, COALESCE(x.harga, v.harga_jual) AS harga FROM saluran_varian x JOIN varian v ON v.sku = x.sku JOIN saluran s ON s.id = x.saluran_id ORDER BY s.urutan")
+      .all<{ produk_id: string; sku: string; nama: string; aktif: number; harga: number }>(),
   ]);
   // Marketplace tempat produk dijual, untuk kolom di Daftar Produk.
-  return json({ produk: p.results.map((x) => ({ ...bentukProduk(x, v.results), marketplace: mp.results.filter((m) => m.produk_id === x.id).map((m) => ({ nama: m.nama, toko_aktif: m.aktif === 1 })) })) });
+  return json({
+    produk: p.results.map((x) => {
+      const b = bentukProduk(x, v.results);
+      const milik = mp.results.filter((m) => m.produk_id === x.id);
+      return {
+        ...b,
+        marketplace: [...new Map(milik.map((m) => [m.nama, { nama: m.nama, toko_aktif: m.aktif === 1 }])).values()],
+        varian: b.varian.map((vv) => ({ ...vv, harga_marketplace: milik.filter((m) => m.sku === vv.sku).map((m) => ({ nama: m.nama, harga: m.harga })) })),
+      };
+    }),
+  });
+}
+
+// Sakelar Tampil di POS dari Daftar Produk.
+export async function ubahTampilPos(req: Request, env: Env, id: string) {
+  const { staff } = await sesiSiap(env.DB, req, "owner", "admin");
+  const tampil = (await bacaJson(req)).tampil_pos === true;
+  const r = await env.DB.batch([
+    env.DB.prepare("UPDATE produk SET tampil_pos = ?, diubah_pada = ? WHERE id = ?").bind(tampil ? 1 : 0, sekarang(), id),
+    logAktivitas(env.DB, staff, tampil ? "Tampilkan produk di POS" : "Sembunyikan produk dari POS", { tabel: "produk", id }),
+  ]);
+  if (r[0].meta.changes !== 1) throw new Gagal(404, "Produk tidak ditemukan");
+  return json({ ok: true });
 }
 
 export async function ambilProduk(db: D1Database, id: string) {

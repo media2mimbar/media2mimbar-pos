@@ -12,6 +12,7 @@ const kepalaProduk = () => `<div class="head"><div><h1>Produk</h1></div>
   ${subProduk === "daftar" ? '<div style="display:flex;gap:8px"><button class="btn" id="hargaGudang">Harga Jual Langsung Gudang</button><button class="btn primary" id="tambahProduk">+ Produk</button></div>' : ""}</div>
   ${subtabs([["daftar", "Daftar Produk"], ["kategori", "Kategori"]], subProduk)}`;
 
+const bukaProduk = new Set();
 async function daftarProduk() {
   $("#isi").innerHTML = '<main><p class="muted">Memuat…</p></main>';
   const [{ produk }, { kategori }] = await Promise.all([api("GET", "/api/produk"), api("GET", "/api/kategori")]);
@@ -23,15 +24,22 @@ async function daftarProduk() {
       const margin = p.harga_min > 0 ? Math.round(((p.harga_min - p.hpp) / p.harga_min) * 100) : 0;
       const menipis = p.stok <= 0 ? '<span class="tag off">Habis</span>' : p.stok < p.stok_min ? '<span class="tag warn">Menipis</span>' : "";
       return `<tr class="klik" data-id="${p.id}">
-        <td><b>${esc(p.nama)}</b><div class="small muted">${esc(p.sku)} · ${esc(p.kategori || "Tanpa kategori")}${p.punya_varian ? ` · ${p.varian.filter((v) => v.aktif).length} varian` : ""}</div></td>
+        <td>${p.punya_varian ? `<button class="btn small" data-buka="${p.id}" title="Lihat varian" style="padding:0 6px;margin-right:6px">${bukaProduk.has(p.id) ? "▾" : "▸"}</button>` : ""}<b>${esc(p.nama)}</b><div class="small muted">${esc(p.sku)} · ${esc(p.kategori || "Tanpa kategori")}${p.punya_varian ? ` · ${p.varian.filter((v) => v.aktif).length} varian` : ""}</div></td>
         <td class="num">${rp(p.hpp)}</td><td class="num">${harga}</td>
         <td class="num">${margin}%</td>
         <td class="num">${p.stok}${p.transit ? `<div class="small muted">+${p.transit} di jalan</div>` : ""} ${menipis}</td>
         <td>${p.marketplace.map((m) => `<span class="tag ${m.toko_aktif ? "" : "off"}" title="${m.toko_aktif ? "" : "Toko nonaktif"}">${esc(m.nama)}</span>`).join("") || '<span class="muted">—</span>'}</td>
-        <td>${p.tampil_pos ? "Ya" : '<span class="muted">Tidak</span>'}</td>
-        <td>${p.aktif ? '<span class="tag aktif">Aktif</span>' : '<span class="tag off">Nonaktif</span>'}</td></tr>`;
+        <td><label style="margin:0;font-weight:400" class="small"><input type="checkbox" data-tampil="${p.id}" ${p.tampil_pos ? "checked" : ""} style="width:auto"> ${p.tampil_pos ? "Tampil" : "Disembunyikan"}</label></td>
+        <td>${p.aktif ? '<span class="tag aktif">Aktif</span>' : '<span class="tag off">Nonaktif</span>'}</td></tr>
+        ${bukaProduk.has(p.id) ? p.varian.map((v) => `<tr class="small"><td style="padding-left:40px">${esc(v.nama || v.sku)} <span class="muted">${esc(v.sku)}${v.aktif ? "" : " · nonaktif"}</span></td><td></td>
+          <td class="num">${rp(v.harga_jual)}</td><td></td><td class="num">${v.stok}</td><td colspan="3">${v.harga_marketplace.map((m) => `${esc(m.nama)} ${rp(m.harga)}`).join(" · ") || '<span class="muted">Tidak dijual di marketplace</span>'}</td></tr>`).join("") : ""}`;
     }).join("") : `<tr><td colspan="8" class="muted">${produk.length ? "Tidak ada produk yang cocok." : "Belum ada produk. Buat kategori dulu, lalu tambah produk."}</td></tr>`;
-    $("#tbProduk").querySelectorAll("tr[data-id]").forEach((tr) => (tr.onclick = () => formProduk(tr.dataset.id)));
+    $("#tbProduk").querySelectorAll("tr[data-id]").forEach((tr) => (tr.onclick = (e) => { if (!e.target.closest("[data-buka],[data-tampil],label")) formProduk(tr.dataset.id); }));
+    $("#tbProduk").querySelectorAll("[data-buka]").forEach((b) => (b.onclick = () => { bukaProduk.has(b.dataset.buka) ? bukaProduk.delete(b.dataset.buka) : bukaProduk.add(b.dataset.buka); gambar(); }));
+    $("#tbProduk").querySelectorAll("[data-tampil]").forEach((c) => (c.onchange = async () => {
+      try { await api("PATCH", `/api/produk/${c.dataset.tampil}/tampil`, { tampil_pos: c.checked }); produk.find((x) => x.id === c.dataset.tampil).tampil_pos = c.checked; gambar(); }
+      catch (x) { c.checked = !c.checked; alert(x.message); }
+    }));
   };
   $("#isi").innerHTML = `<main>${kepalaProduk()}
     <div class="filters">

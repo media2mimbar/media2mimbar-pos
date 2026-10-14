@@ -7,7 +7,8 @@ const inisial = (n) => n.split(/\s+/).slice(0, 2).map((x) => x[0]).join("").toUp
 
 // A: keadaan aplikasi yang sedang berjalan.
 // sesi (disimpan di kv "sesi"): { staff, sesi, offline, lokasi_id, shift_id }
-const A = { sesi: null, umum: null, snap: null, stok: {}, keranjang: [], ord: { promo: null, dilepas: false, pelanggan: null, order: null }, orderDaftar: [], kategori: "semua", cari: "", layar: null };
+const A = { sesi: null, umum: null, snap: null, stok: {}, keranjang: [], ord: { promo: null, dilepas: false, pelanggan: null, order: null }, orderDaftar: [], kategori: "semua", cari: "", layar: null, mode: null };
+// mode tampilan katalog: "grid" atau "sku" (bawaan dari Pengaturan POS, bisa diganti kasir di header).
 
 function toast(pesan) {
   const el = document.createElement("div");
@@ -297,10 +298,12 @@ async function masukKasir() {
 async function segarkan() {
   if (!A.sesi?.lokasi_id || !S.online || !A.sesi.sesi) return;
   try {
+    const adaLaris = !!(A.snap?.terlaris ?? []).length;
     A.snap = await tarikData(A.sesi.lokasi_id);
     A.umum = await kv.get("umum");
     A.stok = await stokTersedia(A.snap);
-    if (A.layar === "kasir") gambarKatalog();
+    // Chip Terlaris baru muncul setelah ada penjualan: gambar ulang header katalog kalau berubah.
+    if (A.layar === "kasir") (adaLaris !== !!(A.snap.terlaris ?? []).length ? gambarKasir() : gambarKatalog());
   } catch (e) {
     if (e.kode === "perlu_masuk") toast("Sesi habis. Keluar lalu masuk lagi untuk memperbarui data");
   }
@@ -325,18 +328,28 @@ function gambarKasir() {
   const kat = (A.snap.kategori ?? []).filter((k) => k.tampil_menu);
   const adaPromo = promoBerlakuSekarang().length > 0;
   tampil(`<div class="kasir">
-    ${bar(esc(A.snap.lokasi.nama), `${esc(t.staff.nama)} · <span id="sinyal">${statusSinyal()}</span> <span id="antre"></span>`, '<button id="btnKunci">Kunci</button><button id="btnMenu">Menu</button>')}
+    ${bar(esc(A.snap.lokasi.nama), `${esc(t.staff.nama)} · <span id="sinyal">${statusSinyal()}</span> <span id="antre"></span>`, `<button id="btnMode" title="Mode tampilan">${modeKatalog() === "sku" ? "Grid" : "SKU"}</button><button id="btnKunci">Kunci</button><button id="btnMenu">Menu</button>`)}
     <div class="atas">
       ${pillTempat()}
       <button id="pillPelanggan" class="card small" style="width:100%;text-align:left;margin-bottom:8px;padding:9px 12px"></button>
-      <input type="search" id="cari" placeholder="Cari produk atau SKU" value="${esc(A.cari)}">
-      <div class="chips" id="chips"><button data-k="semua">Semua</button>${adaPromo ? '<button data-k="promo">Promo</button>' : ""}${kat.map((k) => `<button data-k="${k.id}">${esc(k.nama)}</button>`).join("")}</div>
+      <input type="search" id="cari" placeholder="${modeKatalog() === "sku" ? "Scan barcode atau ketik SKU, lalu Enter" : "Cari produk atau SKU"}" value="${esc(A.cari)}" enterkeyhint="go">
+      <div class="chips" id="chips"><button data-k="semua">Semua</button>${(A.snap.terlaris ?? []).length ? '<button data-k="terlaris">Terlaris</button>' : ""}${adaPromo ? '<button data-k="promo">Promo</button>' : ""}${kat.map((k) => `<button data-k="${k.id}">${esc(k.nama)}</button>`).join("")}</div>
     </div>
     <div class="grid" id="grid"></div>
     <div class="aksi"><button id="btnHapus">••• Hapus</button><button id="btnPromo">Promosi</button><button id="btnSimpan">Simpan</button><button id="btnOrder">Daftar Order</button></div>
     <div class="bawah"><button class="total" id="btnTotal"><small id="jmlBarang"></small><b id="totalBelanja"></b></button><button class="btn primary" id="btnBayar">Bayar</button></div>
   </div>`, "kasir");
-  if ($("#pillTempat")) $("#pillTempat").onclick = () => layarInventori("kiriman");
+  $("#pillTempat").onclick = lembarTempat;
+  $("#btnMode").onclick = () => { A.mode = modeKatalog() === "sku" ? "grid" : "sku"; gambarKasir(); };
+  // Scan barcode: pemindai mengetik SKU lalu Enter. SKU yang cocok persis langsung masuk keranjang.
+  $("#cari").onkeydown = (e) => {
+    if (e.key !== "Enter") return;
+    const kode = e.target.value.trim().toUpperCase();
+    const v = Object.values(A.snap.varian).find((x) => x.aktif && x.sku.toUpperCase() === kode && A.snap.produk[x.produk_id]?.aktif && A.snap.produk[x.produk_id]?.tampil_pos);
+    if (!v) return toast(kode ? `SKU ${kode} tidak ada di katalog tempat ini` : "Ketik atau scan SKU");
+    tambah(v.sku);
+    e.target.value = ""; A.cari = ""; gambarKatalog();
+  };
   $("#pillPelanggan").onclick = lembarPelanggan;
   $("#chips").onclick = (e) => { if (e.target.dataset.k) { A.kategori = e.target.dataset.k; gambarKatalog(); } };
   $("#cari").oninput = (e) => { A.cari = e.target.value; gambarKatalog(); };
@@ -363,15 +376,37 @@ function kosongkanKeranjang() {
   simpanSesi();
 }
 
-// Info tempat di atas katalog: event, tanggal, dan pengingat kiriman yang belum diterima.
+// Info tempat di atas katalog: label status, event, tanggal, dan pengingat kiriman yang belum diterima. Diketuk: sheet info dan stok per varian.
+const modeKatalog = () => A.mode ?? (pengaturan().tampilan === "sku" ? "sku" : "grid");
+function labelTempat() {
+  const e = A.snap.lokasi.event;
+  if (!e) return "Tempat Jualan";
+  if (hariIniWib() < e.mulai) return e.presale_aktif !== 1 ? "Belum mulai" : e.presale_mode === "ambil" ? "Pre-sale · ambil nanti" : "Pre-sale · stok langsung";
+  return "Event";
+}
 function pillTempat() {
   const e = A.snap.lokasi.event;
-  if (!e) return "";
   const tgl = (d) => new Date(d + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" });
   return `<button id="pillTempat" class="card small" style="width:100%;text-align:left;margin-bottom:8px;padding:10px 12px">
-    <b>${esc(e.nama)}</b> · ${esc(e.venue ?? "")} · ${tgl(e.mulai)}${e.selesai !== e.mulai ? "–" + tgl(e.selesai) : ""}
+    <span class="tag ${labelTempat().startsWith("Pre-sale") ? "warn" : ""}">${esc(labelTempat())}</span> <b>${esc(e ? e.nama : A.snap.lokasi.nama)}</b>${e ? ` · ${esc(e.venue ?? "")} · ${tgl(e.mulai)}${e.selesai !== e.mulai ? "–" + tgl(e.selesai) : ""}` : " · jual langsung"}
     ${modePresale() ? '<div class="warn" style="margin-top:6px;padding:6px 10px">Pre-sale · ambil nanti. Pembeli wajib punya no HP, stok berkurang saat barang diserahkan</div>' : ""}
     ${A.snap.kiriman_menunggu ? `<div class="warn" style="margin-top:6px;padding:6px 10px">${A.snap.kiriman_menunggu} kiriman stok belum diterima. Ketuk untuk menerima</div>` : ""}</button>`;
+}
+function lembarTempat() {
+  const e = A.snap.lokasi.event, owner = A.sesi.staff.role.includes("owner");
+  const varian = Object.values(A.snap.varian).filter((v) => v.aktif && A.snap.produk[v.produk_id]?.aktif).sort((a, b) => namaBarang(a).localeCompare(namaBarang(b)));
+  bukaLembar(`<h2>${esc(e ? e.nama : A.snap.lokasi.nama)}</h2><div class="small muted">${esc(labelTempat())}${e ? ` · ${esc(e.venue ?? "")} · ${esc(e.mulai)} s/d ${esc(e.selesai)}` : ""}</div>
+    ${A.snap.kiriman_menunggu ? `<button class="btn primary" id="keTerima">Terima ${A.snap.kiriman_menunggu} kiriman stok</button>` : ""}
+    <h3 style="margin:14px 0 4px">Sisa stok</h3><table class="rinci">${varian.map((v) => `<tr><td>${esc(namaBarang(v))}<br><span class="small muted">${esc(v.sku)} · ${rp(v.harga)}</span></td><td>${A.stok[v.sku] ?? 0}</td></tr>`).join("")}</table>
+    ${owner ? `<button class="btn" id="gantiTempat">Ganti tempat</button>${e ? '<button class="btn" id="tutupEvPill">Tutup event</button>' : ""}` : ""}`);
+  if ($("#keTerima")) $("#keTerima").onclick = () => layarInventori("kiriman");
+  if ($("#gantiTempat")) $("#gantiTempat").onclick = async () => {
+    if (A.keranjang.length) return toast("Kosongkan keranjang dulu");
+    A.sesi.lokasi_id = null; A.sesi.shift_id = null; await simpanSesi();
+    try { A.umum = await tarikUmum(); } catch {}
+    layarTempat();
+  };
+  if ($("#tutupEvPill")) $("#tutupEvPill").onclick = () => layarTutupEventPos();
 }
 
 function gambarKatalog() {
@@ -387,9 +422,20 @@ function gambarKatalog() {
   const q = A.cari.trim().toLowerCase();
   const tampilStok = pengaturan().tampil_stok !== false;
   const pre = modePresale();
-  const daftar = produkAktif().filter((p) => (A.kategori === "semua" || p.kategori_id === A.kategori)
+  const laris = A.snap.terlaris ?? [];
+  const tandaHarga = A.snap.lokasi.event ? "harga event" : "harga khusus";
+  const daftar = produkAktif().filter((p) => (A.kategori === "semua" || (A.kategori === "terlaris" ? laris.includes(p.id) : p.kategori_id === A.kategori))
     && (!q || (p.nama + " " + p.sku + " " + varianDari(p.id).map((v) => v.sku).join(" ")).toLowerCase().includes(q)))
-    .sort((a, b) => a.nama.localeCompare(b.nama));
+    .sort((a, b) => (A.kategori === "terlaris" ? laris.indexOf(a.id) - laris.indexOf(b.id) : a.nama.localeCompare(b.nama)));
+  // Mode SKU: satu baris per varian, cocok untuk scan barcode.
+  if (modeKatalog() === "sku") {
+    const baris = daftar.flatMap((p) => varianDari(p.id).filter((v) => !q || (p.nama + " " + v.sku + " " + v.nama).toLowerCase().includes(q)));
+    $("#grid").innerHTML = `<div class="daftar" style="grid-column:1/-1;margin-top:0">${baris.map((v) => { const s = A.stok[v.sku] ?? 0, n = diKeranjang(v.sku); return `<button data-sku="${esc(v.sku)}" ${s <= 0 && !pre ? 'style="opacity:.5"' : ""}>
+      <span class="isi"><b>${esc(namaBarang(v))}</b>${n ? ` <span class="tag ok">${n}</span>` : ""}<br><span class="small muted">${esc(v.sku)} · ${pre ? "pre-sale" : tampilStok ? (s > 0 ? "sisa " + s : "habis") : ""}</span></span>
+      <span><b>${rp(v.harga)}</b>${v.harga !== v.harga_normal ? `<br><span class="tag warn">${tandaHarga}</span>` : ""}</span></button>`; }).join("") || '<p class="muted">Tidak ada produk.</p>'}</div>`;
+    $$("#grid [data-sku]").forEach((b) => (b.onclick = () => tambah(b.dataset.sku)));
+    return gambarTotal();
+  }
   $("#grid").innerHTML = daftar.map((p) => {
     const v = varianDari(p.id);
     if (!v.length) return "";
@@ -402,7 +448,7 @@ function gambarKatalog() {
       ${jml ? `<span class="jml">${jml}</span>` : ""}
       <b>${esc(p.nama)}</b>
       <span class="stok">${p.punya_varian ? `${v.length} varian · ` : ""}${pre ? "Pre-sale · ambil saat event" : tampilStok ? (stok > 0 ? `sisa ${stok}` : "Habis") : ""}</span>
-      <span class="harga">${min === maks ? rp(min) : `${rp(min)}+`}${khusus ? ' <span class="tag warn">harga khusus</span>' : ""}</span></button>`;
+      <span class="harga">${min === maks ? rp(min) : `${rp(min)}+`}${khusus ? ` <span class="tag warn">${tandaHarga}</span>` : ""}</span></button>`;
   }).join("") || '<p class="muted" style="grid-column:1/-1">Tidak ada produk.</p>';
   $$("#grid .kartu").forEach((b) => (b.onclick = () => ketukProduk(A.snap.produk[b.dataset.p])));
   gambarTotal();
@@ -781,9 +827,14 @@ async function layarKas() {
       <div class="daftar">${kasLokal.map((k) => `<div class="card small"><b>${k.jenis === "masuk" ? "+" : "−"}${rp(k.jumlah)}</b> · ${esc(k.catatan)} <span class="muted">${jam(k.waktu)}</span></div>`).join("") || '<p class="muted">Belum ada.</p>'}</div>
     </div>`, "kas");
   $("#kembali").onclick = gambarKasir;
+  // Uang di laci menurut HP ini (dipakai kalau tanpa sinyal); kas keluar tidak boleh melebihinya.
+  const trxLokal = (await tx("trx", "readonly", (s) => s.index("shift").getAll(A.sesi.shift_id))).filter((t) => t.status === "Lunas");
+  let laci = (A.sesi.shift?.modal ?? 0) + trxLokal.flatMap((t) => t.pembayaran).filter((b) => b.metode === "Tunai").reduce((a, b) => a + b.jumlah, 0)
+    - trxLokal.reduce((a, t) => a + (t.kembalian ?? 0), 0) + kasLokal.reduce((a, k) => a + (k.jenis === "masuk" ? k.jumlah : -k.jumlah), 0) - ((await kv.get("rtunai:" + A.sesi.shift_id)) ?? 0);
   // Ringkasan laci dari server (semua HP yang memakai laci ini).
   if (S.online && A.sesi.sesi) api("GET", `/api/pos/shift/${A.sesi.shift_id}`).then(({ ringkasan: r }) => {
     if (A.layar !== "kas") return;
+    laci = r.seharusnya;
     const modal = A.sesi.shift?.modal ?? 0;
     $("#ringkasKas").innerHTML = `<div class="card" style="margin-top:10px"><table class="rinci">
       <tr><td>Pemasukan (modal + kas masuk)</td><td>${rp(modal + r.kas_masuk)}</td></tr><tr><td>Pengeluaran</td><td>${rp(r.kas_keluar + (r.retur_tunai ?? 0))}</td></tr>
@@ -792,8 +843,12 @@ async function layarKas() {
   }).catch(() => {});
   let jenis = "masuk";
   $$("#fKas .metode button").forEach((b) => (b.onclick = () => { jenis = b.dataset.j; $$("#fKas .metode button").forEach((x) => x.classList.toggle("on", x === b)); }));
+  $("#fKas").jumlah.oninput = (e) => {
+    if (jenis === "keluar" && Number(e.target.value) > Math.max(0, laci)) { e.target.value = Math.max(0, laci); toast(`Maksimal ${rp(Math.max(0, laci))} (uang di laci)`); }
+  };
   $("#fKas").onsubmit = async (e) => {
     e.preventDefault();
+    if (jenis === "keluar" && Number(e.target.jumlah.value) > laci) return toast(`Uang di laci hanya ${rp(Math.max(0, laci))}`);
     const k = { id: ulid(), shift_id: A.sesi.shift_id, jenis, jumlah: Number(e.target.jumlah.value), catatan: e.target.catatan.value.trim(), waktu: sekarang(), oleh: A.sesi.staff.id };
     await antrekan("kas", k);
     await kv.set("kas:" + A.sesi.shift_id, [...kasLokal, k]);

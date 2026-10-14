@@ -206,6 +206,14 @@ function formKirim(form, aksi) {
   });
 }
 
+// Batas isian angka: pesan kecil "Maksimal ..." di bawah kolom yang angkanya diturunkan.
+function pesanMaks(input, teks) {
+  let el = input.nextElementSibling;
+  if (!el?.classList.contains("pesan-maks")) { el = document.createElement("div"); el.className = "pesan-maks small"; el.style.color = "var(--warn-text)"; input.after(el); }
+  el.textContent = "Maksimal " + teks;
+  clearTimeout(el._t); el._t = setTimeout(() => (el.textContent = ""), 2500);
+}
+
 function popup(html) {
   $("#popupIsi").innerHTML = html + '<div class="actions"><button class="btn primary" id="tutupPopup">Tutup</button></div>';
   $("#popup").hidden = false;
@@ -253,7 +261,7 @@ function mulai(staff) {
   $("#akunNama").textContent = staff.nama;
   $("#akunRole").textContent = staff.role.map((r) => NAMA_ROLE[r]).join(", ");
   const owner = staff.role.includes("owner");
-  const tabs = [["dashboard", "Dashboard"], ["penjualan", "Penjualan"], ["event", "Event"], ["presale", "Pre-sale"], ["online", "Online"], ["produk", "Produk"], ["pelanggan", "Pelanggan"], ["promosi", "Promosi"], ["inventori", "Inventori"], ["laporan", "Laporan"], owner && ["keuangan", "Keuangan"], ["pengaturan", "Pengaturan POS"], owner && ["karyawan", "Karyawan"], ["perangkat", "Perangkat POS"], owner && ["riwayat", "Riwayat Masuk"]].filter(Boolean);
+  const tabs = [["dashboard", "Dashboard"], ["penjualan", "Penjualan"], ["event", "Event"], ["presale", "Pre-sale"], ["online", "Online"], ["produk", "Produk"], ["pelanggan", "Pelanggan"], ["promosi", "Promosi"], ["inventori", "Inventori"], ["laporan", "Laporan"], owner && ["keuangan", "Keuangan"], ["pengaturan", "Pengaturan POS"], ["karyawan", "Karyawan"], ["perangkat", "Perangkat POS"], owner && ["riwayat", "Riwayat Masuk"]].filter(Boolean);
   $("#nav").innerHTML = tabs.map(([k, n]) => `<button data-tab="${k}">${n}</button>`).join("");
   $("#nav").onclick = (e) => e.target.dataset.tab && buka(e.target.dataset.tab);
   tampil("layarApp");
@@ -268,25 +276,61 @@ function buka(t) {
 
 // ---------- Karyawan ----------
 
-async function halKaryawan() {
+let subKaryawan = "daftar", filterRiwayat = "";
+const jamWibD = (iso) => new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+
+function halKaryawan(sub) {
+  if (sub) subKaryawan = sub;
+  (subKaryawan === "bertugas" ? halBertugas : halDaftarKaryawan)();
+}
+const kepalaKaryawan = (tombol = "") => `<div class="head"><div><h1>Karyawan</h1></div>${tombol}</div>${subtabs([["daftar", "Daftar Karyawan"], ["bertugas", "Bertugas Hari Ini"]], subKaryawan)}`;
+
+async function halDaftarKaryawan() {
   $("#isi").innerHTML = '<main><p class="muted">Memuat…</p></main>';
-  const { karyawan } = await api("GET", "/api/karyawan");
-  $("#isi").innerHTML = `<main>
-    <div class="head"><div><h1>Karyawan</h1><div class="muted">${karyawan.filter((k) => k.aktif).length} aktif</div></div>
-    <button class="btn primary" id="tambahK">+ Karyawan</button></div>
-    <div class="tablewrap"><table><thead><tr><th>Nama</th><th>Role</th><th>Email</th><th>No HP</th><th>Status</th><th></th></tr></thead><tbody>
+  const owner = saya.role.includes("owner");
+  const [{ karyawan }, rw] = await Promise.all([api("GET", "/api/karyawan"), api("GET", `/api/riwayat-masuk?tempat=pos${filterRiwayat ? "&staff=" + filterRiwayat : ""}`)]);
+  const salah = (a) => a === "PIN salah" || a === "Password salah";
+  $("#isi").innerHTML = `<main>${kepalaKaryawan(owner ? '<button class="btn primary" id="tambahK">+ Karyawan</button>' : "")}
+    <div class="muted small" style="margin-bottom:8px">${karyawan.filter((k) => k.aktif).length} aktif${owner ? "" : " · Admin hanya melihat. Perubahan akun dilakukan Owner."}</div>
+    <div class="tablewrap"><table><thead><tr><th>Nama</th><th>Role</th><th>Email dashboard</th><th>Status akun</th><th>Bertugas di</th><th>Terakhir di POS</th><th></th></tr></thead><tbody>
     ${karyawan.map((k) => `<tr>
-      <td><b>${esc(k.nama)}</b></td>
+      <td><b>${esc(k.nama)}</b><div class="small muted">${esc(k.telp) || ""}</div></td>
       <td>${k.role.map((r) => `<span class="tag ${r}">${NAMA_ROLE[r]}</span>`).join("")}</td>
       <td>${esc(k.email) || '<span class="muted">POS saja</span>'}</td>
-      <td>${esc(k.telp) || "—"}</td>
       <td>${k.aktif ? '<span class="tag aktif">Aktif</span>' : '<span class="tag off">Nonaktif</span>'}
-        ${k.password_sementara ? '<span class="tag warn">Password sementara</span>' : ""}
-        ${k.pin_sementara ? '<span class="tag warn">PIN sementara</span>' : ""}</td>
-      <td><button class="btn small" data-ubah="${k.id}">Ubah</button></td></tr>`).join("")}
+        ${k.password_sementara === null ? "" : k.password_sementara ? '<span class="tag warn">Password sementara</span>' : '<span class="tag">Password sudah diganti</span>'}
+        ${k.pin_sementara ? '<span class="tag warn">PIN sementara</span>' : '<span class="tag">PIN sudah diganti</span>'}</td>
+      <td class="small">${k.bertugas.map(esc).join(", ") || '<span class="muted">—</span>'}</td>
+      <td class="small">${k.terakhir_pos ? waktu(k.terakhir_pos) : '<span class="muted">Belum pernah</span>'}</td>
+      <td>${owner ? `<button class="btn small" data-ubah="${k.id}">Ubah</button>` : ""}</td></tr>`).join("")}
+    </tbody></table></div>
+    <div class="head" style="margin-top:24px"><h2 style="margin:0">Riwayat Masuk POS ${rw.salah_hari_ini ? `<span class="tag off">${rw.salah_hari_ini} PIN salah hari ini</span>` : ""}</h2>
+      <select id="filterRiwayat"><option value="">Semua karyawan</option>${karyawan.map((k) => `<option value="${k.id}" ${k.id === filterRiwayat ? "selected" : ""}>${esc(k.nama)}</option>`).join("")}</select></div>
+    <div class="tablewrap"><table><thead><tr><th>Waktu</th><th>Karyawan</th><th>Aktivitas</th><th>Tempat</th><th>Perangkat</th></tr></thead><tbody>
+    ${rw.riwayat.map((l) => `<tr><td>${waktu(l.waktu)}</td><td>${esc(l.nama) || "—"}</td><td>${salah(l.aksi) ? `<span class="tag off">${esc(l.aksi)}</span>` : esc(l.aksi)}</td>
+      <td>${esc(l.keterangan ?? "")}</td><td>${esc(l.perangkat ?? "—")}</td></tr>`).join("") || '<tr><td colspan="5" class="muted">Belum ada.</td></tr>'}
     </tbody></table></div></main>`;
-  $("#tambahK").onclick = () => formKaryawan(null);
+  pasangSubtabs(halKaryawan);
+  $("#filterRiwayat").onchange = (e) => { filterRiwayat = e.target.value; halDaftarKaryawan(); };
+  if ($("#tambahK")) $("#tambahK").onclick = () => formKaryawan(null);
   $("#isi").querySelectorAll("[data-ubah]").forEach((b) => (b.onclick = () => formKaryawan(karyawan.find((k) => k.id === b.dataset.ubah))));
+}
+
+async function halBertugas() {
+  $("#isi").innerHTML = '<main><p class="muted">Memuat…</p></main>';
+  const { kartu, ringkasan: r } = await api("GET", "/api/karyawan/bertugas");
+  const WARNA = { buka: "aktif", gabung: "aktif", masuk: "", keluar: "", belum: "off" };
+  $("#isi").innerHTML = `<main>${kepalaKaryawan()}
+    <div class="kpis"><div class="kpi"><span class="muted small">Lokasi aktif</span><b>${r.lokasi}</b></div><div class="kpi"><span class="muted small">Laci terbuka</span><b>${r.laci}</b></div>
+      <div class="kpi"><span class="muted small">Ditugaskan, belum masuk POS</span><b style="${r.belum_masuk ? "color:var(--danger-text)" : ""}">${r.belum_masuk}</b></div>
+      <div class="kpi"><span class="muted small">Ditugaskan di dua event sekaligus</span><b>${r.ganda.length}</b>${r.ganda.length ? `<span class="small muted">${r.ganda.map(esc).join(", ")}</span>` : ""}</div></div>
+    <div class="grafik-grid">${kartu.map((k) => `<div class="card"><div class="head" style="margin:0 0 8px"><h2 style="margin:0">${esc(k.nama)}</h2>${k.jenis === "event" ? `<a href="#" data-ev="${k.id}">Detail event</a>` : ""}</div>
+      ${k.jenis === "event" ? `<div class="small muted">Penanggung jawab: ${esc(k.pj ?? "—")}</div>` : '<div class="small muted">Tidak punya petugas tetap.</div>'}
+      ${k.laci.map((l) => `<div class="ok small">Laci terbuka · ${esc(l.kasir)} sejak ${jamWibD(l.buka)} · ${l.transaksi} transaksi · ${rp(l.penjualan)}</div>`).join("") || '<div class="small muted" style="margin-top:8px">Belum ada laci terbuka.</div>'}
+      <table style="margin-top:8px">${k.orang.map((o) => `<tr><td>${esc(o.nama)}${o.ditugaskan ? "" : ' <span class="small muted">(tidak ditugaskan)</span>'}</td>
+        <td><span class="tag ${WARNA[o.status]}">${esc(o.status === "buka" ? "Membuka kasir" : o.teks)}</span>${o.waktu ? ` <span class="small muted">${jamWibD(o.waktu)}</span>` : ""}</td></tr>`).join("") || '<tr><td class="muted small">Belum ada yang memakai POS di sini hari ini.</td></tr>'}</table></div>`).join("")}</div></main>`;
+  pasangSubtabs(halKaryawan);
+  $("#isi").querySelectorAll("[data-ev]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); buka("event"); detailEvent(a.dataset.ev); }));
 }
 
 function formKaryawan(k) {

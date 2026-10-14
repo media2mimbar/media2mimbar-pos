@@ -102,6 +102,7 @@ async function detailEvent(id) {
       <button class="btn" id="kirimEv">Kirim Stok</button><button class="btn" id="tarikEv">Tarik ke Gudang</button><button class="btn primary" id="tutupEv">Tutup Event</button>`}</div></div>
     ${e.presale_aktif ? `<div class="ok">Pre-sale aktif · ${e.presale_mode === "ambil" ? "pesanan diambil nanti" : "stok berkurang saat transaksi"}</div>` : ""}
     ${e.ditutup ? `<div class="ok">Ditutup ${waktu(e.tutup_pada)} oleh ${esc(e.tutup_oleh_nama)}. ${esc(e.tutup_catatan || "")}</div>` : ""}
+    ${d.presale_menunggu?.n ? `<div class="warn">${d.presale_menunggu.n} pesanan pre-sale (${rp(d.presale_menunggu.nilai)}) belum diambil. <a href="#" id="kePresale">Lihat daftar pembeli</a></div>` : ""}
     ${opMenunggu ? `<div class="err">Stok opname ${esc(opMenunggu.no)} dari ${esc(opMenunggu.dihitung_oleh)}: ${esc(opMenunggu.status)}. <a href="#" id="keOpname">Buka di Stok Opname</a></div>` : ""}
     ${!e.ditutup && !d.stok.some((s) => s.sisa || s.transit) ? '<div class="warn">Event ini belum punya stok. Klik Kirim Stok untuk mengirim barang dari Gudang Pusat.</div>' : ""}
     <div class="kpis" style="margin-top:14px">
@@ -121,9 +122,11 @@ async function detailEvent(id) {
         <td class="num" style="${m.diterima !== null && m.diterima < m.dikirim ? "color:var(--danger-text);font-weight:700" : ""}">${m.diterima ?? "—"}${m.diterima !== null && m.diterima < m.dikirim ? ` (kurang ${m.dikirim - m.diterima})` : ""}</td>
         <td>${esc(m.status)}</td><td>${m.status === "Dikirim" && !e.ditutup ? `<button class="btn small danger" data-batalm="${m.id}">Batalkan</button>` : ""}</td></tr>`).join("") || '<tr><td colspan="8" class="muted">Belum ada.</td></tr>'}</tbody></table></div>
     <h2 class="section">Shift kasir dan setoran</h2>
-    <div class="tablewrap"><table><thead><tr><th>Buka</th><th>Kasir</th><th class="num">Modal</th><th class="num">Dihitung</th><th class="num">Selisih</th><th>Status</th></tr></thead><tbody>
-      ${d.shift.map((s) => `<tr><td>${waktu(s.buka)}</td><td>${esc(s.kasir)}</td><td class="num">${rp(s.modal)}</td><td class="num">${s.kas_hitung === null ? "—" : rp(s.kas_hitung)}</td>
-        <td class="num">${s.selisih === null ? "—" : rp(s.selisih)}</td><td>${s.status === "buka" ? '<span class="tag warn">Buka</span>' : "Tutup"}</td></tr>`).join("") || '<tr><td colspan="6" class="muted">Belum ada.</td></tr>'}</tbody></table></div>
+    <div class="tablewrap"><table><thead><tr><th>Buka</th><th>Kasir</th><th class="num">Modal awal</th><th class="num">Tunai masuk</th><th class="num">Kas masuk / keluar</th><th class="num">Seharusnya</th><th class="num">Dihitung</th><th class="num">Selisih</th><th>Catatan</th><th>Status</th></tr></thead><tbody>
+      ${d.shift.map((s) => `<tr><td>${waktu(s.buka)}${s.tutup ? `<div class="small muted">tutup ${waktu(s.tutup)}</div>` : ""}</td><td>${esc(s.kasir)}</td><td class="num">${rp(s.modal)}</td><td class="num">${rp(s.tunai)}</td>
+        <td class="num">${rp(s.kas_masuk)} / ${rp(s.kas_keluar)}${s.retur_tunai ? `<div class="small muted">retur ${rp(s.retur_tunai)}</div>` : ""}</td><td class="num">${rp(s.seharusnya)}</td>
+        <td class="num">${s.kas_hitung === null ? "—" : rp(s.kas_hitung)}</td><td class="num" style="${s.selisih < 0 ? "color:var(--danger-text)" : ""}">${s.selisih === null ? "—" : rp(s.selisih)}</td>
+        <td class="small">${esc(s.catatan ?? "")}</td><td>${s.status === "buka" ? '<span class="tag warn">Buka</span>' : "Tutup"}</td></tr>`).join("") || '<tr><td colspan="10" class="muted">Belum ada.</td></tr>'}</tbody></table></div>
     <h2 class="section">Transaksi</h2>
     <div class="tablewrap"><table><thead><tr><th>Waktu</th><th>No.</th><th>Kasir</th><th>Metode</th><th class="num">Total</th><th>Status</th></tr></thead><tbody>
       ${d.transaksi.map((t) => `<tr class="klik" data-trx="${t.id}"><td>${waktu(t.waktu)}</td><td>${esc(t.no)}</td><td>${esc(t.kasir)}</td><td>${esc(t.metode)}</td><td class="num">${rp(t.total)}</td><td>${esc(t.status)}</td></tr>`).join("") || '<tr><td colspan="6" class="muted">Belum ada.</td></tr>'}</tbody></table></div>
@@ -137,6 +140,7 @@ async function detailEvent(id) {
     $("#tarikEv").onclick = () => formKirimTarik(d, "tarik");
     $("#tutupEv").onclick = () => formTutupEvent(id);
   }
+  if ($("#kePresale")) $("#kePresale").onclick = (x) => { x.preventDefault(); evPresale = id; tabPresale = "Menunggu"; buka("presale"); };
   if ($("#keOpname")) $("#keOpname").onclick = (x) => { x.preventDefault(); bukaOpname(opMenunggu.id); };
   $("#isi").querySelectorAll("[data-trx]").forEach((tr) => (tr.onclick = () => detailTransaksi(tr.dataset.trx)));
   $("#isi").querySelectorAll("[data-batalm]").forEach((b) => (b.onclick = () => popupForm(`<h2>Batalkan kiriman?</h2><p class="muted">Barang kembali ke Gudang Pusat.</p><label>Alasan</label><input type="text" name="alasan" required minlength="5">`,
@@ -167,7 +171,7 @@ function formKirimTarik(d, jenis) {
     const f = $("#fKt");
     f.querySelectorAll("[data-n]").forEach((el) => (el.oninput = () => {
       const i = item[+el.dataset.n];
-      if (Number(el.value) > i.ada) { el.value = i.ada; alert(`Maksimal ${i.ada}`); }
+      if (Number(el.value) > i.ada) { el.value = i.ada; pesanMaks(el, `${i.ada} (stok)`); }
       i.qty = el.value;
     }));
     f.querySelectorAll("[data-hapus]").forEach((b) => (b.onclick = () => { item.splice(+b.dataset.hapus, 1); gambar(); }));
@@ -197,6 +201,7 @@ async function formTutupEvent(id) {
   $("#isi").innerHTML = `<div class="form"><button class="back" id="kembali">← Kembali</button>
     <h1>Tutup ${esc(e.nama)}</h1><p class="muted">Hitung stok fisik di booth. Selisih kurang menjadi kerugian, lalu stok fisik kembali ke Gudang Pusat.</p>
     ${d.shift_terbuka.length ? `<div class="err">Masih ada kasir terbuka: ${d.shift_terbuka.map((s) => esc(s.kasir)).join(", ")}. Tutup kasirnya dulu dari POS.</div>` : ""}
+    ${d.presale_menunggu ? `<div class="warn">${d.presale_menunggu} pesanan pre-sale belum diambil. Setelah event ditutup, pembeli bisa mengambilnya di Gudang Pusat selama 7 hari, lalu statusnya menjadi Perlu Refund.</div>` : ""}
     ${d.kiriman.length ? `<div class="warn">${d.kiriman.length} kiriman belum diterima akan dibatalkan dan barangnya kembali ke gudang (${d.kiriman.map((k) => esc(k.no)).join(", ")}).</div>` : ""}
     ${om ? `<div class="card" style="margin-top:10px"><b>Stok opname ${esc(om.no)} · Menunggu persetujuan</b><div class="small muted">Dihitung ${esc(om.dihitung_oleh)} · ${waktu(om.dihitung_pada)}${om.catatan ? " · " + esc(om.catatan) : ""}</div>
       <p class="small">Isian stok fisik di bawah terisi dari hasil itu. <a href="#" id="mintaUlang">Minta opname ulang</a></p></div>` : ""}
@@ -244,18 +249,26 @@ function mintaOpnameUlang(id, selesai) {
 
 // ---------- Inventori › Stok Opname ----------
 
+let filterOpname = { lokasi: "", status: "", dari: "", sampai: "" };
 async function daftarOpname() {
   $("#isi").innerHTML = '<main><p class="muted">Memuat…</p></main>';
-  const { opname } = await api("GET", "/api/opname");
+  const { opname: semuaOp } = await api("GET", "/api/opname");
+  const fo = filterOpname;
+  const tglO = (o) => new Date(Date.parse(o.dihitung_pada) + 7 * 3600_000).toISOString().slice(0, 10);
+  const opname = semuaOp.filter((o) => (!fo.lokasi || o.lokasi === fo.lokasi) && (!fo.status || o.status === fo.status) && (!fo.dari || tglO(o) >= fo.dari) && (!fo.sampai || tglO(o) <= fo.sampai));
   const WARNA = { "Menunggu persetujuan": "warn", "Perlu opname ulang": "off", Disetujui: "aktif", Diganti: "" };
   const JENIS = { pos: "Hitungan kasir (POS)", gudang: "Opname gudang", tutup_event: "Tutup event" };
   $("#isi").innerHTML = `<main>${kepalaInv('<button class="btn primary" id="opGudang">+ Opname Gudang</button>')}
+    <form class="filters" id="fFilterOp"><select name="lokasi"><option value="">Semua lokasi</option>${[...new Set(semuaOp.map((o) => o.lokasi))].map((l) => `<option ${fo.lokasi === l ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>
+      <select name="status"><option value="">Semua status</option>${Object.keys(WARNA).map((s) => `<option ${fo.status === s ? "selected" : ""}>${s}</option>`).join("")}</select>
+      <input type="date" name="dari" value="${fo.dari}"><span>s/d</span><input type="date" name="sampai" value="${fo.sampai}"><button class="btn small primary">Terapkan</button></form>
     <div class="tablewrap"><table><thead><tr><th>Dihitung</th><th>No.</th><th>Lokasi</th><th>Jenis</th><th class="num">Kurang</th><th class="num">Lebih</th><th class="num">Kerugian</th><th>Status</th></tr></thead><tbody>
     ${opname.length ? opname.map((o) => `<tr class="klik" data-id="${o.id}"><td>${waktu(o.dihitung_pada)}<div class="small muted">${esc(o.dihitung_oleh)}</div></td><td><b>${esc(o.no)}</b></td><td>${esc(o.lokasi)}</td>
       <td>${JENIS[o.jenis]}</td><td class="num">${o.kurang ?? 0}</td><td class="num">${o.lebih ?? 0}</td><td class="num">${o.kerugian ? rp(o.kerugian) : "—"}</td>
       <td><span class="tag ${WARNA[o.status]}">${esc(o.status)}</span>${o.disetujui_oleh ? `<div class="small muted">disetujui ${esc(o.disetujui_oleh)}</div>` : ""}</td></tr>`).join("")
       : '<tr><td colspan="8" class="muted">Belum ada stok opname.</td></tr>'}</tbody></table></div></main>`;
   pasangSubtabs(halInventori);
+  $("#fFilterOp").onsubmit = (e) => { e.preventDefault(); filterOpname = Object.fromEntries(new FormData(e.target)); daftarOpname(); };
   $("#opGudang").onclick = formOpnameGudang;
   $("#isi").querySelectorAll("tr[data-id]").forEach((tr) => (tr.onclick = () => bukaOpname(tr.dataset.id)));
 }
@@ -356,7 +369,7 @@ function formSelesaikan(k) {
   $("#kembali").onclick = $("#batal").onclick = halKerugian;
   const f = $("#fSel");
   f.onchange = () => ($("#bagianGanti").hidden = f.jenis.value === "beban");
-  f.jumlah.oninput = () => { if (angka(f.jumlah.value) > k.sisa) f.jumlah.value = k.sisa; };
+  f.jumlah.oninput = () => { if (angka(f.jumlah.value) > k.sisa) { f.jumlah.value = k.sisa; pesanMaks(f.jumlah, rp(k.sisa)); } };
   formKirim(f, async (x) => {
     await api("POST", `/api/kerugian/${k.id}/selesaikan`, x.jenis === "beban" ? { jenis: "beban", catatan: x.catatan } : { jenis: "ganti", jumlah: angka(x.jumlah), cara: x.cara, catatan: x.catatan });
     halKerugian();

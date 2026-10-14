@@ -323,15 +323,23 @@ async function bukaOrder(o) {
 function lembarPisahBayar() {
   const t = tagihan();
   const pilih = {};
+  const faktor = t.subtotal ? t.total / t.subtotal : 1;
+  // Pisah per barang tidak bisa untuk pesanan 1 barang, atau kalau barang termurah sudah menyamai sisa tagihan.
+  const nBarang = t.items.reduce((a, i) => a + i.qty, 0);
+  const termurah = Math.min(...t.items.map((i) => Math.round(i.harga * faktor)));
+  const bolehBarang = nBarang > 1 && termurah < t.sisa;
+  if (t.sisa <= 1) return toast("Sisa tagihan terlalu kecil untuk dipisah");
   const gambar = (mode = "nominal") => {
+    if (!bolehBarang) mode = "nominal";
     const nilaiBarang = () => Math.round(t.items.reduce((a, i) => a + (pilih[i.sku] ?? 0) * i.harga, 0) * (t.subtotal ? t.total / t.subtotal : 1));
     bukaLembar(`<h2>Pisah bayar</h2><div class="small muted">Sisa tagihan ${rp(t.sisa)}. Sisanya tetap di Daftar Order sampai lunas.</div>
-      <div class="metode"><button data-mode="nominal" class="${mode === "nominal" ? "on" : ""}">Jumlah uang</button><button data-mode="barang" class="${mode === "barang" ? "on" : ""}">Per barang</button></div>
+      <div class="metode"><button data-mode="nominal" class="${mode === "nominal" ? "on" : ""}">Jumlah uang</button>${bolehBarang ? `<button data-mode="barang" class="${mode === "barang" ? "on" : ""}">Per barang</button>` : ""}</div>
       ${mode === "nominal" ? `<label>Jumlah dibayar sekarang</label><input id="nominalPisah" type="number" inputmode="numeric" min="1" max="${t.sisa - 1}">`
       : `${t.items.map((i) => `<div class="baris"><div class="isi"><b>${esc(i.nama)}</b><div class="small muted">${rp(i.harga)} · di keranjang ${i.qty}</div></div>
           <div class="qty"><button data-k="-" data-sku="${esc(i.sku)}">−</button><span>${pilih[i.sku] ?? 0}</span><button data-k="+" data-sku="${esc(i.sku)}">+</button></div></div>`).join("")}
         <div class="ok" id="nilaiPisah">Bayar ${rp(Math.min(nilaiBarang(), t.sisa))}</div>`}
       <button class="btn primary" id="lanjutPisah">Lanjut bayar</button>`);
+    if ($("#nominalPisah")) batasiAngka($("#nominalPisah"), t.sisa - 1, rp);
     $("#lembar").onclick = (e) => {
       const m = e.target.dataset.mode;
       if (m) return gambar(m);
@@ -343,7 +351,8 @@ function lembarPisahBayar() {
       }
       if (e.target.id !== "lanjutPisah") return;
       const n = mode === "nominal" ? Math.round(Number($("#nominalPisah").value || 0)) : Math.min(nilaiBarang(), t.sisa);
-      if (n <= 0) return toast("Isi jumlah yang dibayar");
+      if (n <= 0) return toast(mode === "barang" ? "Pilih barang yang dibayar sekarang" : "Isi jumlah yang dibayar");
+      if (mode === "nominal" && n >= t.sisa) return toast(`Maksimal ${rp(t.sisa - 1)}. Untuk melunasi, pakai Bayar biasa`);
       if (n >= t.sisa) { tutupLembar(); return layarBayar(); }
       tutupLembar();
       layarBayar(n);

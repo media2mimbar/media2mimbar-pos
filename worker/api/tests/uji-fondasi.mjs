@@ -96,8 +96,12 @@ test("Admin wajib ganti password sementara, lalu hanya boleh ke perangkat", asyn
   assert.equal((await api("POST", "/api/ganti-password", { cookie: dimasCookie, body: { lama: "salah", baru: "dimasbaru1" } })).status, 400);
   assert.equal((await api("POST", "/api/ganti-password", { cookie: dimasCookie, body: { lama: dimas.pw, baru: "dimasbaru1" } })).status, 200);
   assert.equal((await api("GET", "/api/perangkat", { cookie: dimasCookie })).status, 200);
-  assert.equal((await api("GET", "/api/karyawan", { cookie: dimasCookie })).status, 403);
-  assert.equal((await api("GET", "/api/riwayat-masuk", { cookie: dimasCookie })).status, 403);
+  // Admin hanya melihat daftar karyawan dan riwayat masuk POS (PRD 5.10); mengubah tetap khusus Owner.
+  assert.equal((await api("GET", "/api/karyawan", { cookie: dimasCookie })).status, 200);
+  assert.equal((await api("POST", "/api/karyawan", { cookie: dimasCookie, body: { nama: "X", role: ["kasir"], pin: "582914" } })).status, 403);
+  const rw = await api("GET", "/api/riwayat-masuk?tempat=dashboard", { cookie: dimasCookie });
+  assert.equal(rw.status, 200);
+  assert.ok(rw.data.riwayat.every((l) => l.tempat === "pos"));
 });
 
 test("Kasir tidak bisa masuk dashboard", async () => {

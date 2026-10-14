@@ -293,6 +293,49 @@ Tahap 7 menambah migrasi `0007_keuangan.sql`: `biaya` (dihapus = ditandai, bukan
 
 Pelengkap POS sesudah tahap 8 (`src/pos-lanjut.ts`, `ui/pos-tambahan.js`): menu Laporan di HP (laporan kasir per shift, kas kasir, produk terjual), Riwayat Masuk (kasir hanya melihat miliknya), Pengaturan baca saja, filter Daftar Order, persetujuan opname oleh Owner/Admin dari HP, batal penerimaan kiriman selama barangnya masih utuh, serta tutup kasir lain dan tutup event dari HP oleh Owner. Fungsi persetujuan opname dan tutup event dipakai bersama dashboard dan POS (`setujuiOpnameInti`, `tutupEventInti`). Retur uang kembali tunai ditolak kalau uang di laci tidak cukup. Impor pesanan online sekarang juga membaca .xlsx langsung di browser (zip dibuka dengan `DecompressionStream`).
 
+Pelengkap dari PRD (sesudah itu):
+- **POS:**
+  - chip Terlaris (4 produk terlaris 30 hari);
+  - tampilan Grid atau Daftar SKU, diatur di Pengaturan POS;
+  - Enter di kolom cari langsung menambah SKU yang cocok persis;
+  - tanda "harga event" dan "harga khusus";
+  - info tempat yang bisa diketuk (sisa stok per varian, terima kiriman, ganti tempat);
+  - kas keluar dan retur tunai dibatasi isi laci;
+  - nominal pisah bayar dibatasi sisa tagihan.
+- **Karyawan:**
+  - Admin bisa melihat daftar (tanpa mengubah);
+  - kolom Bertugas di dan Terakhir di POS;
+  - subtab Bertugas Hari Ini (`GET /api/karyawan/bertugas`);
+  - riwayat masuk POS di halaman yang sama dengan hitungan PIN salah hari ini.
+- **Event:**
+  - setoran per shift di detail event;
+  - peringatan pre-sale yang belum diambil sebelum tutup event;
+  - filter opname.
+- **Promosi:**
+  - filter;
+  - Duplikat;
+  - pilih cakupan (per produk atau total belanja) sebelum form;
+  - info harga paket;
+  - Simpan sebagai draf.
+- **Pre-sale:** tab Semua dan filter per event.
+- **Barang terbuang:**
+  - filter;
+  - ringkasan per jenis;
+  - unduh CSV;
+  - PJ diisi otomatis dari event.
+- **Pesanan online:** stok Gudang Pusat diperiksa di dalam `db.batch` yang sama.
+- **Katalog:**
+  - baris varian bisa dibuka;
+  - harga marketplace per varian;
+  - sakelar tampil di POS (`PATCH /api/produk/:id/tampil`).
+- **Pengaturan POS:** tersimpan otomatis dan ada pratinjau struk.
+- **Foto:** dikecilkan di browser (maksimal 1600 px, JPEG) sebelum disimpan ke D1.
+
+Yang sengaja tidak dibuat:
+- **Reset Data:** terlalu berisiko untuk database produksi.
+- **Nomor transaksi dengan kode HP:** tetap seperti sekarang supaya bisa dibuat saat offline.
+- **Kirim otomatis lewat WhatsApp API:** ditunda di PRD.
+
 Batas yang perlu diingat: satu query D1 maksimal 100 parameter, jadi satu faktur dibatasi 90 baris barang dan satu produk 40 varian.
 
 Jumlah iterasi PBKDF2 ditetapkan 8.000 (sekitar 4 sampai 5 ms CPU di Node). Ganti password menjalankan dua hash, jadi angka ini sengaja tidak dinaikkan. Cek waktu CPU sebenarnya di Cloudflare › Workers › hikayat-api › Observability setelah dipakai.

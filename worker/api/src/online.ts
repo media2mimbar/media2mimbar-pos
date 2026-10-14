@@ -218,11 +218,18 @@ export async function tambahPesanan(req: Request, env: Env) {
   }
   if (p.pelanggan_id && !(await env.DB.prepare("SELECT 1 FROM pelanggan WHERE id = ?").bind(p.pelanggan_id).first())) throw new Gagal(400, "Pelanggan tidak ditemukan");
   if ((await noSudahAda(env.DB, s.id, [p.no_pesanan])).size) throw new Gagal(409, `No. pesanan ${p.no_pesanan} sudah tercatat di ${s.nama}`);
-  const tulis = tulisPesanan(env.DB, s, p, info, "Manual", null, staff.id);
+  // Input manual tidak boleh melebihi stok Gudang Pusat (impor file tetap diterima karena pesanannya sudah terjadi).
+  const perSku = new Map<string, number>();
+  for (const i of p.items) perSku.set(i.sku, (perSku.get(i.sku) ?? 0) + i.qty);
+  const tulis = [
+    ...[...perSku].map(([sku, qty]) => penjaga(env.DB, "COALESCE((SELECT qty FROM stok WHERE sku = ? AND lokasi_id = 'gudang'), 0) >= ?", sku, qty)),
+    ...tulisPesanan(env.DB, s, p, info, "Manual", null, staff.id),
+  ];
   try {
     await env.DB.batch([...tulis, logAktivitas(env.DB, staff, "Input pesanan online", { tabel: "pesanan_online", keterangan: `${s.nama} ${p.no_pesanan}` })]);
   } catch (e) {
     if (bentrok(e)) throw new Gagal(409, `No. pesanan ${p.no_pesanan} sudah tercatat di ${s.nama}`);
+    if (kenaPenjaga(e)) throw new Gagal(400, `Stok Gudang Pusat tidak cukup: ${[...perSku].map(([sku, q]) => `${sku} ${q} pcs`).join(", ")}`);
     throw e;
   }
   return json({ ok: true }, 201);

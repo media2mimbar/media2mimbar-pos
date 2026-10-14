@@ -156,6 +156,7 @@ async function tarikData(lokasiId) {
   snap.kategori = r.kategori;
   snap.kiriman_menunggu = r.kiriman_menunggu ?? 0;
   snap.promo = r.promo ?? [];
+  snap.terlaris = r.terlaris ?? [];
   for (const p of r.produk) snap.produk[p.id] = p;
   for (const v of r.varian) snap.varian[v.sku] = v;
   for (const s of r.stok) snap.stok[s.sku] = s.qty;
@@ -265,3 +266,11 @@ const rp = (n) => "Rp " + Number(n || 0).toLocaleString("id-ID");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const jam = (iso) => new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 const tglJam = (iso) => new Date(iso).toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
+// Batas isian angka (PRD bagian 7): angka yang melewati batas langsung diturunkan ke batas, dengan pesan.
+function batasiAngka(input, maks, format = (n) => String(n)) {
+  input.max = maks;
+  input.addEventListener("input", () => {
+    if (input.value !== "" && Number(input.value) > maks) { input.value = maks; toast(`Maksimal ${format(maks)}`); }
+  });
+}

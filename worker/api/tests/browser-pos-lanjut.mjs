@@ -122,6 +122,22 @@ try {
   await hp.getByText(/Kode HP/).waitFor();
   await hp.locator("#kembali").click();
 
+  // Katalog: kategori Terlaris, mode SKU dengan scan barcode (SKU + Enter), pill tempat berisi stok per varian.
+  await hp.locator("#btnMenu").waitFor();
+  await hp.evaluate(() => segarkan());
+  await hp.locator('#chips [data-k="terlaris"]').waitFor();
+  await hp.locator('#chips [data-k="terlaris"]').click();
+  assert.equal(await hp.locator("#grid .kartu").count(), 1);
+  await hp.locator("#btnMode").click();
+  await hp.locator("#cari").fill("kb-s");
+  await hp.locator("#cari").press("Enter");
+  await hp.locator("#grid [data-sku='KB-S'] .tag.ok", { hasText: "1" }).waitFor();
+  await hp.locator("#btnHapus").click();
+  await hp.locator("#btnMode").click();
+  await hp.locator("#pillTempat").click();
+  assert.match(await hp.locator("#lembar").textContent(), /Event.*Sisa stok.*Kaos Burtuqol · S.*KB-S.*3/s);
+  await hp.locator("#lapis").click({ position: { x: 5, y: 5 } });
+
   // Opname: dihitung (fisik 2 dari 3), lalu disetujui Owner dari HP.
   await menu("inventori");
   await hp.locator('[data-tab="opname"]').click();

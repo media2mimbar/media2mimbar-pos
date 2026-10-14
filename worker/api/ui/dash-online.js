@@ -108,6 +108,10 @@ async function formPesananOnline(salId) {
     const segar = () => { $("#kotor").textContent = rp(kotor()); $("#kira").textContent = rp(kira()); };
     f.querySelectorAll("[data-k]").forEach((el) => (el.oninput = el.onchange = () => {
       const b = baris[el.dataset.i];
+      if (el.dataset.k === "qty" && b.sku) {
+        const ada = varian.find((v) => v.sku === b.sku)?.stok_gudang ?? 0;
+        if (Number(el.value) > ada) { el.value = ada; pesanMaks(el, `${ada} (stok gudang)`); }
+      }
       b[el.dataset.k] = el.value;
       if (el.dataset.k === "sku") { b.harga = String(varian.find((v) => v.sku === el.value)?.harga ?? ""); gambar(); return; }
       segar();

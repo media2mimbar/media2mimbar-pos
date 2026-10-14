@@ -95,6 +95,7 @@ try {
   await hp.locator("#fBuka [name=modal]").fill("100000");
   await hp.getByRole("button", { name: "Buka Kasir" }).click();
   await hp.getByText("1 kiriman stok belum diterima").click();
+  await hp.locator("#keTerima").click();
   await hp.locator("[data-mutasi]").first().click();
   await hp.locator('#fTerima [data-sku="KB-M"]').fill("5");
   await hp.getByText("Kurang 1 pcs").waitFor();
@@ -106,7 +107,7 @@ try {
   await hp.getByText("Sudah diterima").waitFor();
   await hp.locator("#kembali").click();
   const kartu = hp.locator(".kartu", { hasText: "Kaos Burtuqol" });
-  assert.match(await kartu.textContent(), /sisa 15.*Rp 99\.000\+.*harga khusus/s);
+  assert.match(await kartu.textContent(), /sisa 15.*Rp 99\.000\+.*harga event/s);
   await kartu.click();
   await hp.locator('#lembar button[data-k="+"][data-sku="KB-S"]').click();
   await hp.locator("#selesaiVarian").click();

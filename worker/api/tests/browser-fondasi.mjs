@@ -50,7 +50,7 @@ try {
   assert.match(await laptop.locator("#popupIsi").textContent(), /PIN sementara: 333333/);
   await laptop.screenshot({ path: SHOTS + "1-karyawan-baru.png" });
   await laptop.locator("#tutupPopup").click();
-  assert.match(await laptop.locator("table").textContent(), /Sari Handayani.*Kasir.*POS saja.*PIN sementara/s);
+  assert.match(await laptop.locator("table").first().textContent(), /Sari Handayani.*Kasir.*POS saja.*PIN sementara/s);
   await laptop.screenshot({ path: SHOTS + "2-daftar-karyawan.png" });
 
   await laptop.getByRole("button", { name: "Perangkat POS" }).click();
