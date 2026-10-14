@@ -13,10 +13,10 @@ Per Oktober 2026.
 | File aplikasi | Pages | Bandwidth tidak dibatasi, 500 build per bulan, boleh untuk usaha | Dashboard (laptop) dan POS (HP, PWA) |
 | Server | Workers | 100.000 permintaan per hari, 10 ms CPU per permintaan | Login, cek PIN, semua aturan bisnis, laporan |
 | Database | D1 (SQLite) | 5 GB, 5 juta baris dibaca dan 100.000 baris ditulis per hari | Semua data |
-| Foto | R2 | 10 GB, 1 juta operasi tulis dan 10 juta operasi baca per bulan, tanpa biaya data keluar | Bukti biaya, foto barang terbuang dan retur, gambar QRIS |
+| Foto | D1 (tabel `berkas`) | Ikut kuota D1 di atas | Bukti biaya, foto barang terbuang dan retur, gambar QRIS |
 | Pemulihan data | D1 Time Travel | Kembali ke menit mana pun dalam 7 hari terakhir | Salah hapus atau salah impor |
 | Jadwal | Workers Cron Triggers | Termasuk paket gratis | Rekap harian, bersih-bersih sesi |
-| Backup jangka panjang | GitHub Actions + R2 | Kuota menit GitHub | Salinan database setiap malam, disimpan 30 hari |
+| Backup jangka panjang | GitHub Actions (artifact) | Kuota menit dan penyimpanan GitHub | Salinan database setiap malam, disimpan 30 hari |
 
 Biaya: Rp0 per bulan. Opsional: domain sendiri sekitar Rp150 ribu sampai Rp200 ribu per tahun. Tanpa domain, alamatnya `nama.pages.dev`.
 
@@ -30,11 +30,10 @@ Biaya: Rp0 per bulan. Opsional: domain sendiri sekitar Rp150 ribu sampai Rp200 r
             Cloudflare Pages (file aplikasi)
                          ▼
             Cloudflare Workers (API /api/*)
-              ├─ D1  (database)
-              ├─ R2  (foto, privat)
+              ├─ D1  (database + foto)
               └─ Cron (rekap harian)
                          ▼
-            GitHub Actions: ekspor D1 tiap malam → R2
+            GitHub Actions: ekspor D1 tiap malam → artifact privat
 ```
 
 ---
@@ -176,12 +175,18 @@ Kalau kuota harian D1 habis, server menolak tulis sampai pukul 00.00 UTC (07.00 
 
 ---
 
-## 6. Foto di R2
+## 6. Foto di D1
+
+R2 tidak dipakai (keputusan Oktober 2026). Foto disimpan di D1 sebagai BLOB di tabel `berkas`: id, jenis, mime, ukuran, isi, ref_tabel, ref_id, dibuat_pada, dibuat_oleh.
+
 
 - Foto dikecilkan di perangkat sebelum diunggah: sisi terpanjang 1280 px, JPEG kualitas 0,7, rata-rata 100 KB sampai 200 KB.
 - Unggah lewat Worker: `POST /api/berkas`. Worker memeriksa sesi, jenis file (JPEG, PNG, WebP), dan ukuran maksimal 1 MB.
-- Bucket R2 **tidak publik**. Foto diambil lewat `GET /api/berkas/:id`, dan Worker mengecek hak akses dulu. Bukti transfer dan foto nota termasuk data sensitif.
-- Kunci file: `tahun/bulan/jenis/ulid.jpg`.
+- Foto tidak punya alamat publik. Foto diambil lewat `GET /api/berkas/:id`, dan Worker mengecek hak akses dulu. Bukti transfer dan foto nota termasuk data sensitif.
+- Batas D1: satu baris maksimal 2 MB, jadi batas unggah 1 MB aman.
+- Daftar dan laporan tidak pernah memilih kolom `isi`. Isi foto hanya dibaca oleh `GET /api/berkas/:id`.
+- Foto ikut masuk ekspor malam, jadi ukuran backup bertambah seiring jumlah foto.
+- Kalau database mendekati 5 GB, pindahkan foto ke R2. Kolom `id` tetap, jadi alamat `/api/berkas/:id` tidak berubah.
 
 ---
 
@@ -198,11 +203,11 @@ Kalau kuota harian D1 habis, server menolak tulis sampai pukul 00.00 UTC (07.00 
 | Lapisan | Cara | Jangka |
 |---|---|---|
 | D1 Time Travel | Otomatis, selalu aktif | 7 hari ke belakang, bisa kembali ke menit tertentu |
-| Ekspor malam | GitHub Actions menjalankan `wrangler d1 export` lalu mengunggah file ke bucket R2 terpisah | Disimpan 30 hari, file lama dihapus otomatis |
-| Foto | R2 tidak menghapus file. Foto yang tidak dipakai dibiarkan | — |
+| Ekspor malam | GitHub Actions menjalankan `wrangler d1 export` lalu menyimpan file sebagai artifact di repositori privat | Disimpan 30 hari (`retention-days: 30`), file lama dihapus otomatis |
+| Foto | Ikut ekspor malam karena ada di D1 | Sama dengan database |
 | Uji pemulihan | Sebulan sekali, impor ekspor terbaru ke database uji dan cocokkan jumlah transaksi | Wajib |
 
-Token API Cloudflare untuk GitHub Actions hanya diberi izin D1 baca dan R2 tulis ke bucket backup.
+Token API Cloudflare untuk GitHub Actions hanya diberi izin D1 baca.
 
 ---
 
@@ -216,7 +221,7 @@ Dengan asumsi 2 event berjalan bersamaan, 300 transaksi per hari, 5 akun dashboa
 | Baris ditulis D1 | ~3.000 per hari (sekitar 10 baris per transaksi) | 100.000 per hari |
 | Baris dibaca D1 | ~200.000 per hari (laporan memakai rekap) | 5 juta per hari |
 | Ukuran database | ~1 KB sampai 2 KB per transaksi lengkap, jadi 5 GB cukup untuk jutaan transaksi | 5 GB |
-| Foto | ~150 KB per foto, jadi 10 GB cukup untuk ~60.000 foto | 10 GB |
+| Foto | ~150 KB per foto, berbagi 5 GB dengan data lain. 2 GB foto sekitar 13.000 foto | Ikut 5 GB D1 |
 
 Ini angka perkiraan. Setelah 2 minggu berjalan, cek angka sebenarnya di halaman Analytics Cloudflare.
 
@@ -224,17 +229,20 @@ Ini angka perkiraan. Setelah 2 minggu berjalan, cek angka sebenarnya di halaman 
 
 ## 10. Daftar keamanan
 
-- [ ] Semua endpoint memeriksa sesi dan role di server.
-- [ ] Pepper, kunci HMAC, dan token API disimpan sebagai Worker secret, tidak di kode atau repositori.
-- [ ] Password dan PIN hanya disimpan sebagai hash.
-- [ ] Akun dan PIN dikunci setelah 5 kali salah.
-- [ ] Cookie sesi `HttpOnly`, `Secure`, `SameSite=Strict`.
-- [ ] Input divalidasi dengan Zod di server, termasuk jumlah, harga, dan stok.
-- [ ] Query D1 memakai parameter (`.bind()`), tidak pernah menyambung teks.
-- [ ] Bucket R2 privat, foto dilayani lewat Worker.
-- [ ] Perangkat POS bisa dinonaktifkan dari dashboard.
-- [ ] Log aktivitas penting: login, ubah harga, void, retur, hapus biaya, batal faktur, persetujuan opname.
-- [ ] Backup malam berjalan dan pemulihannya sudah diuji.
+Diperiksa Oktober 2026 (tahap 8).
+
+- [x] Semua endpoint memeriksa sesi dan role di server. Diperiksa otomatis: semua rute di `src/index.ts` memanggil `sesiSiap`, `sesiPos`, atau `perangkatDari`, kecuali empat yang memang terbuka: status setup, setup Owner pertama (butuh kode setup dan hanya selama belum ada akun), login, dan pendaftaran HP (butuh kode sekali pakai, dikunci setelah 5 kali salah).
+- [x] Pepper dan token API disimpan sebagai Worker secret atau secret GitHub, tidak di kode atau repositori.
+- [x] Password (PBKDF2 + pepper) dan PIN (HMAC + pepper) hanya disimpan sebagai hash. Token sesi dan token perangkat juga disimpan sebagai hash.
+- [x] Akun, PIN, dan kode pendaftaran HP dikunci 15 menit setelah 5 kali salah.
+- [x] Cookie sesi `HttpOnly`, `Secure`, `SameSite=Strict`.
+- [x] Input divalidasi di server, termasuk jumlah, harga, stok, dan angka transaksi dari HP. Memakai fungsi validasi sendiri (`src/util.ts`), belum Zod.
+- [x] Query D1 memakai parameter (`.bind()`). Teks yang disambung ke SQL hanya tanda tanya placeholder dan nama kolom tetap.
+- [x] Foto hanya dilayani lewat Worker setelah cek sesi dashboard atau token HP, dengan `content-security-policy: default-src 'none'`.
+- [x] Perangkat POS bisa dinonaktifkan dari dashboard; HP itu langsung ditolak di semua endpoint POS.
+- [x] Log aktivitas penting: login dan semua aksi akun/HP (`log_masuk`), ubah harga, faktur, batal faktur, opname, biaya, promo, impor, kerugian (`log_aktivitas`). Void dan retur tercatat di transaksi beserta siapa yang melakukan dan menyetujui.
+- [x] Backup malam (`.github/workflows/backup-d1.yml`) menguji pemulihan setiap kali berjalan. Repositori publik, jadi file backup dienkripsi AES-256. Butuh tiga secret GitHub sebelum aktif; lihat `docs/Panduan-Siap-Pakai.md`.
+- [ ] Uji lapangan di satu event kecil (daftar periksa di `docs/Panduan-Siap-Pakai.md`).
 
 ---
 
@@ -252,6 +260,87 @@ Ini angka perkiraan. Setelah 2 minggu berjalan, cek angka sebenarnya di halaman 
 | 8. Siap pakai | Backup malam, uji pemulihan, uji lapangan di satu event kecil | Dipakai sungguhan |
 
 Saran: jalankan tahap 3 di satu event kecil sebelum tahap 4 sampai 7 selesai. Masalah offline dan sinyal paling cepat ketahuan di lapangan.
+
+### Catatan pembangunan (Oktober 2026)
+
+Tahap 1 sampai 8 sudah dibangun di `worker/api` dan berjalan di `https://hikayat-api.media2mimbar.workers.dev`. Beberapa hal berbeda dari rancangan di atas karena lingkungan pengembangan saat itu tidak bisa mengunduh paket npm:
+
+| Rancangan | Yang dipakai sekarang | Rencana |
+|---|---|---|
+| Hono | Router kecil di `src/index.ts` | Bisa diganti Hono tanpa mengubah fungsi tiap rute |
+| Drizzle ORM + Drizzle Kit | SQL biasa dengan `.bind()`, migrasi di `migrations/*.sql`, dicatat di tabel `_migrasi` | Tetap SQL biasa atau pindah ke Drizzle saat skema membesar |
+| Zod | Fungsi validasi di `src/util.ts` | Ganti Zod saat paket bisa dipasang |
+| Dashboard dan POS di Pages (React + Vite) | Halaman HTML sederhana di `ui/`, dilayani Worker yang sama (`/` dan `/pos`) | Dipindah ke Pages saat tahap 3 (PWA) |
+| `wrangler deploy` | `deploy.py` memanggil API Cloudflare langsung | Tetap bisa memakai wrangler kapan saja |
+
+Tahap 2 menambah migrasi `0002_katalog_stok.sql`: `kategori`, `produk`, `varian`, `lokasi` (berisi Gudang Pusat), `stok`, `stok_gerak`, `pemasok`, `faktur`, `faktur_item`, `faktur_bayar`, `hpp_riwayat`, dan `log_aktivitas`. Rumus HPP dan status faktur ada di `src/aturan.ts` (calon `packages/aturan`) dan diuji dengan angka dari prototipe. Pemeriksaan stok saat batal faktur dan sisa tagihan saat bayar dijalankan di dalam `db.batch` yang sama dengan penulisannya, jadi dua orang yang menyimpan bersamaan tidak bisa membuat stok gudang atau sisa tagihan jadi salah.
+
+Tahap 3 menambah migrasi `0003_pos.sql`: `shift`, `kas_laci`, `trx`, `trx_item`, `trx_bayar`, `harga_saluran`, `berkas` (foto di D1), `persetujuan`, dan `dokumen_ditolak`. POS di HP:
+- File aplikasi disimpan service worker (`/pos-sw.js`, cakupan `/pos`), jadi POS tetap terbuka tanpa sinyal.
+- Katalog, stok, pengaturan, dan gambar QRIS disimpan di IndexedDB. Tarik data memakai `sejak` dan indeks `diubah_pada` supaya baris yang dibaca D1 tetap kecil.
+- Setiap aksi kasir (buka shift, kas, transaksi, tutup kasir, riwayat masuk) masuk antrean dengan ULID, lalu dikirim berurutan ke `POST /api/pos/sinkron`. Server memeriksa ulang angka (subtotal, total, pembayaran, 4 digit QRIS). Kiriman yang tidak lolos disimpan di `dokumen_ditolak` dan tampil di Dashboard › Penjualan › Kiriman Ditolak.
+- Masuk offline memakai PBKDF2(PIN, salt HP) yang disimpan saat karyawan pernah masuk online di HP itu.
+- Tutup kasir online memakai token persetujuan sekali pakai dari `POST /api/pos/setujui`. Tutup kasir offline ditandai `offline = 1`.
+- Setoran kasir di dashboard menghitung ulang "seharusnya" dari transaksi yang sudah masuk server, jadi tetap benar walau ada HP yang mengirim belakangan.
+
+Tahap 4 menambah migrasi `0004_event.sql`: `event`, `event_kasir`, `event_varian` (produk yang dijual + harga event), `mutasi`, `mutasi_item`, `opname`, `opname_item`, `kerugian`, `kerugian_riwayat`. Setiap event juga punya baris `lokasi` dengan ID yang sama, jadi stok dan transaksi menempel ke ID dan ikut "pindah" saat nama event diganti. Kirim stok mengurangi gudang dan menambah `transit` di event; diterima di POS lewat dokumen antrean `terima`. Opname dari POS lewat dokumen `opname`. Tutup event membatalkan kiriman yang belum diterima, menyesuaikan stok ke hitungan fisik, mencatat kerugian, lalu memindahkan sisa ke gudang dalam satu `db.batch`. Kerugian kas laci dicatat otomatis saat tutup kasir kurang.
+
+Tahap 5 menambah migrasi `0005_pos_lengkap.sql`: `promo`, `pelanggan`, `retur`, `retur_item`, `terbuang`, `terbuang_item`, dan kolom pre-sale, void, dan refund di `trx`. Rumus promo ada di `src/promo.ts` dan dipakai server dan HP (dikompilasi menjadi `/pos-promo.js`), jadi potongan di HP dan di server selalu sama. Dokumen antrean baru: `pelanggan`, `void`, `retur`, `serah`. Foto retur diunggah ke `berkas` (D1); kalau HP offline, foto disimpan di IndexedDB dan diunggah saat sinkron. Daftar Order dan pisah bayar hanya disimpan di HP sampai lunas, jadi tutup kasir ditolak selama masih ada pesanan yang dibayar sebagian.
+
+Tahap 6 menambah migrasi `0006_online.sql`: `saluran` (Shopee, Tokopedia, TikTok Shop, Lainnya, beserta biaya), `saluran_varian` (harga marketplace per SKU), `pesanan_online`, `pesanan_item`, `impor_batch`. File CSV dibaca di browser; server memeriksa ulang dan menyimpan per kiriman maksimal 100 pesanan dalam satu `db.batch`. File .xls lama perlu disimpan ulang sebagai .xlsx atau CSV.
+
+Tahap 7 menambah migrasi `0007_keuangan.sql`: `biaya` (dihapus = ditandai, bukan dibuang), `rekap_harian`, dan pengaturan `keuangan`. Semua laporan memakai satu sumber angka, `sqlFakta` di `src/laporan.ts`: baris jual per barang dari POS, retur, dan pesanan online, dengan diskon dan potongan marketplace dibagi rata ke barang menurut nilainya. Laporan penjualan menghitung pre-sale pada tanggal transaksi; laporan keuangan menghitungnya saat barang diserahkan. Cron `10 17 * * *` (00.10 WIB) menghitung ulang rekap harian 7 hari terakhir, jadi transaksi dari HP yang lama offline tetap masuk. Laporan lain masih dihitung langsung dari tabel transaksi karena datanya masih kecil.
+
+Pelengkap POS sesudah tahap 8 (`src/pos-lanjut.ts`, `ui/pos-tambahan.js`): menu Laporan di HP (laporan kasir per shift, kas kasir, produk terjual), Riwayat Masuk (kasir hanya melihat miliknya), Pengaturan baca saja, filter Daftar Order, persetujuan opname oleh Owner/Admin dari HP, batal penerimaan kiriman selama barangnya masih utuh, serta tutup kasir lain dan tutup event dari HP oleh Owner. Fungsi persetujuan opname dan tutup event dipakai bersama dashboard dan POS (`setujuiOpnameInti`, `tutupEventInti`). Retur uang kembali tunai ditolak kalau uang di laci tidak cukup. Impor pesanan online sekarang juga membaca .xlsx langsung di browser (zip dibuka dengan `DecompressionStream`).
+
+Pelengkap dari PRD (sesudah itu):
+- **POS:**
+  - chip Terlaris (4 produk terlaris 30 hari);
+  - tampilan Grid atau Daftar SKU, diatur di Pengaturan POS;
+  - Enter di kolom cari langsung menambah SKU yang cocok persis;
+  - tanda "harga event" dan "harga khusus";
+  - info tempat yang bisa diketuk (sisa stok per varian, terima kiriman, ganti tempat);
+  - kas keluar dan retur tunai dibatasi isi laci;
+  - nominal pisah bayar dibatasi sisa tagihan.
+- **Karyawan:**
+  - Admin bisa melihat daftar (tanpa mengubah);
+  - kolom Bertugas di dan Terakhir di POS;
+  - subtab Bertugas Hari Ini (`GET /api/karyawan/bertugas`);
+  - riwayat masuk POS di halaman yang sama dengan hitungan PIN salah hari ini.
+- **Event:**
+  - setoran per shift di detail event;
+  - peringatan pre-sale yang belum diambil sebelum tutup event;
+  - filter opname.
+- **Promosi:**
+  - filter;
+  - Duplikat;
+  - pilih cakupan (per produk atau total belanja) sebelum form;
+  - info harga paket;
+  - Simpan sebagai draf.
+- **Pre-sale:** tab Semua dan filter per event.
+- **Barang terbuang:**
+  - filter;
+  - ringkasan per jenis;
+  - unduh CSV;
+  - PJ diisi otomatis dari event.
+- **Pesanan online:** stok Gudang Pusat diperiksa di dalam `db.batch` yang sama.
+- **Katalog:**
+  - baris varian bisa dibuka;
+  - harga marketplace per varian;
+  - sakelar tampil di POS (`PATCH /api/produk/:id/tampil`).
+- **Pengaturan POS:** tersimpan otomatis dan ada pratinjau struk.
+- **Foto:** dikecilkan di browser (maksimal 1600 px, JPEG) sebelum disimpan ke D1.
+
+Tampilan dashboard disamakan dengan prototipe (`prototipe/dashboard.html`): bilah atas putih dengan pilihan Penjualan/Karyawan, menu samping oranye 300px dengan submenu (Laporan, Keuangan, Penjualan Online, Penjualan POS, Produk, Inventori), ikon menu disalin dari prototipe (`ui/dash-ikon.js`), font Inter, kotak oranye Total Penjualan di Dashboard, tab berbentuk pil, dan sakelar untuk pilihan aktif/nonaktif. Submenu di menu samping menggantikan tab di dalam halaman; fungsi `subtabs()` mengenali grup yang punya submenu dan tidak menggambar tabnya lagi. Karyawan, Perangkat POS, dan Riwayat Masuk menjadi satu halaman di area Karyawan. Font Inter dimuat dari Google Fonts, jadi CSP halaman mengizinkan `fonts.googleapis.com` (style) dan `fonts.gstatic.com` (font); tanpa internet ke Google, halaman memakai font sistem.
+
+Yang sengaja tidak dibuat:
+- **Reset Data:** terlalu berisiko untuk database produksi.
+- **Nomor transaksi dengan kode HP:** tetap seperti sekarang supaya bisa dibuat saat offline.
+- **Kirim otomatis lewat WhatsApp API:** ditunda di PRD.
+
+Batas yang perlu diingat: satu query D1 maksimal 100 parameter, jadi satu faktur dibatasi 90 baris barang dan satu produk 40 varian.
+
+Jumlah iterasi PBKDF2 ditetapkan 8.000 (sekitar 4 sampai 5 ms CPU di Node). Ganti password menjalankan dua hash, jadi angka ini sengaja tidak dinaikkan. Cek waktu CPU sebenarnya di Cloudflare › Workers › hikayat-api › Observability setelah dipakai.
 
 ---
 
@@ -272,6 +361,6 @@ Sumber:
 - [Cloudflare Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/)
 - [Cloudflare D1 pricing](https://developers.cloudflare.com/d1/platform/pricing/)
 - [Cloudflare D1 Time Travel](https://developers.cloudflare.com/d1/reference/time-travel/)
-- [Cloudflare R2 pricing](https://developers.cloudflare.com:2053/r2/pricing)
+- [Cloudflare D1 limits](https://developers.cloudflare.com/d1/platform/limits/)
 - [Cloudflare Pages limits](https://developers.cloudflare.com/pages/platform/limits)
 - [Password hashing di Cloudflare Workers (Flavio Copes)](https://flaviocopes.com/native-email-password-authentication-cloudflare-workers/)
