@@ -33,19 +33,29 @@ input:focus{outline:2px solid var(--accent-bg);border-color:var(--accent)}
 .gb-baris:hover .gb-batang,.gb-baris:focus .gb-batang{filter:brightness(.9)}
 .gb-baris:hover::after,.gb-baris:focus::after{content:attr(data-tip);position:absolute;left:34%;bottom:100%;background:#1E2321;color:#fff;font-size:12px;padding:5px 8px;border-radius:6px;white-space:nowrap;z-index:5;pointer-events:none}
 tr.total td{border-top:2px solid var(--border)}
-@media print{.top,.ku-noprint,.subtabs,.back,#popup{display:none!important}body{background:#fff}.card{break-inside:avoid;box-shadow:none}main{max-width:none;padding:0}}
+@media print{.side,.top,.ku-noprint,.subtabs,.back,#popup{display:none!important}body{background:#fff}.card{break-inside:avoid;box-shadow:none}main{max-width:none;padding:0}}
 .warn{background:var(--warn-bg);color:var(--warn-text);padding:10px 12px;border-radius:8px;margin-top:14px}
-.top{background:var(--accent);color:#fff;display:flex;align-items:center;gap:20px;padding:0 20px;height:56px;flex-wrap:wrap}
-.top b{font-size:16px}
-.top nav{display:flex;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none}
-.top nav button{background:none;border:0;color:#FFD6BD;font:inherit;font-weight:600;padding:8px 10px;white-space:nowrap;border-radius:8px;cursor:pointer}
-.top nav button.on{background:rgba(255,255,255,.18);color:#fff}
+.top{background:#fff;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:24px;padding:0 20px;height:56px;position:sticky;top:0;z-index:4}
+.logo{width:196px;color:var(--accent-dark);line-height:1.15;font-size:12px}.logo b{display:block;font-size:15px}
+.area{display:flex;gap:4px;flex:1}
+.area button{background:none;border:0;font:inherit;font-weight:600;color:var(--text-2);padding:7px 14px;border-radius:8px;cursor:pointer}
+.area button.on{background:var(--accent);color:#fff}
+.app{display:flex;align-items:flex-start}
+.side{width:236px;flex:none;background:var(--accent);min-height:calc(100vh - 56px);position:sticky;top:56px;padding:10px 0}
+#nav{display:flex;flex-direction:column}
+#nav button{display:flex;align-items:center;gap:12px;background:none;border:0;border-left:3px solid transparent;color:#fff;font:inherit;font-weight:600;padding:11px 18px;text-align:left;cursor:pointer;white-space:nowrap}
+#nav button:hover{background:rgba(0,0,0,.08)}
+#nav button.on{background:rgba(0,0,0,.2);border-left-color:#FFD6BD}
+#nav svg{width:18px;height:18px;flex:none;pointer-events:none}
+#isi{flex:1;min-width:0}
+.app:has(#isi>.form) .side{display:none}
+@media (max-width:900px){.app{flex-direction:column;align-items:stretch}.side{width:auto;min-height:0;position:static;padding:0}#nav{flex-direction:row;overflow-x:auto}#nav button{border-left:0;border-bottom:3px solid transparent;padding:10px 14px}#nav button.on{border-bottom-color:#FFD6BD}.logo{width:auto}}
 .akun{position:relative}
-.akun>button{background:none;border:0;color:#fff;font:inherit;cursor:pointer;text-align:right}
+.akun>button{background:none;border:0;color:var(--text);font:inherit;cursor:pointer;text-align:right}
 .menu{position:absolute;right:0;top:44px;background:#fff;color:var(--text);border:1px solid var(--border);border-radius:10px;min-width:180px;box-shadow:0 8px 24px rgba(0,0,0,.08);z-index:5}
 .menu button{display:block;width:100%;text-align:left;background:none;border:0;padding:10px 14px;font:inherit;cursor:pointer}
 .menu button:hover{background:var(--bg)}
-main{max-width:1100px;margin:24px auto;padding:0 20px}
+main{margin:0;padding:24px 28px}
 .head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
 .tablewrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;background:#fff}
@@ -72,7 +82,7 @@ textarea{min-height:70px;resize:vertical}
 .subtabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:18px;flex-wrap:wrap}
 .subtabs button{background:none;border:0;border-bottom:2px solid transparent;padding:8px 14px;font:inherit;font-weight:600;color:var(--text-2);cursor:pointer}
 .subtabs button.on{color:var(--accent-dark);border-bottom-color:var(--accent)}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
 .kpi{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 16px}
 .kpi b{display:block;font-size:20px;margin-top:2px}
 .filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
@@ -130,17 +140,17 @@ tfoot td{font-weight:700;background:#FAFAF8}
 
 <div id="layarApp" hidden>
   <header class="top">
-    <b>Hikayat</b>
-    <nav id="nav"></nav>
+    <div class="logo">Hikayat<b>Merchandise</b></div>
+    <div class="area" id="area"><button data-area="penjualan">Penjualan</button><button data-area="karyawan">Karyawan</button></div>
     <div class="akun">
-      <button id="akunBtn"><div id="akunNama"></div><div class="small" id="akunRole" style="color:#FFD6BD"></div></button>
+      <button id="akunBtn"><div id="akunNama"></div><div class="small muted" id="akunRole"></div></button>
       <div class="menu" id="akunMenu" hidden>
         <button id="mGantiPw">Ganti password</button>
         <button id="mKeluar">Keluar</button>
       </div>
     </div>
   </header>
-  <div id="isi"></div>
+  <div class="app"><aside class="side"><nav id="nav"></nav></aside><div id="isi"></div></div>
 </div>
 
 <div class="overlay" id="popup" hidden><div class="card" id="popupIsi"></div></div>
@@ -261,16 +271,45 @@ function mulai(staff) {
   $("#akunNama").textContent = staff.nama;
   $("#akunRole").textContent = staff.role.map((r) => NAMA_ROLE[r]).join(", ");
   const owner = staff.role.includes("owner");
-  const tabs = [["dashboard", "Dashboard"], ["penjualan", "Penjualan"], ["event", "Event"], ["presale", "Pre-sale"], ["online", "Online"], ["produk", "Produk"], ["pelanggan", "Pelanggan"], ["promosi", "Promosi"], ["inventori", "Inventori"], ["laporan", "Laporan"], owner && ["keuangan", "Keuangan"], ["pengaturan", "Pengaturan POS"], ["karyawan", "Karyawan"], ["perangkat", "Perangkat POS"], owner && ["riwayat", "Riwayat Masuk"]].filter(Boolean);
-  $("#nav").innerHTML = tabs.map(([k, n]) => `<button data-tab="${k}">${n}</button>`).join("");
+  tabs = [["dashboard", "Dashboard"], ["laporan", "Laporan"], owner && ["keuangan", "Keuangan"], ["event", "Event"], ["presale", "Pesanan Pre-sale"], ["online", "Penjualan Online"], ["penjualan", "Penjualan POS"], ["produk", "Produk"], ["inventori", "Inventori"], ["pelanggan", "Pelanggan"], ["promosi", "Promosi"], ["pengaturan", "Pengaturan POS"], ["karyawan", "Karyawan"], ["perangkat", "Perangkat POS"], owner && ["riwayat", "Riwayat Masuk"]].filter(Boolean);
   $("#nav").onclick = (e) => e.target.dataset.tab && buka(e.target.dataset.tab);
+  $("#area").onclick = (e) => {
+    const a = e.target.dataset.area;
+    if (a) buka(a === "karyawan" ? "karyawan" : tabTerakhir);
+  };
   tampil("layarApp");
   buka(tabs.some(([k]) => k === tab) ? tab : tabs[0][0]);
 }
 
+// Bilah atas memilih area (Penjualan atau Karyawan); menu samping berisi halaman di area itu.
+const AREA_KARYAWAN = ["karyawan", "perangkat", "riwayat"];
+let tabs = [], tabTerakhir = "dashboard";
+const IKON = {
+  dashboard: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
+  laporan: "M5 3h14v18H5zM9 8h6M9 12h6M9 16h4",
+  keuangan: "M3 7h18v12H3zM3 11h18M7 15h3",
+  event: "M4 6h16v14H4zM4 10h16M8 3v5M16 3v5",
+  presale: "M6 8h12l-1 12H7zM9 8a3 3 0 0 1 6 0",
+  online: "M3 4h3l2 11h11l2-8H7M10 20h.01M17 20h.01",
+  penjualan: "M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6",
+  produk: "M12 3l8 4v10l-8 4-8-4V7zM4 7l8 4 8-4M12 11v10",
+  inventori: "M3 9l9-5 9 5v11H3zM8 20v-6h8v6",
+  pelanggan: "M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21a7 7 0 0 1 14 0M16 3a4 4 0 0 1 0 8M18 14a6 6 0 0 1 4 7",
+  promosi: "M3 12l9-9h8v8l-9 9zM15 8h.01",
+  pengaturan: "M7 3h10v18H7zM11 18h2",
+  karyawan: "M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0",
+  perangkat: "M7 3h10v18H7zM11 18h2",
+  riwayat: "M12 7v5l3 3M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5",
+};
+const ikon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${IKON[k] || ""}"/></svg>`;
+
 function buka(t) {
   tab = t;
-  for (const b of $("#nav").children) b.classList.toggle("on", b.dataset.tab === t);
+  const area = AREA_KARYAWAN.includes(t) ? "karyawan" : "penjualan";
+  if (area === "penjualan") tabTerakhir = t;
+  for (const b of $("#area").children) b.classList.toggle("on", b.dataset.area === area);
+  $("#nav").innerHTML = tabs.filter(([k]) => AREA_KARYAWAN.includes(k) === (area === "karyawan"))
+    .map(([k, n]) => `<button data-tab="${k}" class="${k === t ? "on" : ""}">${ikon(k)}${n}</button>`).join("");
   ({ dashboard: halDashboard, keuangan: halKeuangan, online: halOnline, pelanggan: halPelanggan, presale: halPresale, promosi: halPromosi, event: halEvent, laporan: halLaporan, penjualan: halPenjualan, pengaturan: halPengaturan, produk: halProduk, inventori: halInventori, karyawan: halKaryawan, perangkat: halPerangkat, riwayat: halRiwayat })[t]();
 }
 
@@ -305,7 +344,7 @@ async function halDaftarKaryawan() {
       <td>${owner ? `<button class="btn small" data-ubah="${k.id}">Ubah</button>` : ""}</td></tr>`).join("")}
     </tbody></table></div>
     <div class="head" style="margin-top:24px"><h2 style="margin:0">Riwayat Masuk POS ${rw.salah_hari_ini ? `<span class="tag off">${rw.salah_hari_ini} PIN salah hari ini</span>` : ""}</h2>
-      <select id="filterRiwayat"><option value="">Semua karyawan</option>${karyawan.map((k) => `<option value="${k.id}" ${k.id === filterRiwayat ? "selected" : ""}>${esc(k.nama)}</option>`).join("")}</select></div>
+      <select id="filterRiwayat" style="width:auto;min-width:220px"><option value="">Semua karyawan</option>${karyawan.map((k) => `<option value="${k.id}" ${k.id === filterRiwayat ? "selected" : ""}>${esc(k.nama)}</option>`).join("")}</select></div>
     <div class="tablewrap"><table><thead><tr><th>Waktu</th><th>Karyawan</th><th>Aktivitas</th><th>Tempat</th><th>Perangkat</th></tr></thead><tbody>
     ${rw.riwayat.map((l) => `<tr><td>${waktu(l.waktu)}</td><td>${esc(l.nama) || "—"}</td><td>${salah(l.aksi) ? `<span class="tag off">${esc(l.aksi)}</span>` : esc(l.aksi)}</td>
       <td>${esc(l.keterangan ?? "")}</td><td>${esc(l.perangkat ?? "—")}</td></tr>`).join("") || '<tr><td colspan="5" class="muted">Belum ada.</td></tr>'}
