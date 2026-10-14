@@ -184,7 +184,7 @@ function cocokkan(method: string, path: string): { h: Handler; id: string } | "s
 
 const HEADER_HALAMAN = {
   "cache-control": "no-cache",
-  "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'",
+  "content-security-policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'",
   "x-content-type-options": "nosniff",
   "referrer-policy": "same-origin",
 };

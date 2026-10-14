@@ -8,7 +8,7 @@ function halOnline(sub) {
   if (sub) subOnline = sub;
   ({ pesanan: daftarPesananOnline, impor: riwayatImporOnline, biaya: biayaMarketplace })[subOnline]();
 }
-const kepalaOnline = (tombol = "") => `<div class="head"><div><h1>Penjualan Online</h1><p class="muted small">Pesanan Shopee, Tokopedia, TikTok Shop, dan lainnya. Pesanan mengurangi stok Gudang Pusat.</p></div>${tombol}</div>
+const kepalaOnline = (tombol = "") => `<div class="head"><div><h1>${judulMenu("online", subOnline)}</h1><p class="muted small">Pesanan Shopee, Tokopedia, TikTok Shop, dan lainnya. Pesanan mengurangi stok Gudang Pusat.</p></div>${tombol}</div>
   ${subtabs([["pesanan", "Daftar Pesanan"], ["impor", "Riwayat Impor"], ["biaya", "Biaya Marketplace"]], subOnline)}`;
 
 // ---------- Daftar pesanan ----------
@@ -24,7 +24,7 @@ async function daftarPesananOnline() {
   const [{ saluran }, d] = await Promise.all([api("GET", "/api/saluran"), api("GET", "/api/online?" + q)]);
   const r = d.ringkasan.total;
   $("#isi").innerHTML = `<main>${kepalaOnline('<div style="display:flex;gap:8px"><button class="btn" id="imporFile">Impor CSV/Excel</button><button class="btn primary" id="inputManual">+ Input Manual</button></div>')}
-    <div class="filters">${[["", "Semua"], ...saluran.map((s) => [s.id, s.nama])].map(([id, n]) => `<button class="btn small ${filterOnline.saluran === id ? "primary" : ""}" data-sal="${id}">${esc(n)}</button>`).join("")}</div>
+    ${pil([["", "Semua"], ...saluran.map((s) => [s.id, esc(s.nama)])], filterOnline.saluran, "sal")}
     <form class="filters" id="fFilterOnline"><label style="margin:0">Dari</label><input type="date" name="dari" value="${filterOnline.dari}"><label style="margin:0">Sampai</label><input type="date" name="sampai" value="${filterOnline.sampai}">
       <input type="search" name="cari" placeholder="No. pesanan, pembeli, SKU" value="${esc(filterOnline.cari)}"><button class="btn small primary">Terapkan</button></form>
     <div class="kpis"><div class="kpi"><span class="muted small">Pesanan</span><b>${r.jumlah}</b></div><div class="kpi"><span class="muted small">Penjualan kotor</span><b>${rp(r.kotor)}</b></div>
@@ -422,7 +422,7 @@ async function biayaMarketplace() {
   $("#isi").querySelectorAll("[data-ubah]").forEach((b) => (b.onclick = () => {
     const s = mp.find((x) => x.id === b.dataset.ubah);
     popupForm(`<h2>${esc(s.nama)}</h2>
-      <label><input type="checkbox" name="aktif" ${s.aktif ? "checked" : ""} style="width:auto"> Toko aktif</label>
+      <label class="checks"><label><input type="checkbox" class="sakelar" name="aktif" ${s.aktif ? "checked" : ""}> Toko aktif</label></label>
       <div class="grid2"><div><label>Biaya admin (%)</label><input name="admin" inputmode="decimal" value="${s.biaya_admin_bp / 100}"></div>
         <div><label>Biaya layanan (%)</label><input name="layanan" inputmode="decimal" value="${s.biaya_layanan_bp / 100}"></div></div>
       <label>Biaya per pesanan (Rp)</label><input name="pesanan" inputmode="numeric" value="${s.biaya_pesanan}">`, "Simpan", async (d, f) => {
@@ -439,7 +439,7 @@ async function bagianMarketplace(produkId, el) {
   const gambar = () => {
     el.innerHTML = `<div class="section"><h2>Harga Marketplace</h2><form class="card" id="fMp">
       <p class="small muted">Aktifkan marketplace tempat produk ini dijual. Harga yang dikosongkan memakai harga jual.</p>
-      ${d.saluran.map((s) => `<div style="margin-top:12px"><label><input type="checkbox" data-mp="${s.id}" ${s.dijual ? "checked" : ""} style="width:auto"> ${esc(s.nama)}${s.toko_aktif ? "" : ' <span class="tag off">Toko nonaktif</span>'}</label>
+      ${d.saluran.map((s) => `<div style="margin-top:12px"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="sakelar" data-mp="${s.id}" ${s.dijual ? "checked" : ""}> ${esc(s.nama)}${s.toko_aktif ? "" : ' <span class="tag off">Toko nonaktif</span>'}</label>
         ${s.dijual ? `<table>${d.varian.map((v) => `<tr><td>${esc(v.nama || v.sku)} <span class="small muted">${esc(v.sku)} · harga jual ${rp(v.harga_jual)}</span></td>
           <td style="width:160px"><input inputmode="numeric" data-harga="${s.id}" data-sku="${esc(v.sku)}" value="${s.harga[v.sku] ?? ""}" placeholder="${v.harga_jual}"></td></tr>`).join("")}</table>` : ""}</div>`).join("")}
       <div class="err" hidden></div><div class="actions"><button class="btn primary">Simpan harga marketplace</button><span class="muted small" id="mpOk"></span></div></form></div>`;

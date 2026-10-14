@@ -331,6 +331,8 @@ Pelengkap dari PRD (sesudah itu):
 - **Pengaturan POS:** tersimpan otomatis dan ada pratinjau struk.
 - **Foto:** dikecilkan di browser (maksimal 1600 px, JPEG) sebelum disimpan ke D1.
 
+Tampilan dashboard disamakan dengan prototipe (`prototipe/dashboard.html`): bilah atas putih dengan pilihan Penjualan/Karyawan, menu samping oranye 300px dengan submenu (Laporan, Keuangan, Penjualan Online, Penjualan POS, Produk, Inventori), ikon menu disalin dari prototipe (`ui/dash-ikon.js`), font Inter, kotak oranye Total Penjualan di Dashboard, tab berbentuk pil, dan sakelar untuk pilihan aktif/nonaktif. Submenu di menu samping menggantikan tab di dalam halaman; fungsi `subtabs()` mengenali grup yang punya submenu dan tidak menggambar tabnya lagi. Karyawan, Perangkat POS, dan Riwayat Masuk menjadi satu halaman di area Karyawan. Font Inter dimuat dari Google Fonts, jadi CSP halaman mengizinkan `fonts.googleapis.com` (style) dan `fonts.gstatic.com` (font); tanpa internet ke Google, halaman memakai font sistem.
+
 Yang sengaja tidak dibuat:
 - **Reset Data:** terlalu berisiko untuk database produksi.
 - **Nomor transaksi dengan kode HP:** tetap seperti sekarang supaya bisa dibuat saat offline.

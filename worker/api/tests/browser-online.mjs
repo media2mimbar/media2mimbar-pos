@@ -57,7 +57,7 @@ try {
 
   // 1. Biaya marketplace Shopee.
   await d.locator('#nav [data-tab="online"]').click();
-  await d.locator('[data-sub="biaya"]').click();
+  await d.locator('#nav [data-nav="online/biaya"]').click();
   await d.locator('[data-ubah="shopee"]').click();
   await d.locator("#fPopup [name=admin]").fill("6,5");
   await d.locator("#fPopup [name=layanan]").fill("2");
@@ -78,7 +78,7 @@ try {
 
   // 3. Input manual Shopee: harga terisi dari harga marketplace, potongan dari perkiraan.
   await d.locator('#nav [data-tab="online"]').click();
-  await d.locator('[data-sub="pesanan"]').click();
+  await d.locator('#nav [data-nav="online/pesanan"]').click();
   await d.locator("#inputManual").click();
   await d.locator("#fOnline [name=no_pesanan]").fill("MANUAL-1");
   await d.locator('[data-k="sku"]').first().selectOption("KB-S");
@@ -155,7 +155,7 @@ try {
   await d.locator('[data-st="Dibatalkan"]').click();
   await d.locator("tr", { hasText: "2610020D3E4F" }).locator(".tag", { hasText: "Dibatalkan" }).waitFor();
   assert.equal(stok("KB-M"), 10);
-  await d.locator('[data-sub="impor"]').click();
+  await d.locator('#nav [data-nav="online/impor"]').click();
   await d.locator("td", { hasText: "pesanan_shopee.csv" }).waitFor();
 
   // 6. Pelanggan: tambah, ubah, lihat riwayat.

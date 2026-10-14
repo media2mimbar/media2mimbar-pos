@@ -1,7 +1,7 @@
 // Dashboard › Event (daftar, form, detail, kirim stok, tarik, tutup event), Inventori › Stok Opname, Laporan › Selisih & Kerugian.
 
 let tabEvent = "Semua";
-const WARNA_EVENT = { Berlangsung: "aktif", "Akan Datang": "", "Perlu Ditutup": "warn", Selesai: "off" };
+const WARNA_EVENT = { Berlangsung: "aktif", "Akan Datang": "info", "Perlu Ditutup": "warn", Selesai: "" };
 const tglPendek = (d) => new Date(d + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" });
 const rentangTgl = (e) => (e.mulai === e.selesai ? tglPendek(e.mulai) : `${tglPendek(e.mulai)} – ${tglPendek(e.selesai)}`);
 
@@ -11,12 +11,13 @@ async function halEvent() {
   const aktif = event.filter((e) => e.status === "Berlangsung" || e.status === "Perlu Ditutup");
   const tabs = ["Semua", "Berlangsung", "Akan Datang", "Perlu Ditutup", "Selesai"];
   const tampil = event.filter((e) => tabEvent === "Semua" || e.status === tabEvent);
-  $("#isi").innerHTML = `<main><div class="head"><div><h1>Event</h1></div><button class="btn primary" id="tambahEvent">+ Buat Event</button></div>
-    ${aktif.length ? `<div class="kpis">${aktif.map((e) => `<div class="kpi klik" data-id="${e.id}" style="cursor:pointer">
-      <span class="tag ${WARNA_EVENT[e.status]}">${e.status}</span><b>${esc(e.nama)}</b>
-      <div class="small muted">Hari ini ${rp(e.penjualan_hari_ini)} · total ${rp(e.penjualan)}</div>
-      <div class="small">${e.kasir_terbuka ? "Kasir terbuka: " + esc(e.kasir_terbuka) : '<span class="muted">Belum ada kasir terbuka</span>'}</div></div>`).join("")}</div>` : ""}
-    <div class="filters">${tabs.map((t) => `<button class="btn small ${t === tabEvent ? "primary" : ""}" data-tabe="${t}">${t}</button>`).join("")}</div>
+  $("#isi").innerHTML = `<main><div class="head"><div><h1>Event</h1><p>Stok dikirim dari Gudang Pusat sebelum event, lalu sisanya ditarik kembali saat event ditutup.</p></div><button class="btn primary" id="tambahEvent">+ Buat Event</button></div>
+    ${aktif.length ? `<div class="live">${aktif.map((e) => `<div class="card klik" data-id="${e.id}">
+      <div class="live-judul"><span class="titik ${e.status === "Berlangsung" ? "" : "kuning"}"></span><b>${esc(e.nama)}</b><span class="tag ${WARNA_EVENT[e.status]}" style="margin-left:auto">${e.status}</span></div>
+      <div class="small muted">${esc(e.venue || "")}${e.venue ? " · " : ""}${rentangTgl(e)}</div>
+      <div class="live-angka"><div><span class="small muted">Hari ini</span><b>${rp(e.penjualan_hari_ini)}</b></div><div><span class="small muted">Total event</span><b>${rp(e.penjualan)}</b></div>
+        <div><span class="small muted">Shift terbuka</span><b>${e.kasir_terbuka ? esc(e.kasir_terbuka) : "—"}</b></div></div></div>`).join("")}</div>` : ""}
+    ${pil(tabs.map((t) => [t, `${t} <span class="hitung">${t === "Semua" ? event.length : event.filter((e) => e.status === t).length}</span>`]), tabEvent, "tabe")}
     <div class="tablewrap"><table><thead><tr><th>Event</th><th>Tanggal</th><th>Status</th><th>Kasir bertugas</th><th class="num">Transaksi</th><th class="num">Penjualan</th></tr></thead><tbody>
     ${tampil.length ? tampil.map((e) => `<tr class="klik" data-id="${e.id}"><td><b>${esc(e.nama)}</b><div class="small muted">${esc(e.venue || "")}</div></td><td>${rentangTgl(e)}</td>
       <td><span class="tag ${WARNA_EVENT[e.status]}">${e.status}</span>${e.presale_aktif ? ' <span class="tag">pre-sale</span>' : ""}</td><td>${esc(e.kasir || "—")}</td>
@@ -51,7 +52,7 @@ async function formEvent(id) {
         <label>Kasir yang bertugas</label>
         <div class="checks">${staf.map((k) => `<label><input type="checkbox" data-kasir="${k.id}" ${f0.kasir.has(k.id) ? "checked" : ""}> ${esc(k.nama)}</label>`).join("")}</div>
         <label>Catatan</label><textarea name="catatan">${esc(e?.catatan)}</textarea>
-        <div class="checks" style="margin-top:14px"><label><input type="checkbox" id="presale" ${presale ? "checked" : ""}> Pre-sale aktif (bisa dijual sebelum tanggal mulai, khusus Owner)</label></div>
+        <div class="checks" style="margin-top:14px"><label><input type="checkbox" class="sakelar" id="presale" ${presale ? "checked" : ""}> Pre-sale aktif (bisa dijual sebelum tanggal mulai, khusus Owner)</label></div>
         ${presale ? `<label>Mode pre-sale</label><select name="presale_mode"><option value="ambil" ${e?.presale_mode !== "stok" ? "selected" : ""}>Pesanan diambil nanti (stok berkurang saat diserahkan)</option>
           <option value="stok" ${e?.presale_mode === "stok" ? "selected" : ""}>Kurangi stok saat transaksi</option></select>` : ""}
         <h2 class="section">Produk yang dijual</h2>
@@ -96,10 +97,11 @@ async function detailEvent(id) {
   const d = await api("GET", "/api/event/" + id);
   const e = d.event, r = d.ringkasan;
   const opMenunggu = d.opname.find((o) => o.status === "Menunggu persetujuan" || o.status === "Perlu opname ulang");
-  $("#isi").innerHTML = `<main><button class="back" id="kembali">← Kembali</button>
-    <div class="head"><div><h1>${esc(e.nama)}</h1><div class="muted">${esc(e.venue || "")} · ${rentangTgl(e)} · PJ ${esc(e.pj)} · kasir ${d.kasir.map((k) => esc(k.nama)).join(", ") || "—"}</div></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="tag ${WARNA_EVENT[e.status]}">${e.status}</span>${e.ditutup ? "" : `<button class="btn" id="ubahEv">Ubah</button>
+  $("#isi").innerHTML = `<main><button class="back" id="kembali">← Semua Event</button>
+    <div class="head" style="margin-bottom:6px"><div class="judul-baris"><h1>${esc(e.nama)}</h1><span class="tag ${WARNA_EVENT[e.status]}">${e.status}</span></div>
+      <div class="head-aksi">${e.ditutup ? "" : `<button class="btn" id="ubahEv">Ubah</button>
       <button class="btn" id="kirimEv">Kirim Stok</button><button class="btn" id="tarikEv">Tarik ke Gudang</button><button class="btn primary" id="tutupEv">Tutup Event</button>`}</div></div>
+    <p class="ket" style="margin:0 0 14px">${esc(e.venue || "")} · ${rentangTgl(e)} · Penanggung jawab: <b>${esc(e.pj)}</b> · Kasir: ${d.kasir.map((k) => esc(k.nama)).join(", ") || "—"}</p>
     ${e.presale_aktif ? `<div class="ok">Pre-sale aktif · ${e.presale_mode === "ambil" ? "pesanan diambil nanti" : "stok berkurang saat transaksi"}</div>` : ""}
     ${e.ditutup ? `<div class="ok">Ditutup ${waktu(e.tutup_pada)} oleh ${esc(e.tutup_oleh_nama)}. ${esc(e.tutup_catatan || "")}</div>` : ""}
     ${d.presale_menunggu?.n ? `<div class="warn">${d.presale_menunggu.n} pesanan pre-sale (${rp(d.presale_menunggu.nilai)}) belum diambil. <a href="#" id="kePresale">Lihat daftar pembeli</a></div>` : ""}
@@ -110,11 +112,11 @@ async function detailEvent(id) {
       <div class="kpi"><span class="muted small">Produk terjual</span><b>${r.produk_terjual} pcs</b></div>
       <div class="kpi"><span class="muted small">Rata-rata per transaksi</span><b>${rp(r.transaksi ? Math.round(r.penjualan / r.transaksi) : 0)}</b></div>
       <div class="kpi"><span class="muted small">Laba kotor</span><b>${rp(r.laba_kotor)}</b></div></div>
-    <div class="small muted">Metode bayar: ${d.metode.map((m) => `${esc(m.metode)} ${rp(m.jumlah)}`).join(" · ") || "—"}</div>
-    <h2 class="section">Stok di event</h2>
-    <div class="tablewrap"><table><thead><tr><th>Barang</th><th class="num">Diterima</th><th class="num">Dalam perjalanan</th><th class="num">Ditarik</th><th class="num">Terjual</th>${d.stok.some((s) => s.selisih) ? '<th class="num">Selisih</th>' : ""}<th class="num">Sisa</th></tr></thead><tbody>
+    <div class="dua-kolom lebar-kanan">${grafikBatang("Metode Pembayaran", d.metode.map((m) => ({ label: m.metode, nilai: m.jumlah })))}
+    <div class="card" style="padding:0"><h3 style="padding:16px 16px 0">Stok di Event</h3>
+    <div class="tablewrap"><table><thead><tr><th>Barang</th><th class="num">Diterima</th><th class="num">Di jalan</th><th class="num">Ditarik</th><th class="num">Terjual</th>${d.stok.some((s) => s.selisih) ? '<th class="num">Selisih</th>' : ""}<th class="num">Sisa</th></tr></thead><tbody>
       ${d.stok.map((s) => `<tr><td>${esc(s.nama)}<div class="small muted">${esc(s.sku)}</div></td><td class="num">${s.diterima}</td><td class="num">${s.transit}</td><td class="num">${s.ditarik}</td>
-        <td class="num">${s.terjual}</td>${d.stok.some((x) => x.selisih) ? `<td class="num" style="${s.selisih < 0 ? "color:var(--danger-text)" : ""}">${s.selisih}</td>` : ""}<td class="num"><b>${s.sisa}</b></td></tr>`).join("")}</tbody></table></div>
+        <td class="num">${s.terjual}</td>${d.stok.some((x) => x.selisih) ? `<td class="num" style="${s.selisih < 0 ? "color:var(--danger-text)" : ""}">${s.selisih}</td>` : ""}<td class="num"><b>${s.sisa}</b></td></tr>`).join("")}</tbody></table></div></div></div>
     <h2 class="section">Mutasi stok</h2>
     <div class="tablewrap"><table><thead><tr><th>No.</th><th>Jenis</th><th>Dikirim</th><th>Diterima</th><th class="num">Qty kirim</th><th class="num">Qty terima</th><th>Status</th><th></th></tr></thead><tbody>
       ${d.mutasi.map((m) => `<tr><td><b>${esc(m.no)}</b></td><td>${m.jenis === "kirim" ? "Kirim" : "Tarik ke gudang"}</td><td>${waktu(m.dikirim_pada)}<div class="small muted">${esc(m.dikirim_oleh)}</div></td>

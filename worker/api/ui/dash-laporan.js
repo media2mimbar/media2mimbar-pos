@@ -8,9 +8,11 @@ function grafikBatang(judul, baris, opsi = {}) {
   const format = opsi.format ?? rp;
   const isi = baris.filter((b) => nilai(b) > 0);
   const maks = Math.max(1, ...isi.map(nilai));
+  const total = isi.reduce((a, b) => a + nilai(b), 0);
+  const tampil = opsi.persen ? (b) => Math.round((nilai(b) / total) * 100) + "%" : (b) => format(nilai(b));
   return `<div class="card grafik"><h3>${esc(judul)}</h3>${isi.length ? isi.map((b) => `<div class="gb-baris" tabindex="0" data-tip="${esc(b.label)}: ${esc(format(nilai(b)))}${b.catatan ? " · " + esc(b.catatan) : ""}">
-      <span class="gb-label">${esc(b.label)}</span><span class="gb-jalur"><span class="gb-batang" style="width:${Math.max(1, (nilai(b) / maks) * 100)}%"></span></span><span class="gb-nilai">${esc(format(nilai(b)))}</span></div>`).join("")
-    : '<p class="muted small">Belum ada data.</p>'}</div>`;
+      <div class="gb-atas"><span class="gb-label">${esc(b.label)}</span><span class="gb-nilai">${esc(tampil(b))}</span></div><span class="gb-jalur"><span class="gb-batang" style="width:${Math.max(1, (nilai(b) / maks) * 100)}%"></span></span></div>`).join("")
+    : '<p class="kosong small">Belum ada data.</p>'}</div>`;
 }
 
 // ---------- Periode bersama untuk laporan ----------
@@ -24,10 +26,9 @@ function pastikanPeriode() {
   if (!periodeLap.dari) [periodeLap.dari, periodeLap.sampai] = hitungPeriode(periodeLap.tab);
 }
 function pilihPeriode(ulang) {
-  return `<div class="filters" id="periodeLap">${[["hari", "Hari ini"], ["7hari", "7 hari"], ["bulan", "Bulan ini"], ["30hari", "30 hari"], ["semua", "Semua"]]
-    .map(([k, n]) => `<button type="button" class="btn small ${periodeLap.tab === k ? "primary" : ""}" data-per="${k}">${n}</button>`).join("")}
-    <label style="margin:0">Dari</label><input type="date" id="perDari" value="${periodeLap.dari}" max="${hariIni()}"><label style="margin:0">s/d</label><input type="date" id="perSampai" value="${periodeLap.sampai}" max="${hariIni()}">
-    ${periodeLap.tab === "khusus" ? '<button type="button" class="btn small" id="perHapus" title="Hapus rentang">✕</button>' : ""}</div>`;
+  return `<div class="filters" id="periodeLap">${pil([["hari", "Hari ini"], ["7hari", "7 hari"], ["bulan", "Bulan ini"], ["30hari", "30 hari"], ["semua", "Semua"]], periodeLap.tab, "per")}
+    <div class="rentang">Dari <input type="date" id="perDari" value="${periodeLap.dari}" max="${hariIni()}"> s/d <input type="date" id="perSampai" value="${periodeLap.sampai}" max="${hariIni()}">
+    ${periodeLap.tab === "khusus" ? '<button type="button" class="btn small" id="perHapus" title="Hapus rentang">✕</button>' : ""}</div></div>`;
 }
 function pasangPeriode(ulang) {
   const el = $("#periodeLap");
@@ -53,24 +54,26 @@ async function halDashboard() {
   if (!dashPer.tanggal) dashPer.tanggal = hariIni();
   const d = await api("GET", `/api/ringkasan?periode=${dashPer.periode}&tanggal=${dashPer.tanggal}`);
   const r = d.ringkasan, g = d.grafik;
-  const label = d.periode.dari === d.periode.sampai ? tgl(d.periode.dari) : `${tgl(d.periode.dari)} – ${tgl(d.periode.sampai)}`;
-  $("#isi").innerHTML = `<main><div class="head"><div><h1>Dashboard</h1><p class="muted small">Semua lokasi: event, Gudang Pusat, dan online. Penjualan bersih setelah diskon, retur, dan potongan marketplace.</p></div>
-      <button class="btn" id="keLaporan">Buka laporan lengkap</button></div>
-    <div class="filters">${[["harian", "Harian"], ["mingguan", "Mingguan"], ["bulanan", "Bulanan"]].map(([k, n]) => `<button class="btn small ${dashPer.periode === k ? "primary" : ""}" data-p="${k}">${n}</button>`).join("")}
-      <button class="btn small" id="mundur" aria-label="Periode sebelumnya">‹</button><b>${label}</b><button class="btn small" id="maju" aria-label="Periode berikutnya" ${d.periode.sampai >= hariIni() ? "disabled" : ""}>›</button></div>
-    <div class="kpis"><div class="kpi"><span class="muted small">Total penjualan</span><b>${rp(r.bersih)}</b></div><div class="kpi"><span class="muted small">Transaksi</span><b>${r.transaksi}</b></div>
-      <div class="kpi"><span class="muted small">Rata-rata per transaksi</span><b>${rp(r.rata)}</b></div><div class="kpi"><span class="muted small">Produk terjual</span><b>${r.qty} pcs</b></div>
-      <div class="kpi"><span class="muted small">Laba kotor</span><b>${rp(r.laba)}</b></div></div>
-    <div class="kpis"><div class="kpi"><span class="muted small">Penjualan offline</span><b>${rp(r.offline)}</b></div><div class="kpi"><span class="muted small">Penjualan online</span><b>${rp(r.online)}</b></div>
-      <div class="kpi"><span class="muted small">Potongan marketplace</span><b>${rp(r.mp)}</b></div>
-      <div class="kpi"><span class="muted small">Dana marketplace belum cair</span><b>${rp(r.belum_cair.nilai)}</b><span class="small muted">${r.belum_cair.n} pesanan Diproses</span></div></div>
+  const tglPendek = (ymd) => new Date(ymd + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" });
+  const label = `${tglPendek(d.periode.dari)} - ${tglPendek(d.periode.sampai)}`;
+  const mini = (lbl, val) => `<div><div class="lbl">${lbl}</div><div class="val">${val}</div></div>`;
+  const kartu = (lbl, val, sub, merah) => `<div class="kpi"><span>${lbl}</span><b style="${merah ? "color:var(--danger-text)" : ""}">${val}</b><span>${sub}</span></div>`;
+  $("#isi").innerHTML = `<main><div class="head"><div><h1>Dashboard Penjualan</h1><p>Diperbarui ${new Date().toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "medium" })} · Semua lokasi dan saluran</p></div></div>
+    <div class="filters">${pil([["harian", "Harian"], ["mingguan", "Mingguan"], ["bulanan", "Bulanan"]], dashPer.periode, "p")}
+      <div class="rentang"><button class="btn small" id="mundur" aria-label="Periode sebelumnya" style="border:0;padding:4px 8px">‹</button><b style="min-width:130px;text-align:center;color:var(--text)">${label}</b><button class="btn small" id="maju" aria-label="Periode berikutnya" style="border:0;padding:4px 8px" ${d.periode.sampai >= hariIni() ? "disabled" : ""}>›</button></div>
+      <span style="flex:1"></span><button class="btn" id="keLaporan">Buka laporan lengkap →</button></div>
+    <div class="banner"><div class="banner-total"><div class="lbl">Total Penjualan</div><div class="val">${rp(r.bersih)}</div><div class="sub">Offline (event) + online (marketplace), bersih setelah diskon, retur, dan potongan</div></div>
+      <div class="banner-mini">${mini("Transaksi", r.transaksi)}${mini("Rata-rata per Transaksi", rp(r.rata))}${mini("Produk Terjual", r.qty + " pcs")}${mini("Laba Kotor", rp(r.laba))}</div></div>
+    <div class="kartu4">${kartu("Penjualan Offline (Event)", rp(r.offline), `${r.offline_n ?? 0} transaksi POS`)}${kartu("Penjualan Online", rp(r.online), `${r.online_n ?? 0} pesanan marketplace`)}
+      ${kartu("Potongan Marketplace", rp(r.mp), "Admin, layanan, dan biaya pesanan", true)}${kartu("Belum Cair dari Marketplace", rp(r.belum_cair.nilai), `${r.belum_cair.n} pesanan berstatus Diproses`)}</div>
     <div class="grafik-grid">
-      ${grafikBatang("Metode pembayaran POS", g.metode.map((m) => ({ label: m.metode, nilai: m.jumlah })))}
-      ${grafikBatang("Penjualan per saluran", g.saluran.map((s) => ({ label: s.nama, nilai: s.bersih, catatan: `${s.transaksi} transaksi` })))}
-      ${grafikBatang("Penjualan per kategori", g.kategori.map((k) => ({ label: k.nama, nilai: k.bersih })))}
-      ${grafikBatang("Produk terlaris", g.produk.map((p) => ({ label: p.nama, nilai: p.qty, catatan: rp(p.bersih) })), { format: (n) => n + " pcs" })}
-      ${grafikBatang("Penjualan per kasir", g.kasir.map((k) => ({ label: k.nama, nilai: k.bersih })))}
-      <div class="card grafik"><h3>Stok menipis</h3>${g.menipis.length ? `<table>${g.menipis.map((p) => `<tr><td>${esc(p.nama)}</td><td class="num">${p.stok} <span class="muted small">/ min ${p.stok_min}</span></td></tr>`).join("")}</table>` : '<p class="muted small">Semua stok aman.</p>'}</div>
+      ${grafikBatang("Metode Pembayaran (POS)", g.metode.map((m) => ({ label: m.metode, nilai: m.jumlah })))}
+      ${grafikBatang("Penjualan per Saluran", g.saluran.map((s) => ({ label: s.nama, nilai: s.bersih, catatan: `${s.transaksi} transaksi` })))}
+      ${grafikBatang("Penjualan per Kategori", g.kategori.map((k) => ({ label: k.nama, nilai: k.bersih })), { persen: true })}
+      ${grafikBatang("Produk Terlaris", g.produk.map((p) => ({ label: p.nama, nilai: p.qty, catatan: rp(p.bersih) })), { format: (n) => n + " pcs" })}
+      ${grafikBatang("Penjualan per Kasir", g.kasir.map((k) => ({ label: k.nama, nilai: k.bersih })))}
+      <div class="card grafik"><h3>Stok Menipis (semua lokasi)</h3>${g.menipis.length ? g.menipis.map((p) => `<div class="gb-baris"><div class="gb-atas"><span class="gb-label">${esc(p.nama)}</span><span class="gb-nilai" style="color:var(--danger-text)">${p.stok} pcs <span class="muted small">/ min ${p.stok_min}</span></span></div>
+        <span class="gb-jalur"><span class="gb-batang" style="background:var(--danger-text);width:${Math.max(2, Math.min(100, (p.stok / Math.max(1, p.stok_min)) * 100))}%"></span></span></div>`).join("") : '<p class="kosong small">Semua stok di atas batas minimum</p>'}</div>
     </div></main>`;
   $("#isi").querySelectorAll("[data-p]").forEach((b) => (b.onclick = () => { dashPer.periode = b.dataset.p; halDashboard(); }));
   const geser = (arah) => {
@@ -80,12 +83,12 @@ async function halDashboard() {
   };
   $("#mundur").onclick = () => geser(-1);
   $("#maju").onclick = () => geser(1);
-  $("#keLaporan").onclick = () => { subLaporan = "saluran"; buka("laporan"); };
+  $("#keLaporan").onclick = () => buka("laporan", "saluran");
 }
 
 // ---------- Laporan ----------
 
-const kepalaLaporan = (tombol = "") => `<div class="head"><div><h1>Laporan</h1></div>${tombol}</div>
+const kepalaLaporan = (tombol = "") => `<div class="head"><div><h1>${judulMenu("laporan", subLaporan)}</h1></div>${tombol}</div>
   ${subtabs([["saluran", "Per Saluran"], ["event", "Per Event"], ["kasir", "Per Kasir"], ["produk", "Per Produk"], ["harian", "Rekap Harian"], ["kerugian", "Selisih & Kerugian"]], subLaporan)}`;
 
 function tabelLaporan(kolom, baris, total) {
@@ -162,7 +165,7 @@ function halKeuangan(sub) {
   if (sub) subKeu = sub;
   ({ keseluruhan: keuKeseluruhan, event: keuEvent, biaya: daftarBiaya })[subKeu]();
 }
-const kepalaKeu = (tombol = "") => `<div class="head ku-noprint"><div><h1>Keuangan</h1></div>${tombol}</div>
+const kepalaKeu = (tombol = "") => `<div class="head ku-noprint"><div><h1>${judulMenu("keuangan", subKeu)}</h1></div>${tombol}</div>
   <div class="ku-noprint">${subtabs([["keseluruhan", "Laporan Keseluruhan"], ["event", "Laporan per Event"], ["biaya", "Biaya"]], subKeu)}</div>`;
 const pct = (a, b) => (!a ? "0%" : b ? (Math.round((a / b) * 1000) / 10).toLocaleString("id-ID") + "%" : "—");
 const barisLR = (label, n, dasar, opsi = {}) => `<tr class="${opsi.tebal ? "total" : ""}"><td style="padding-left:${opsi.indent ? 24 : 8}px">${opsi.tebal ? `<b>${label}</b>` : label}</td>
@@ -195,8 +198,8 @@ async function keuKeseluruhan() {
     ["", "Potongan marketplace", -r.mp], ["", "Penjualan bersih", B], ["", "HPP", -r.hpp], ["", "Laba kotor", r.laba], ...k.biaya_event.map((b) => ["Biaya event", b.kategori, -b.jumlah]),
     ...k.biaya_umum.map((b) => ["Biaya umum", b.kategori, -b.jumlah]), ["", "Kerugian", -r.kerugian], ["", "Penggantian penanggung jawab", r.diganti], ["", "Selisih kas lebih", r.kas_lebih], ["", "Laba bersih", r.laba_bersih]];
   $("#isi").innerHTML = `<main>${kepalaKeu(tombolKeu(null))}
-    <div class="filters ku-noprint">${[["bulan", "Bulan ini"], ["lalu", "Bulan lalu"], ["90hari", "90 hari"], ["tahun", "Tahun ini"], ["semua", "Semua"]].map(([x, n]) => `<button class="btn small ${periodeKeu.tab === x ? "primary" : ""}" data-pk="${x}">${n}</button>`).join("")}
-      <input type="date" id="pkDari" value="${periodeKeu.dari}" max="${hariIni()}"><span>s/d</span><input type="date" id="pkSampai" value="${periodeKeu.sampai}" max="${hariIni()}">
+    <div class="filters ku-noprint">${pil([["bulan", "Bulan ini"], ["lalu", "Bulan lalu"], ["90hari", "90 hari"], ["tahun", "Tahun ini"], ["semua", "Semua"]], periodeKeu.tab, "pk")}
+      <div class="rentang">Dari <input type="date" id="pkDari" value="${periodeKeu.dari}" max="${hariIni()}"> s/d <input type="date" id="pkSampai" value="${periodeKeu.sampai}" max="${hariIni()}"></div>
       <label style="margin:0 0 0 12px;font-weight:400"><input type="checkbox" id="bagiUmum" ${k.pengaturan.bagi_biaya_umum ? "checked" : ""} style="width:auto"> Bagi biaya umum ke event</label></div>
     <p class="small muted">${tgl(k.dari)} – ${tgl(k.sampai)} · semua event, jual langsung Gudang Pusat, online, dan biaya umum. Pre-sale dihitung saat barang diserahkan.</p>
     <div class="kpis"><div class="kpi"><span class="muted small">Penjualan bersih</span><b>${rp(B)}</b></div><div class="kpi"><span class="muted small">Laba kotor</span><b>${rp(r.laba)}</b><span class="small muted">${pct(r.laba, B)}</span></div>

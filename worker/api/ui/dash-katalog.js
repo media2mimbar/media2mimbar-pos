@@ -8,8 +8,8 @@ function halProduk(sub) {
   ({ daftar: daftarProduk, kategori: halKategori })[subProduk]();
 }
 
-const kepalaProduk = () => `<div class="head"><div><h1>Produk</h1></div>
-  ${subProduk === "daftar" ? '<div style="display:flex;gap:8px"><button class="btn" id="hargaGudang">Harga Jual Langsung Gudang</button><button class="btn primary" id="tambahProduk">+ Produk</button></div>' : ""}</div>
+const kepalaProduk = () => `<div class="head"><div><h1>${judulMenu("produk", subProduk)}</h1></div>
+  ${subProduk === "daftar" ? '<div style="display:flex;gap:8px"><button class="btn" id="hargaGudang">Harga Jual Langsung Gudang</button><button class="btn primary" id="tambahProduk">+ Tambah Produk</button></div>' : ""}</div>
   ${subtabs([["daftar", "Daftar Produk"], ["kategori", "Kategori"]], subProduk)}`;
 
 const bukaProduk = new Set();
@@ -29,7 +29,7 @@ async function daftarProduk() {
         <td class="num">${margin}%</td>
         <td class="num">${p.stok}${p.transit ? `<div class="small muted">+${p.transit} di jalan</div>` : ""} ${menipis}</td>
         <td>${p.marketplace.map((m) => `<span class="tag ${m.toko_aktif ? "" : "off"}" title="${m.toko_aktif ? "" : "Toko nonaktif"}">${esc(m.nama)}</span>`).join("") || '<span class="muted">—</span>'}</td>
-        <td><label style="margin:0;font-weight:400" class="small"><input type="checkbox" data-tampil="${p.id}" ${p.tampil_pos ? "checked" : ""} style="width:auto"> ${p.tampil_pos ? "Tampil" : "Disembunyikan"}</label></td>
+        <td><label style="margin:0" title="${p.tampil_pos ? "Tampil di POS" : "Disembunyikan dari POS"}"><input type="checkbox" class="sakelar" data-tampil="${p.id}" ${p.tampil_pos ? "checked" : ""} aria-label="Tampil di POS"></label></td>
         <td>${p.aktif ? '<span class="tag aktif">Aktif</span>' : '<span class="tag off">Nonaktif</span>'}</td></tr>
         ${bukaProduk.has(p.id) ? p.varian.map((v) => `<tr class="small"><td style="padding-left:40px">${esc(v.nama || v.sku)} <span class="muted">${esc(v.sku)}${v.aktif ? "" : " · nonaktif"}</span></td><td></td>
           <td class="num">${rp(v.harga_jual)}</td><td></td><td class="num">${v.stok}</td><td colspan="3">${v.harga_marketplace.map((m) => `${esc(m.nama)} ${rp(m.harga)}`).join(" · ") || '<span class="muted">Tidak dijual di marketplace</span>'}</td></tr>`).join("") : ""}`;
@@ -90,9 +90,9 @@ async function formProduk(id) {
       </div>
       <label>Deskripsi</label><textarea name="deskripsi">${esc(p?.deskripsi)}</textarea>
       <div class="checks" style="margin-top:16px">
-        <label><input type="checkbox" name="tampil_pos" ${p ? (p.tampil_pos ? "checked" : "") : "checked"}> Tampil di POS</label>
-        <label><input type="checkbox" name="aktif" ${p ? (p.aktif ? "checked" : "") : "checked"}> Aktif</label>
-        ${baru ? '<label><input type="checkbox" id="pakaiVarian"> Punya varian (ukuran, warna)</label>' : ""}
+        <label><input type="checkbox" class="sakelar" name="tampil_pos" ${p ? (p.tampil_pos ? "checked" : "") : "checked"}> Tampil di POS</label>
+        <label><input type="checkbox" class="sakelar" name="aktif" ${p ? (p.aktif ? "checked" : "") : "checked"}> Aktif</label>
+        ${baru ? '<label><input type="checkbox" class="sakelar" id="pakaiVarian"> Punya varian (ukuran, warna)</label>' : ""}
       </div>
       <div id="bagianHarga"></div>
       <div class="err" hidden></div>
@@ -181,7 +181,7 @@ async function halKategori() {
       <div class="filters" style="margin:0">
         <input type="text" name="nama" placeholder="Nama kategori baru" required style="min-width:240px">
         <input type="number" name="urutan" placeholder="Urutan" min="0" style="width:110px">
-        <label class="checks" style="margin:0"><label><input type="checkbox" name="tampil_menu" checked> Tampil sebagai menu di POS</label></label>
+        <label class="checks" style="margin:0"><label><input type="checkbox" class="sakelar" name="tampil_menu" checked> Tampil sebagai menu di POS</label></label>
         <button class="btn primary">Tambah</button>
       </div>
       <div class="err" hidden></div>
@@ -210,7 +210,7 @@ function ubahKategori(k) {
   popupForm(`<h2>Ubah kategori</h2>
     <label>Nama</label><input type="text" name="nama" value="${esc(k.nama)}" required>
     <label>Urutan</label><input type="number" name="urutan" min="0" value="${k.urutan}">
-    <div class="checks" style="margin-top:14px"><label><input type="checkbox" name="tampil_menu" ${k.tampil_menu ? "checked" : ""}> Tampil sebagai menu di POS</label></div>`,
+    <div class="checks" style="margin-top:14px"><label><input type="checkbox" class="sakelar" name="tampil_menu" ${k.tampil_menu ? "checked" : ""}> Tampil sebagai menu di POS</label></div>`,
     "Simpan", async (d, f) => {
       await api("PATCH", "/api/kategori/" + k.id, { nama: d.nama, urutan: angka(d.urutan) ?? 0, tampil_menu: f.tampil_menu.checked });
       halKategori();

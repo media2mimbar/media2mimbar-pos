@@ -115,6 +115,8 @@ try {
   await hp.locator("#baru").click();
 
   await hp.waitForFunction(() => document.querySelector("#antre")?.textContent === "");
+  // Antrean bisa terlihat kosong sesaat sebelum transaksi kedua masuk antrean; tunggu sampai dua-duanya ada di server.
+  for (let i = 0; i < 50 && sql("SELECT COUNT(*) AS n FROM trx")[0].n < 2; i++) await hp.waitForTimeout(200);
   const trx = sql("SELECT no, total, promo, pelanggan_nama, status FROM trx ORDER BY no");
   assert.deepEqual(trx.map((t) => [t.total, t.promo, t.pelanggan_nama]), [[90000, "Beli 2 Totebag gratis Topi", "Fajar Ramadhan"], [45000, null, null]]);
   assert.deepEqual(sql("SELECT metode, jumlah FROM trx_bayar ORDER BY trx_id, urutan").map((b) => [b.metode, b.jumlah]), [["Tunai", 50000], ["Transfer", 40000], ["Tunai", 45000]]);
@@ -274,7 +276,7 @@ try {
   await dash.screenshot({ path: SHOTS + "l5-dash-presale.png" });
 
   await dash.locator('#nav [data-tab="inventori"]').click();
-  await dash.locator('[data-sub="terbuang"]').click();
+  await dash.locator('#nav [data-nav="inventori/terbuang"]').click();
   await dash.getByRole("cell", { name: /Retur barang cacat/ }).waitFor();
   await dash.locator("#catatTerbuang").click();
   await dash.locator("#tambahSku").selectOption("TP");

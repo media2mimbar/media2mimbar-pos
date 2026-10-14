@@ -114,9 +114,10 @@ export async function ringkasan(req: Request, env: Env) {
   ]);
   const t = total[0] ?? lengkapi({ transaksi: 0, qty: 0, kotor: 0, diskon: 0, bulat: 0, mp: 0, retur: 0, hpp: 0 });
   const per = (s: string) => sumber.find((x) => x.sumber === s)?.bersih ?? 0;
+  const perN = (s: string) => sumber.find((x) => x.sumber === s)?.transaksi ?? 0;
   return json({
     periode: { jenis, ...p },
-    ringkasan: { ...t, rata: t.transaksi ? Math.round(t.bersih / t.transaksi) : 0, offline: per("pos"), online: per("online"), belum_cair: belumCair },
+    ringkasan: { ...t, rata: t.transaksi ? Math.round(t.bersih / t.transaksi) : 0, offline: per("pos"), online: per("online"), offline_n: perN("pos"), online_n: perN("online"), belum_cair: belumCair },
     grafik: { metode: metode.results, saluran, kategori, produk, kasir, menipis: menipis.results },
   });
 }

@@ -31,10 +31,10 @@ try {
   await hal.locator("#fMasuk button.primary").click();
 
   // Produk kosong: diarahkan membuat kategori dulu.
-  await hal.getByRole("heading", { name: "Dashboard", exact: true }).waitFor();
+  await hal.getByRole("heading", { name: "Dashboard Penjualan" }).waitFor();
   await hal.getByRole("button", { name: "Produk", exact: true }).click();
   await hal.getByRole("heading", { name: "Produk" }).waitFor();
-  await hal.getByRole("button", { name: "+ Produk" }).click();
+  await hal.getByRole("button", { name: "+ Tambah Produk" }).click();
   await hal.getByText("Buat kategori dulu").waitFor();
   await hal.getByRole("button", { name: "Buka Kategori" }).click();
   await hal.locator("#fKat [name=nama]").fill("Kaos");
@@ -42,8 +42,8 @@ try {
   await hal.locator("td", { hasText: "Kaos" }).first().waitFor();
 
   // Produk bervarian dengan stok awal.
-  await hal.locator('[data-sub="daftar"]').click();
-  await hal.getByRole("button", { name: "+ Produk" }).click();
+  await hal.locator('#nav [data-nav="produk/daftar"]').click();
+  await hal.getByRole("button", { name: "+ Tambah Produk" }).click();
   const fp = hal.locator("#fP");
   await fp.locator("[name=nama]").fill("Kaos Burtuqol");
   await fp.locator("[name=kategori_id]").selectOption({ label: "Kaos" });
@@ -106,7 +106,7 @@ try {
 
   // Daftar stok: kembali ke stok awal 9.
   await hal.getByRole("button", { name: "← Kembali" }).click();
-  await hal.locator('[data-sub="stok"]').click();
+  await hal.locator('#nav [data-nav="inventori/stok"]').click();
   await hal.locator("#tbStok tr", { hasText: "KB-S" }).waitFor();
   assert.match(await hal.locator("#tbStok tr", { hasText: "KB-S" }).textContent(), /9.*9.*Aman/s);
   assert.match(await hal.locator("#tbStok tr", { hasText: "KB-M" }).textContent(), /Habis/);

@@ -37,11 +37,11 @@ try {
   assert.match(await laptop.locator("#fMasuk .err").textContent(), /Sisa 4/);
   await laptop.locator("#fMasuk [name=password]").fill("hikayat123");
   await laptop.locator("#fMasuk button.primary").click();
-  await laptop.getByRole("heading", { name: "Dashboard", exact: true }).waitFor();
+  await laptop.getByRole("heading", { name: "Dashboard Penjualan" }).waitFor();
   await laptop.getByRole("button", { name: "Karyawan" }).click();
   await laptop.getByRole("heading", { name: "Karyawan" }).waitFor();
 
-  await laptop.getByRole("button", { name: "+ Karyawan" }).click();
+  await laptop.getByRole("button", { name: "+ Tambah Karyawan" }).click();
   await laptop.locator("#fK [name=nama]").fill("Sari Handayani");
   await laptop.locator("#fK [value=kasir]").check();
   await laptop.locator("#fK [name=pin]").fill("333333");
@@ -50,7 +50,7 @@ try {
   assert.match(await laptop.locator("#popupIsi").textContent(), /PIN sementara: 333333/);
   await laptop.screenshot({ path: SHOTS + "1-karyawan-baru.png" });
   await laptop.locator("#tutupPopup").click();
-  assert.match(await laptop.locator("table").first().textContent(), /Sari Handayani.*Kasir.*POS saja.*PIN sementara/s);
+  assert.match(await laptop.locator("table").first().textContent(), /Sari Handayani.*POS saja.*Kasir.*PIN sementara/s);
   await laptop.screenshot({ path: SHOTS + "2-daftar-karyawan.png" });
 
   await laptop.getByRole("button", { name: "Perangkat POS" }).click();

@@ -10,7 +10,7 @@ function halInventori(sub) {
   ({ faktur: daftarFaktur, pemasok: daftarPemasok, stok: daftarStok, opname: daftarOpname, terbuang: daftarTerbuang })[subInv]();
 }
 
-const kepalaInv = (tombol = "") => `<div class="head"><div><h1>Inventori</h1></div>${tombol}</div>
+const kepalaInv = (tombol = "") => `<div class="head"><div><h1>${judulMenu("inventori", subInv)}</h1></div>${tombol}</div>
   ${subtabs([["faktur", "Faktur Pembelian"], ["pemasok", "Daftar Pemasok"], ["stok", "Daftar Stok"], ["opname", "Stok Opname"], ["terbuang", "Stok Terbuang"]], subInv)}`;
 
 const WARNA_STATUS = { Lunas: "aktif", "Belum lunas": "warn", "Lewat jatuh tempo": "off", Dibatalkan: "" };
@@ -30,7 +30,7 @@ async function daftarFaktur() {
       <div class="kpi"><span class="muted small">Lewat jatuh tempo</span><b style="color:var(--danger-text)">${rp(ringkasan.lewat_jatuh_tempo)}</b></div>
       <div class="kpi"><span class="muted small">Jatuh tempo 7 hari ke depan</span><b>${rp(ringkasan.jatuh_tempo_7_hari)}</b></div>
     </div>
-    <div class="filters">${tabs.map((t) => `<button class="btn small ${t === tabFaktur ? "primary" : ""}" data-tabf="${t}">${t}</button>`).join("")}</div>
+    ${pil(tabs.map((t) => [t, t]), tabFaktur, "tabf")}
     <div class="tablewrap"><table><thead><tr><th>Tanggal</th><th>No. Faktur</th><th>Pemasok</th><th class="num">Barang</th><th class="num">Total</th><th class="num">Sisa bayar</th><th>Jatuh tempo</th><th>Status</th></tr></thead><tbody>
     ${tampil.length ? tampil.map((f) => `<tr class="klik" data-id="${f.id}"><td>${tgl(f.tanggal)}</td><td><b>${esc(f.no)}</b></td><td>${esc(f.pemasok)}</td>
       <td class="num">${f.jumlah_barang} pcs</td><td class="num">${rp(f.total)}</td><td class="num">${f.sisa ? rp(f.sisa) : "—"}</td>
@@ -244,10 +244,7 @@ async function daftarStok() {
   $("#isi").innerHTML = '<main><p class="muted">Memuat…</p></main>';
   const [{ lokasi, stok }, { kategori }] = await Promise.all([api("GET", "/api/stok"), api("GET", "/api/kategori")]);
   $("#isi").innerHTML = `<main>${kepalaInv('<button class="btn" id="unduhStok">Unduh CSV</button>')}
-    <div class="filters">
-      <button class="btn small ${filterStok.tab === "lokasi" ? "primary" : ""}" data-tabs="lokasi">Per lokasi</button>
-      <button class="btn small ${filterStok.tab === "gerak" ? "primary" : ""}" data-tabs="gerak">Pergerakan</button>
-    </div>
+    ${pil([["lokasi", "Per lokasi"], ["gerak", "Pergerakan"]], filterStok.tab, "tabs")}
     <div id="isiStok"></div></main>`;
   pasangSubtabs(halInventori);
   $("#isi").querySelectorAll("[data-tabs]").forEach((b) => (b.onclick = () => { filterStok.tab = b.dataset.tabs; daftarStok(); }));

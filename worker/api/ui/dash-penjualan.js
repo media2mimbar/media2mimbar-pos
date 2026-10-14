@@ -9,7 +9,7 @@ function halPenjualan(sub) {
   ({ transaksi: daftarTransaksi, setoran: daftarSetoran, ditolak: daftarDitolak })[subJual]();
 }
 
-const kepalaJual = () => `<div class="head"><div><h1>Penjualan</h1></div></div>
+const kepalaJual = () => `<div class="head"><div><h1>${judulMenu("penjualan", subJual)}</h1></div></div>
   ${subtabs([["transaksi", "Transaksi POS"], ["setoran", "Setoran Kasir"], ["ditolak", "Kiriman Ditolak"]], subJual)}
   ${subJual === "ditolak" ? "" : `<form class="filters" id="fRentang"><label style="margin:0">Dari</label><input type="date" name="dari" value="${rentangJual.dari}">
     <label style="margin:0">Sampai</label><input type="date" name="sampai" value="${rentangJual.sampai}"><button class="btn small primary">Terapkan</button></form>`}`;
@@ -119,17 +119,18 @@ async function unggah(blob, jenis) {
 }
 
 async function halPengaturan() {
-  $("#isi").innerHTML = '<div class="form"><p class="muted">Memuat…</p></div>';
+  $("#isi").innerHTML = '<main><p class="muted">Memuat…</p></main>';
   const { pengaturan: p } = await api("GET", "/api/pengaturan/pos");
   const rek = [...p.rekening];
   let qrisId = p.qris.berkas_id;
   const gambar = () => {
-    $("#isi").innerHTML = `<div class="form"><h1>Pengaturan POS</h1><p class="muted">Setiap perubahan tersimpan otomatis dan terbaca HP kasir saat tarik data berikutnya (paling lama 2 menit saat online).</p>
-    <form class="card" id="fPos" style="margin-top:12px">
-      <h2>Metode pembayaran</h2>
-      <div class="checks">${["tunai", "qris", "transfer"].map((m) => `<label><input type="checkbox" name="m_${m}" ${p.metode[m] ? "checked" : ""}> ${{ tunai: "Tunai", qris: "QRIS", transfer: "Transfer" }[m]}</label>`).join("")}</div>
+    $("#isi").innerHTML = `<main><div class="head"><div><h1>Pengaturan POS</h1><p>Semua yang tampil di aplikasi kasir HP diatur dari sini.</p></div>
+      <span class="small muted" style="max-width:420px;text-align:right">Setiap perubahan tersimpan sendiri dan berlaku di POS saat HP kasir menarik data berikutnya (paling lama 2 menit saat online). <b id="tersimpan" hidden style="color:var(--success-text)"></b></span></div>
+    <form class="set" id="fPos"><div>
+      <div class="card"><h2>Metode Pembayaran</h2>
+      <div class="checks">${["tunai", "qris", "transfer"].map((m) => `<label><input type="checkbox" class="sakelar" name="m_${m}" ${p.metode[m] ? "checked" : ""}> ${{ tunai: "Tunai", qris: "QRIS", transfer: "Transfer" }[m]}</label>`).join("")}</div>
       <label>Nominal uang cepat (pisahkan dengan koma)</label><input type="text" name="nominal" value="${p.nominal_cepat.join(", ")}">
-      <h2 class="section">QRIS statis</h2>
+      </div><div class="card"><h2>QRIS Statis</h2>
       <div class="grid2"><div><label>Nama merchant</label><input type="text" name="q_nama" value="${esc(p.qris.nama)}"></div>
         <div><label>NMID</label><input type="text" name="q_nmid" value="${esc(p.qris.nmid)}"></div></div>
       <label>Gambar QRIS</label>
@@ -138,34 +139,34 @@ async function halPengaturan() {
         <input type="file" id="fileQris" accept="image/png,image/jpeg,image/webp" style="width:auto">
         ${qrisId ? '<button type="button" class="btn small danger" id="hapusQris">Hapus gambar</button>' : ""}
       </div>
-      <h2 class="section">Rekening transfer</h2>
+      </div><div class="card"><h2>Rekening Transfer</h2>
       <div class="tablewrap"><table><thead><tr><th>Bank</th><th>Nomor</th><th>Atas nama</th><th></th></tr></thead><tbody>
         ${rek.map((r, i) => `<tr><td><input type="text" data-r="${i}" data-k="bank" value="${esc(r.bank)}"></td><td><input type="text" data-r="${i}" data-k="no" value="${esc(r.no)}"></td>
           <td><input type="text" data-r="${i}" data-k="nama" value="${esc(r.nama)}"></td><td><button type="button" class="btn small danger" data-hapusrek="${i}">Hapus</button></td></tr>`).join("")}
         <tr><td colspan="4"><button type="button" class="btn small" id="tambahRek">+ Rekening</button></td></tr></tbody></table></div>
-      <h2 class="section">Total dan pajak</h2>
+      </div><div class="card"><h2>Harga, Diskon &amp; Pajak</h2>
       <div class="grid2">
         <div><label>Pembulatan total (ke bawah)</label><select name="pembulatan">${[0, 100, 500, 1000].map((n) => `<option value="${n}" ${p.pembulatan === n ? "selected" : ""}>${n ? "Rp " + n.toLocaleString("id-ID") : "Tanpa pembulatan"}</option>`).join("")}</select></div>
         <div><label>Tarif PPN (%)</label><input type="number" name="pajak_persen" min="0" max="100" value="${p.pajak.persen}"></div>
       </div>
-      <div class="checks" style="margin-top:10px"><label><input type="checkbox" name="pajak_aktif" ${p.pajak.aktif ? "checked" : ""}> PPN aktif</label>
-        <label><input type="checkbox" name="diskon_aktif" ${p.diskon_kasir.aktif ? "checked" : ""}> Diskon manual kasir</label></div>
+      <div class="checks" style="margin-top:10px"><label><input type="checkbox" class="sakelar" name="pajak_aktif" ${p.pajak.aktif ? "checked" : ""}> PPN aktif</label>
+        <label><input type="checkbox" class="sakelar" name="diskon_aktif" ${p.diskon_kasir.aktif ? "checked" : ""}> Diskon manual kasir</label></div>
       <label>Batas diskon manual kasir (%)</label><input type="number" name="diskon_maks" min="0" max="100" value="${p.diskon_kasir.maks_persen}" style="max-width:200px">
-      <h2 class="section">Keamanan dan tampilan</h2>
+      </div><div class="card"><h2>Keamanan &amp; Tampilan</h2>
       <div class="grid2"><div><label>Kunci layar otomatis</label><select name="kunci">${[0, 5, 10, 20, 30].map((n) => `<option value="${n}" ${p.kunci_menit === n ? "selected" : ""}>${n ? n + " menit" : "Mati"}</option>`).join("")}</select></div></div>
-      <div class="checks" style="margin-top:10px"><label><input type="checkbox" name="void_pin" ${p.void_pin ? "checked" : ""}> Void perlu PIN atasan</label>
-        <label><input type="checkbox" name="tampil_stok" ${p.tampil_stok ? "checked" : ""}> Tampilkan sisa stok di kartu produk</label></div>
+      <div class="checks" style="margin-top:10px"><label><input type="checkbox" class="sakelar" name="void_pin" ${p.void_pin ? "checked" : ""}> Void perlu PIN atasan</label>
+        <label><input type="checkbox" class="sakelar" name="tampil_stok" ${p.tampil_stok ? "checked" : ""}> Tampilkan sisa stok di kartu produk</label></div>
       <div class="grid2"><div><label>Tampilan katalog awal di POS</label><select name="tampilan"><option value="grid" ${p.tampilan !== "sku" ? "selected" : ""}>Grid (kartu per produk)</option><option value="sku" ${p.tampilan === "sku" ? "selected" : ""}>SKU (daftar per varian)</option></select></div></div>
-      <p class="small muted">Masuk POS selalu memakai PIN 6 angka.</p>
-      <h2 class="section">Struk</h2>
-      <div class="grid2"><div><label>Nama</label><input type="text" name="s_nama" value="${esc(p.struk.nama)}"></div><div><label>Baris info</label><input type="text" name="s_info" value="${esc(p.struk.info)}" placeholder="IG, WA, alamat"></div></div>
+      <p class="small muted">Masuk POS selalu memakai PIN 6 angka.</p></div></div>
+      <div><div class="card"><h2>Struk</h2>
+      <label style="margin-top:0">Nama di struk</label><input type="text" name="s_nama" value="${esc(p.struk.nama)}"><label>Baris info</label><input type="text" name="s_info" value="${esc(p.struk.info)}" placeholder="IG, WA, alamat">
       <label>Pesan penutup</label><input type="text" name="s_footer" value="${esc(p.struk.footer)}">
-      <div class="checks" style="margin-top:10px"><label><input type="checkbox" name="s_kasir" ${p.struk.tampil_kasir ? "checked" : ""}> Tampilkan nama kasir</label>
-        <label><input type="checkbox" name="s_event" ${p.struk.tampil_event ? "checked" : ""}> Tampilkan nama tempat/event</label></div>
-      <h3 style="margin:14px 0 6px">Pratinjau struk</h3><div id="pratinjau"></div>
-      <div class="err" hidden></div><div class="ok" id="tersimpan" hidden>Tersimpan.</div>
-      <div class="actions"><button class="btn primary">Simpan sekarang</button></div>
-    </form></div>`;
+      <div class="checks" style="margin-top:12px;flex-direction:column"><label><input type="checkbox" class="sakelar" name="s_kasir" ${p.struk.tampil_kasir ? "checked" : ""}> Tampilkan nama kasir</label>
+        <label><input type="checkbox" class="sakelar" name="s_event" ${p.struk.tampil_event ? "checked" : ""}> Tampilkan nama tempat/event</label></div>
+      <h3 style="margin:16px 0 8px">Pratinjau struk</h3><div id="pratinjau"></div>
+      <div class="err" hidden></div>
+      <div class="actions"><button class="btn primary">Simpan sekarang</button></div></div></div>
+    </form></main>`;
     const f = $("#fPos");
     f.querySelectorAll("[data-r]").forEach((el) => (el.oninput = () => { rek[+el.dataset.r][el.dataset.k] = el.value; }));
     f.querySelectorAll("[data-hapusrek]").forEach((b) => (b.onclick = () => { rek.splice(+b.dataset.hapusrek, 1); gambar(); $("#fPos").requestSubmit(); }));
@@ -179,7 +180,7 @@ async function halPengaturan() {
     // Pratinjau struk mengikuti isian.
     const pratinjau = () => {
       const fmt = (n) => "Rp " + n.toLocaleString("id-ID");
-      $("#pratinjau").innerHTML = `<div style="max-width:300px;border:1px dashed var(--border-strong);border-radius:8px;padding:12px;font:13px ui-monospace,monospace;background:#fff">
+      $("#pratinjau").innerHTML = `<div style="border:1px dashed var(--border-strong);border-radius:8px;padding:14px;font:11.5px/1.55 ui-monospace,Menlo,Consolas,monospace;background:#fff">
         <div style="text-align:center"><b>${esc(f.s_nama.value || "Hikayat")}</b>${f.s_info.value ? `<div>${esc(f.s_info.value)}</div>` : ""}${f.s_event.checked ? "<div>Hikayat Fest Bandung</div>" : ""}</div>
         <div style="margin-top:8px">No. HK-261020-A1-0001<br>20 Okt 2026 14.05${f.s_kasir.checked ? "<br>Kasir: Sari" : ""}</div><hr>
         <div>Kaos Burtuqol M<br>&nbsp;2 x ${fmt(125000)} <span style="float:right">${fmt(250000)}</span></div><hr>
@@ -208,7 +209,7 @@ async function halPengaturan() {
       };
       const r = await api("PUT", "/api/pengaturan/pos", nilai);
       Object.assign(p, r.pengaturan);
-      $("#tersimpan").textContent = "Tersimpan otomatis " + new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+      $("#tersimpan").textContent = "Terakhir tersimpan " + new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
       $("#tersimpan").hidden = false;
     });
   };

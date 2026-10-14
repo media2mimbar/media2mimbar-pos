@@ -68,17 +68,17 @@ try {
   await d.locator("#fMasuk button.primary").click();
 
   // 1. Dashboard: penjualan hari ini 500.000 (POS 375.000 + online 125.000), grafik terisi.
-  await d.getByRole("heading", { name: "Dashboard", exact: true }).waitFor();
-  assert.match(await d.locator(".kpi", { hasText: "Total penjualan" }).textContent(), /Rp 500\.000/);
-  assert.match(await d.locator(".kpi", { hasText: "Laba kotor" }).first().textContent(), /Rp 260\.000/);
-  assert.equal(await d.locator(".grafik", { hasText: "Metode pembayaran POS" }).locator(".gb-baris").count(), 2);
-  assert.match(await d.locator(".grafik", { hasText: "Penjualan per saluran" }).textContent(), /Hikayat Fest.*Rp 375\.000.*Lainnya.*Rp 125\.000/s);
-  await d.locator(".grafik", { hasText: "Penjualan per saluran" }).locator(".gb-baris").first().hover();
+  await d.getByRole("heading", { name: "Dashboard Penjualan" }).waitFor();
+  assert.match(await d.locator(".banner-total").textContent(), /Rp 500\.000/);
+  assert.match(await d.locator(".banner-mini > div", { hasText: "Laba Kotor" }).textContent(), /Rp 260\.000/);
+  assert.equal(await d.locator(".grafik", { hasText: "Metode Pembayaran (POS)" }).locator(".gb-baris").count(), 2);
+  assert.match(await d.locator(".grafik", { hasText: "Penjualan per Saluran" }).textContent(), /Hikayat Fest.*Rp 375\.000.*Lainnya.*Rp 125\.000/s);
+  await d.locator(".grafik", { hasText: "Penjualan per Saluran" }).locator(".gb-baris").first().hover();
   await d.screenshot({ path: SHOTS + "k1-dashboard.png", fullPage: true });
   await d.locator("#mundur").click();
-  assert.match(await d.locator(".kpi", { hasText: "Total penjualan" }).textContent(), /Rp 0/);
+  assert.match(await d.locator(".banner-total").textContent(), /Rp 0/);
   await d.locator('[data-p="bulanan"]').click();
-  assert.match(await d.locator(".kpi", { hasText: "Total penjualan" }).textContent(), /Rp 500\.000/);
+  assert.match(await d.locator(".banner-total").textContent(), /Rp 500\.000/);
 
   // 2. Laporan: semua submenu, CSV.
   await d.locator("#keLaporan").click();
@@ -91,16 +91,16 @@ try {
   for await (const c of csv) isi += c;
   assert.match(isi, /"Hikayat Fest","2","3","375000"/);
   for (const [sub, teks] of [["event", "Rp 250.000"], ["kasir", "Rina Wijaya"], ["produk", "Kaos Burtuqol"], ["harian", "hari ini"], ["kerugian", "Total kerugian"]]) {
-    await d.locator(`[data-sub="${sub}"]`).click();
+    await d.locator(`#nav [data-nav="laporan/${sub}"]`).click();
     await d.getByText(teks).first().waitFor();
   }
-  await d.locator('[data-sub="saluran"]').click();
+  await d.locator('#nav [data-nav="laporan/saluran"]').click();
   await d.locator('[data-per="7hari"]').click();
   assert.equal(await d.locator("#perDari").inputValue(), geser(-6));
 
   // 3. Biaya: biaya event dengan bukti foto, biaya umum.
   await d.locator('#nav [data-tab="keuangan"]').click();
-  await d.locator('[data-sub="biaya"]').click();
+  await d.locator('#nav [data-nav="keuangan/biaya"]').click();
   await d.locator("#tambahBiaya").click();
   await d.locator("#fBiaya [name=lokasi_id]").selectOption(ev);
   await d.locator("#fBiaya [name=kategori]").selectOption("Sewa booth");
@@ -121,7 +121,7 @@ try {
   assert.ok(sql("SELECT bukti FROM biaya WHERE keterangan = 'Booth A1'")[0].bukti);
 
   // 4. Keuangan keseluruhan: laba bersih 260.000 − 315.000 − 100.000 = −155.000.
-  await d.locator('[data-sub="keseluruhan"]').click();
+  await d.locator('#nav [data-nav="keuangan/keseluruhan"]').click();
   await d.locator(".kpi", { hasText: "Laba bersih" }).locator("b", { hasText: "Rp -155.000" }).waitFor();
   await d.screenshot({ path: SHOTS + "k2-keuangan.png", fullPage: true });
   // Bagi biaya umum: Hikayat Fest menanggung 100.000 × 375/500 = 75.000.
@@ -155,7 +155,7 @@ try {
   await ad.locator("#fGantiPw [name=baru]").fill("dimasbaru99");
   await ad.locator("#fGantiPw [name=ulang]").fill("dimasbaru99");
   await ad.locator("#fGantiPw button.primary").click();
-  await ad.getByRole("heading", { name: "Dashboard", exact: true }).waitFor();
+  await ad.getByRole("heading", { name: "Dashboard Penjualan" }).waitFor();
   assert.equal(await ad.locator('#nav [data-tab="keuangan"]').count(), 0);
   await ad.locator('#nav [data-tab="event"]').click();
   await ad.locator("tr", { hasText: "Hikayat Fest" }).click();
