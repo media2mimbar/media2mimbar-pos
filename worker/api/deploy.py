@@ -18,7 +18,9 @@ API = "https://api.cloudflare.com/client/v4"
 ACCOUNT = os.environ["CLOUDFLARE_ACCOUNT_ID"]
 TOKEN = os.environ.get("CLOUDFLARE_API_TOKEN", "")
 NAMA_WORKER = "hikayat-api"
-NAMA_DB = "hikayat"
+# Database di Asia-Pasifik supaya dekat dengan pengguna di Indonesia. "hikayat" (lama) ada di Amerika Utara.
+NAMA_DB = "hikayat-asia"
+LOKASI_DB = "apac"
 TANGGAL_KOMPAT = "2026-09-01"
 DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -51,7 +53,7 @@ def siapkan_db():
     if ada:
         db_id = ada[0]["uuid"]
     else:
-        db_id = req("POST", f"/accounts/{ACCOUNT}/d1/database", {"name": NAMA_DB})["uuid"]
+        db_id = req("POST", f"/accounts/{ACCOUNT}/d1/database", {"name": NAMA_DB, "primary_location_hint": LOKASI_DB})["uuid"]
         print(f"Database D1 '{NAMA_DB}' dibuat")
     sql(db_id, "CREATE TABLE IF NOT EXISTS _migrasi (nama TEXT PRIMARY KEY, dijalankan_pada TEXT NOT NULL)")
     sudah = {r["nama"] for r in sql(db_id, "SELECT nama FROM _migrasi")[0]["results"]}

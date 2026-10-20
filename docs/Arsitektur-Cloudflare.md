@@ -333,6 +333,8 @@ Pelengkap dari PRD (sesudah itu):
 
 Tampilan dashboard disamakan dengan prototipe (`prototipe/dashboard.html`): bilah atas putih dengan pilihan Penjualan/Karyawan, menu samping oranye 300px dengan submenu (Laporan, Keuangan, Penjualan Online, Penjualan POS, Produk, Inventori), ikon menu disalin dari prototipe (`ui/dash-ikon.js`), font Inter, kotak oranye Total Penjualan di Dashboard, tab berbentuk pil, dan sakelar untuk pilihan aktif/nonaktif. Submenu di menu samping menggantikan tab di dalam halaman; fungsi `subtabs()` mengenali grup yang punya submenu dan tidak menggambar tabnya lagi. Karyawan, Perangkat POS, dan Riwayat Masuk menjadi satu halaman di area Karyawan. Font Inter dimuat dari Google Fonts, jadi CSP halaman mengizinkan `fonts.googleapis.com` (style) dan `fonts.gstatic.com` (font); tanpa internet ke Google, halaman memakai font sistem.
 
+Lokasi database (20 Oktober 2026): database pertama `hikayat` dibuat lewat API dari server pengembangan, sehingga Cloudflare menaruhnya di Amerika Utara bagian timur (ENAM). Dari Indonesia, setiap query D1 harus bolak-balik ke Virginia, dan satu halaman dashboard bisa butuh beberapa kali. Isinya sudah dipindah ke `hikayat-asia` yang dibuat dengan `primary_location_hint: "apac"`. `deploy.py` dan `scripts/backup-d1.py` memakai nama baru ini. Database lama masih ada sebagai cadangan dan boleh dihapus setelah aplikasi berjalan normal. Cek sesi juga dirampingkan: peran staf dibaca di query yang sama dengan sesi, dan di POS cek HP serta sesi berjalan bersamaan.
+
 Yang sengaja tidak dibuat:
 - **Reset Data:** terlalu berisiko untuk database produksi.
 - **Nomor transaksi dengan kode HP:** tetap seperti sekarang supaya bisa dibuat saat offline.

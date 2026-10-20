@@ -20,7 +20,7 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-NAMA_DB = "hikayat"
+NAMA_DB = "hikayat-asia"
 API = "https://api.cloudflare.com/client/v4"
 TABEL_PENTING = ["staff", "perangkat", "produk", "varian", "stok", "stok_gerak", "faktur", "event", "shift", "trx", "trx_item",
                  "trx_bayar", "retur", "pesanan_online", "pelanggan", "biaya", "kerugian", "berkas"]
