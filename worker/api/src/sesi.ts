@@ -44,19 +44,20 @@ export function cookieSesi(token: string): string {
 }
 export const cookieHapus = `${COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
 
-async function bacaSesi(db: D1Database, token: string | null, jenis: "dashboard" | "pos", perangkatId: string | null) {
+// Satu query untuk sesi, staf, dan perannya: setiap bolak-balik ke D1 menambah jeda di setiap permintaan.
+async function bacaSesi(db: D1Database, token: string | null, jenis: "dashboard" | "pos") {
   if (!token) return null;
   const id = await sha256(token);
   const row = await db
     .prepare(
-      `SELECT s.id AS sesi_id, s.terakhir_aktif, s.perangkat_id, st.id, st.nama, st.email, st.pw_sementara, st.pin_sementara
+      `SELECT s.id AS sesi_id, s.terakhir_aktif, s.perangkat_id, st.id, st.nama, st.email, st.pw_sementara, st.pin_sementara,
+         (SELECT group_concat(r.role) FROM staff_role r WHERE r.staff_id = st.id) AS peran
        FROM sesi s JOIN staff st ON st.id = s.staff_id
        WHERE s.id = ? AND s.jenis = ? AND st.aktif = 1`,
     )
     .bind(id, jenis)
-    .first<Omit<Staff, "role"> & { sesi_id: string; terakhir_aktif: string; perangkat_id: string | null }>();
+    .first<Omit<Staff, "role"> & { sesi_id: string; terakhir_aktif: string; perangkat_id: string | null; peran: string | null }>();
   if (!row) return null;
-  if (jenis === "pos" && row.perangkat_id !== perangkatId) return null;
   const t = sekarang();
   if (tambahMenit(row.terakhir_aktif, MENIT_TIDAK_AKTIF) < t) {
     await db.prepare("DELETE FROM sesi WHERE id = ?").bind(id).run();
@@ -71,13 +72,13 @@ async function bacaSesi(db: D1Database, token: string | null, jenis: "dashboard"
     email: row.email,
     pw_sementara: row.pw_sementara,
     pin_sementara: row.pin_sementara,
-    role: await ambilRole(db, row.id),
+    role: (row.peran ? (row.peran.split(",") as Role[]) : []).sort(),
   };
-  return { sesiId: id, staff };
+  return { sesiId: id, staff, perangkatId: row.perangkat_id };
 }
 
 export async function sesiDashboard(db: D1Database, req: Request) {
-  const s = await bacaSesi(db, bacaCookie(req, COOKIE), "dashboard", null);
+  const s = await bacaSesi(db, bacaCookie(req, COOKIE), "dashboard");
   if (!s || !s.staff.role.some((r) => r === "owner" || r === "admin")) {
     throw new Gagal(401, "Silakan masuk dulu", "perlu_masuk");
   }
@@ -102,10 +103,10 @@ export async function perangkatDari(db: D1Database, req: Request): Promise<Peran
 }
 
 export async function sesiPos(db: D1Database, req: Request) {
-  const perangkat = await perangkatDari(db, req);
-  const s = await bacaSesi(db, req.headers.get("x-sesi"), "pos", perangkat.id);
-  if (!s) throw new Gagal(401, "Silakan masuk dengan PIN", "perlu_masuk");
-  return { ...s, perangkat };
+  // HP dan sesi dicek bersamaan; sesi hanya sah di HP tempat ia dibuat.
+  const [perangkat, s] = await Promise.all([perangkatDari(db, req), bacaSesi(db, req.headers.get("x-sesi"), "pos")]);
+  if (!s || s.perangkatId !== perangkat.id) throw new Gagal(401, "Silakan masuk dengan PIN", "perlu_masuk");
+  return { sesiId: s.sesiId, staff: s.staff, perangkat };
 }
 
 export function wajibRole(staff: Staff, ...boleh: Role[]) {

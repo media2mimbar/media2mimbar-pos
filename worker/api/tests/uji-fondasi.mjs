@@ -231,3 +231,14 @@ test("halaman dan alamat tidak dikenal", async () => {
   assert.equal((await api("GET", "/api/tidak-ada")).status, 404);
   assert.equal((await api("DELETE", "/api/karyawan")).status, 405);
 });
+
+test("halaman yang tidak berubah dijawab 304 tanpa isi", async () => {
+  const pertama = await worker.fetch(new Request("https://hikayat.test/dash-laporan.js"), env);
+  const tag = pertama.headers.get("etag");
+  assert.match(tag, /^"[0-9a-f]{16}"$/);
+  const kedua = await worker.fetch(new Request("https://hikayat.test/dash-laporan.js", { headers: { "if-none-match": tag } }), env);
+  assert.equal(kedua.status, 304);
+  assert.equal(await kedua.text(), "");
+  const lain = await worker.fetch(new Request("https://hikayat.test/dash-laporan.js", { headers: { "if-none-match": '"lama"' } }), env);
+  assert.equal(lain.status, 200);
+});
