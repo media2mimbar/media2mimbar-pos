@@ -89,23 +89,32 @@ async function formPesananOnline(salId) {
           <div><label>Status</label><select name="status"><option>Selesai</option><option>Diproses</option></select></div>
           <div><label>Nama pembeli (opsional)</label><input name="pembeli" maxlength="80"></div>
           <div><label>Pelanggan (opsional)</label><select name="pelanggan_id"><option value="">—</option>${pelanggan.map((p) => `<option value="${p.id}">${esc(p.nama)}${p.telp ? " · " + esc(p.telp) : ""}</option>`).join("")}</select></div></div>
-        <label>Barang</label>
-        ${varian.length ? "" : `<div class="warn small">Belum ada produk yang aktif di saluran ini. Aktifkan di Produk › form produk › Harga Marketplace.</div>`}
-        <table>${baris.map((b, i) => `<tr><td><select data-i="${i}" data-k="sku"><option value="">Pilih produk</option>${varian.map((v) => `<option value="${esc(v.sku)}" ${v.sku === b.sku ? "selected" : ""}>${esc(v.nama)} · stok gudang ${v.stok_gudang}</option>`).join("")}</select></td>
-          <td style="width:90px"><input inputmode="numeric" data-i="${i}" data-k="qty" value="${b.qty}"></td><td style="width:140px"><input inputmode="numeric" data-i="${i}" data-k="harga" value="${b.harga}" placeholder="Harga"></td>
-          <td style="width:70px">${baris.length > 1 ? `<button type="button" class="btn small" data-hapus="${i}">Hapus</button>` : ""}</td></tr>`).join("")}</table>
-        <button type="button" class="btn small" id="tambahBaris">+ Barang</button>
-        <div class="grid2"><div><label>Potongan marketplace (Rp)</label><input inputmode="numeric" name="potongan" value="0">
-          <p class="small muted">Perkiraan dari Biaya Marketplace: <b id="kira">${rp(kira())}</b> <button type="button" class="btn small" id="pakaiKira">Pakai</button></p></div>
-          <div><label>Kotor</label><div style="padding:10px 0"><b id="kotor">${rp(kotor())}</b></div></div></div>
-        <label>Catatan</label><input name="catatan" maxlength="300">
+        <div class="bagian">Barang</div>
+        ${varian.length ? "" : `<div class="warn small" style="margin:0 0 10px">Belum ada produk yang aktif di saluran ini. Aktifkan di Produk › form produk › Harga Marketplace.</div>`}
+        <div class="tablewrap"><table><thead><tr><th>Produk</th><th class="num" style="width:110px">Jumlah</th><th class="num" style="width:170px">Harga satuan</th><th class="num" style="width:140px">Subtotal</th><th style="width:48px"></th></tr></thead><tbody>
+          ${baris.map((b, i) => `<tr><td><select data-i="${i}" data-k="sku"><option value="">Pilih produk</option>${varian.map((v) => `<option value="${esc(v.sku)}" ${v.sku === b.sku ? "selected" : ""}>${esc(v.nama)} · stok gudang ${v.stok_gudang}</option>`).join("")}</select></td>
+          <td><input inputmode="numeric" data-i="${i}" data-k="qty" value="${b.qty}" style="text-align:right"></td><td><input inputmode="numeric" data-i="${i}" data-k="harga" value="${b.harga}" placeholder="0" style="text-align:right"></td>
+          <td class="num" data-subtotal="${i}">${rp((angka(b.qty) ?? 0) * (angka(b.harga) ?? 0))}</td>
+          <td>${baris.length > 1 ? `<button type="button" class="ikon-hapus" data-hapus="${i}" title="Hapus barang" aria-label="Hapus barang">✕</button>` : ""}</td></tr>`).join("")}
+          <tr><td colspan="5"><button type="button" class="btn small garis-putus" id="tambahBaris">+ Barang</button></td></tr></tbody></table></div>
+        <div class="grid2" style="margin-top:6px;align-items:start"><div><label>Potongan marketplace (Rp)</label><input inputmode="numeric" name="potongan" value="0">
+          <p class="small muted" style="margin:6px 0 0">Perkiraan dari Biaya Marketplace: <b id="kira">${rp(kira())}</b> <button type="button" class="btn small" id="pakaiKira">Pakai</button></p></div>
+          <div class="ringkas"><div><span>Kotor</span><b id="kotor">${rp(kotor())}</b></div><div><span>Potongan</span><span id="potTampil">−${rp(0)}</span></div><div class="besar"><span>Bersih</span><b id="bersih">${rp(kotor())}</b></div></div></div>
+        <label>Catatan</label><input name="catatan" maxlength="300" placeholder="Opsional">
         <div class="err" hidden></div>
-        <div class="actions"><button class="btn primary">Simpan pesanan</button><button type="button" class="btn" id="batal">Batal</button></div>
+        <div class="actions"><button class="btn primary">Simpan pesanan</button><button type="button" class="btn batal" id="batal">Batal</button></div>
       </form></div>`;
     const f = $("#fOnline");
     for (const [k, v] of Object.entries(isian)) if (v !== undefined) f[k].value = v;
     f.saluran_id.onchange = () => formPesananOnline(f.saluran_id.value);
-    const segar = () => { $("#kotor").textContent = rp(kotor()); $("#kira").textContent = rp(kira()); };
+    const segar = () => {
+      const pot = angka(f.potongan.value) ?? 0;
+      baris.forEach((b, i) => { const el = f.querySelector(`[data-subtotal="${i}"]`); if (el) el.textContent = rp((angka(b.qty) ?? 0) * (angka(b.harga) ?? 0)); });
+      $("#kotor").textContent = rp(kotor()); $("#kira").textContent = rp(kira());
+      $("#potTampil").textContent = "−" + rp(pot); $("#bersih").textContent = rp(kotor() - pot);
+    };
+    f.potongan.oninput = segar;
+    segar();
     f.querySelectorAll("[data-k]").forEach((el) => (el.oninput = el.onchange = () => {
       const b = baris[el.dataset.i];
       if (el.dataset.k === "qty" && b.sku) {
@@ -118,7 +127,7 @@ async function formPesananOnline(salId) {
     }));
     f.querySelectorAll("[data-hapus]").forEach((el) => (el.onclick = () => { baris.splice(+el.dataset.hapus, 1); gambar(); }));
     $("#tambahBaris").onclick = () => { baris.push({ sku: "", qty: 1, harga: "" }); gambar(); };
-    $("#pakaiKira").onclick = () => { f.potongan.value = kira(); };
+    $("#pakaiKira").onclick = () => { f.potongan.value = kira(); segar(); };
     $("#kembali").onclick = $("#batal").onclick = () => halOnline("pesanan");
     formKirim(f, async (d) => {
       const items = baris.filter((b) => b.sku).map((b) => ({ sku: b.sku, qty: angka(b.qty), harga: angka(b.harga) }));

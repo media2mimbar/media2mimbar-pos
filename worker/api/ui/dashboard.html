@@ -31,8 +31,8 @@ h2,h3{font-size:12.5px;font-weight:700;margin:0 0 12px}
 
 /* Isian */
 label{display:block;font-weight:500;font-size:12px;color:var(--text-2);margin:12px 0 5px}
-input[type=text],input[type=email],input[type=password],input[type=tel],input[type=number],input[type=date],input[type=search],input[type=time],input[type=file],select,textarea{width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:8px;background:#fff;color:var(--text)}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
+:where(input:not([type=checkbox],[type=radio],[type=range],[type=color],[type=submit],[type=button],[type=reset],[type=hidden],[type=image]),select,textarea){width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:8px;background:#fff;color:var(--text)}
+:where(input,select,textarea):focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
 textarea{min-height:70px;resize:vertical}
 input[type=checkbox].sakelar{appearance:none;-webkit-appearance:none;width:32px;height:18px;border-radius:999px;background:var(--border-strong);position:relative;flex:none;margin:0;transition:background .15s;vertical-align:middle}
 input[type=checkbox].sakelar::after{content:"";position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .15s}
@@ -185,7 +185,12 @@ td input,td select{padding:7px 9px}
 .pil .hitung{font-weight:400;color:var(--text-mut);font-size:11.5px}
 
 /* Lain-lain */
-.actions{display:flex;gap:8px;margin-top:20px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap}
+/* Baris tombol: Batal di kiri, Simpan dan aksi lain di kanan (tombol utama paling kanan). Urutan di HTML tidak berubah. */
+.actions{display:flex;gap:8px;margin-top:20px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap;justify-content:flex-end;align-items:center}
+.actions>.batal{order:-2;margin-right:auto}
+.actions>span{order:-1;margin-right:auto}
+.actions:has(>span)>.batal{margin-right:0}
+.actions>.primary{order:2}
 .kode{font:700 34px/1.2 ui-monospace,Menlo,monospace;letter-spacing:4px;background:var(--accent-bg);color:var(--accent-dark);padding:16px;border-radius:10px;text-align:center;margin:12px 0}
 .cred{font:600 16px ui-monospace,Menlo,monospace;background:var(--bg);padding:2px 8px;border-radius:6px}
 .overlay{position:fixed;inset:0;background:rgba(20,25,20,.42);display:flex;align-items:center;justify-content:center;padding:16px;z-index:100}
@@ -194,6 +199,14 @@ td input,td select{padding:7px 9px}
 .pilih{max-height:60vh;overflow:auto;border:1px solid var(--border-strong);border-radius:8px;margin-top:10px;background:#fff}
 .pilih label{display:flex;gap:10px;align-items:center;font-weight:400;color:var(--text-2);font-size:12.5px;margin:0;padding:9px 12px;border-bottom:1px solid var(--border)}
 .section{margin-top:22px}
+.bagian{color:var(--text-mut);font-weight:600;margin:22px 0 8px;text-transform:uppercase;font-size:11px;letter-spacing:.03em}
+.garis-putus{width:100%;border-style:dashed}
+.ikon-hapus{width:30px;height:30px;border-radius:8px;border:1px solid transparent;background:none;color:var(--text-mut);cursor:pointer;font-size:13px}
+.ikon-hapus:hover{border-color:var(--border-strong);color:var(--danger-text)}
+.ringkas{margin-top:12px;border:1px solid var(--border);border-radius:8px;padding:10px 14px;background:#FAFAF8}
+.ringkas>div{display:flex;justify-content:space-between;padding:4px 0}
+.ringkas>div>span:first-child{color:var(--text-2)}
+.ringkas .besar{border-top:1px solid var(--border);margin-top:4px;padding-top:8px;font-size:15px}
 @media print{.side,.top,.ku-noprint,.subtabs,.back,#popup{display:none!important}body{background:#fff}.card,.kpi{break-inside:avoid;box-shadow:none}main{padding:0}}
 @media (max-width:1100px){.grafik-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.kartu4{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:900px){.logo{width:auto}.app{flex-direction:column}.side{width:auto}#nav{flex-direction:row;overflow-x:auto;position:static;max-height:none;padding:0}.nav-group,.nav-children{display:contents}.nav-head,.nav-child{width:auto;flex:none;white-space:nowrap;padding:10px 12px;font-size:13px}.nav-child{background:rgba(0,0,0,.08)}.nav-head.garis::after,.nav-child.on::after{top:auto;left:0;width:auto;height:3px}.nh-icon{display:none}.chev{display:none}.banner-mini{flex-wrap:wrap}}
@@ -240,8 +253,7 @@ td input,td select{padding:7px 9px}
     <label>Ulangi password baru</label><input type="password" name="ulang" autocomplete="new-password" required>
     <p class="small muted">Minimal 8 karakter, berisi huruf dan angka.</p>
     <div class="err" hidden></div>
-    <button class="btn primary block">Simpan password</button>
-    <button type="button" class="btn block" id="batalGantiPw">Batal</button>
+    <div class="actions"><button class="btn primary">Simpan password</button><button type="button" class="btn batal" id="batalGantiPw">Batal</button></div>
   </form>
 </div>
 
@@ -571,9 +583,8 @@ function formKaryawan(k) {
       <div class="err" hidden></div>
       <div class="actions">
         <button class="btn primary">Simpan</button>
-        <button type="button" class="btn" id="batal">Batal</button>
-        ${baru ? "" : `<span style="flex:1"></span>
-          ${k.email ? '<button type="button" class="btn" id="resetPw">Reset password</button>' : ""}
+        <button type="button" class="btn batal" id="batal">Batal</button>
+        ${baru ? "" : `${k.email ? '<button type="button" class="btn" id="resetPw">Reset password</button>' : ""}
           <button type="button" class="btn" id="resetPin">Reset PIN</button>`}
       </div>
     </form></div>`;
@@ -651,7 +662,7 @@ function formPerangkat() {
     <form class="card" id="fHp" style="margin-top:12px">
       <label>Nama HP</label><input type="text" name="nama" placeholder="Misalnya: HP Booth 1 (Samsung A15)" required>
       <div class="err" hidden></div>
-      <div class="actions"><button class="btn primary">Buat kode</button><button type="button" class="btn" id="batal">Batal</button></div>
+      <div class="actions"><button class="btn primary">Buat kode</button><button type="button" class="btn batal" id="batal">Batal</button></div>
     </form></div>`;
   $("#kembali").onclick = $("#batal").onclick = halPerangkat;
   formKirim($("#fHp"), async (d) => {

@@ -63,7 +63,7 @@ async function formEvent(id) {
             <td><input type="number" min="0" data-v="${i}" value="${v.harga}" placeholder="${s?.normal ?? ""}"></td><td><button type="button" class="btn small danger" data-hapusv="${i}">Hapus</button></td></tr>`; }).join("")}
           <tr><td colspan="6"><button type="button" class="btn small" id="tambahVarianEv">+ Produk</button></td></tr></tbody></table></div>
         <div class="err" hidden></div>
-        <div class="actions"><button class="btn primary">Simpan</button><button type="button" class="btn" id="batal">Batal</button></div>
+        <div class="actions"><button class="btn primary">Simpan</button><button type="button" class="btn batal" id="batal">Batal</button></div>
       </form></div>`;
     const f = $("#fEv");
     const simpanIsian = () => {
@@ -167,7 +167,7 @@ function formKirimTarik(d, jenis) {
         </tbody></table></div>
         <label>Catatan</label><input type="text" name="catatan">
         <div class="err" hidden></div>
-        <div class="actions"><button class="btn primary">${jenis === "kirim" ? "Kirim" : "Tarik ke gudang"}</button><button type="button" class="btn" id="batal">Batal</button></div>
+        <div class="actions"><button class="btn primary">${jenis === "kirim" ? "Kirim" : "Tarik ke gudang"}</button><button type="button" class="btn batal" id="batal">Batal</button></div>
       </form></div>`;
     $("#kembali").onclick = $("#batal").onclick = () => detailEvent(e.id);
     const f = $("#fKt");
@@ -216,7 +216,7 @@ async function formTutupEvent(id) {
       <div id="bagianPj" hidden><div class="grid2"><div><label>Penanggung jawab</label><select name="pj_id">${karyawan.filter((k) => k.aktif).map((k) => `<option value="${k.id}" ${k.id === e.pj_id ? "selected" : ""}>${esc(k.nama)}</option>`).join("")}</select></div></div>
         <label>Penjelasan selisih</label><textarea name="penjelasan">${esc(om?.catatan || "")}</textarea></div>
       <div class="err" hidden></div>
-      <div class="actions"><button class="btn primary" ${d.shift_terbuka.length ? "disabled" : ""}>${om ? "Setujui opname & tutup event" : "Tutup event"}</button><button type="button" class="btn" id="batal">Batal</button></div>
+      <div class="actions"><button class="btn primary" ${d.shift_terbuka.length ? "disabled" : ""}>${om ? "Setujui opname & tutup event" : "Tutup event"}</button><button type="button" class="btn batal" id="batal">Batal</button></div>
     </form></div>`;
   $("#kembali").onclick = $("#batal").onclick = () => detailEvent(id);
   const f = $("#fTutup");
@@ -313,7 +313,7 @@ async function formOpnameGudang() {
       ${baris.map((s) => `<tr><td>${esc(s.produk + (s.varian ? " · " + s.varian : ""))}<div class="small muted">${esc(s.sku)}</div></td><td class="num">${s.per_lokasi.gudang ?? 0}</td>
         <td><input type="number" min="0" data-sku="${esc(s.sku)}" placeholder="${Math.max(0, s.per_lokasi.gudang ?? 0)}"></td><td class="num" data-sel="${esc(s.sku)}"></td></tr>`).join("")}</tbody></table></div>
       <label>Catatan (wajib kalau ada selisih)</label><textarea name="catatan"></textarea>
-      <div class="err" hidden></div><div class="actions"><button class="btn primary">Kirim hasil opname</button><button type="button" class="btn" id="batal">Batal</button></div></form></div>`;
+      <div class="err" hidden></div><div class="actions"><button class="btn primary">Kirim hasil opname</button><button type="button" class="btn batal" id="batal">Batal</button></div></form></div>`;
   $("#kembali").onclick = $("#batal").onclick = () => halInventori("opname");
   const f = $("#fOg");
   f.oninput = () => f.querySelectorAll("[data-sku]").forEach((el) => {
@@ -367,7 +367,7 @@ function formSelesaikan(k) {
         <div><label>Cara</label><select name="cara"><option>Tunai</option><option>Transfer</option><option>Potong gaji</option></select></div></div></div>
       <label>Catatan</label><input type="text" name="catatan">
       <p class="small muted">Ditandai oleh ${esc(saya.nama)}.</p>
-      <div class="err" hidden></div><div class="actions"><button class="btn primary">Simpan</button><button type="button" class="btn" id="batal">Batal</button></div></form></div>`;
+      <div class="err" hidden></div><div class="actions"><button class="btn primary">Simpan</button><button type="button" class="btn batal" id="batal">Batal</button></div></form></div>`;
   $("#kembali").onclick = $("#batal").onclick = halKerugian;
   const f = $("#fSel");
   f.onchange = () => ($("#bagianGanti").hidden = f.jenis.value === "beban");

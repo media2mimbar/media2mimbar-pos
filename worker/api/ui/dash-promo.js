@@ -77,7 +77,7 @@ async function formPromo(id, salin, cakupan = "produk") {
       <div class="grid2"><div><label>Jam mulai</label><input type="time" name="jam_mulai" value="${p.jam_mulai}"></div><div><label>Jam selesai</label><input type="time" name="jam_selesai" value="${p.jam_selesai}"></div></div>
       <label>Hari</label><div class="filters">${NAMA_HARI.map((h, i) => `<label style="margin:0;font-weight:400"><input type="checkbox" name="hari" value="${i}" ${p.hari.includes(i) ? "checked" : ""} style="width:auto"> ${h}</label>`).join("")}</div>
       <div class="err" hidden></div>
-      <div class="actions"><button class="btn primary">${id ? "Simpan" : "Buat promo"}</button><button type="button" class="btn" id="simpanDraf">Simpan Draft</button><button type="button" class="btn" id="batalPromo">Batal</button></div>
+      <div class="actions"><button class="btn primary">${id ? "Simpan" : "Buat promo"}</button><button type="button" class="btn" id="simpanDraf">Simpan Draft</button><button type="button" class="btn batal" id="batalPromo">Batal</button></div>
     </form></div>`;
   const f = $("#fPromo");
   const atur = () => {
@@ -231,7 +231,7 @@ async function formTerbuang() {
         <label>Penjelasan (minimal 10 huruf)</label><textarea name="penjelasan" required minlength="10" maxlength="500"></textarea>
         <label>Foto (opsional)</label><input type="file" name="foto" accept="image/*">
         <div class="err" hidden></div>
-        <div class="actions"><button class="btn primary">Simpan</button><button type="button" class="btn" id="batalTerbuang">Batal</button></div>
+        <div class="actions"><button class="btn primary">Simpan</button><button type="button" class="btn batal" id="batalTerbuang">Batal</button></div>
       </form></div>`;
     const f = $("#fTerbuang");
     for (const [k, v] of Object.entries(isian)) f[k].value = v;
