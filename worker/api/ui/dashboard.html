@@ -306,7 +306,46 @@ function unduhCsv(nama, baris) {
 let saya = null;
 let tab = null;
 
+// Simpanan GET di memori: menu yang pernah dibuka langsung tampil, lalu data terbaru diambil di belakang.
+// Kalau datanya berubah dan pengguna belum menyentuh halaman, halaman digambar ulang. Setiap simpan/ubah/hapus mengosongkan simpanan.
+const simpanGet = new Map(); // path -> { waktu, janji: Promise<string> }
+const UMUR_SIMPAN = 5 * 60_000, JEDA_SEGAR = 2000; // data hasil penyegaran tidak disegarkan lagi selama 2 detik
+let generasi = 0; // naik setiap pindah halaman atau setiap klik/ketik; gambar ulang hanya kalau belum berubah
+for (const ev of ["click", "input", "keydown"]) document.addEventListener(ev, () => generasi++, true);
+
 async function api(method, path, body) {
+  if (method !== "GET") { const r = await panggil(method, path, body); simpanGet.clear(); return r; }
+  const ada = simpanGet.get(path), umur = ada ? Date.now() - ada.waktu : Infinity;
+  if (ada && umur < UMUR_SIMPAN) {
+    if (ada.selesai && !(ada.dariSegar && umur < JEDA_SEGAR)) segarkanDiBelakang(path, ada);
+    return JSON.parse(await ada.janji);
+  }
+  return JSON.parse(await ambilSimpan(path));
+}
+function ambilSimpan(path, dariSegar = false) {
+  const isi = { waktu: Date.now(), dariSegar, selesai: false };
+  const janji = panggil("GET", path).then((d) => { isi.selesai = true; return JSON.stringify(d); });
+  isi.janji = janji;
+  simpanGet.set(path, isi);
+  janji.catch(() => simpanGet.get(path) === isi && simpanGet.delete(path));
+  return janji;
+}
+async function segarkanDiBelakang(path, lama) {
+  const g = generasi, t = tab;
+  try {
+    const [teksLama, teksBaru] = await Promise.all([lama.janji, ambilSimpan(path, true)]);
+    if (teksLama === teksBaru || g !== generasi || t !== tab) return;
+    if ($("#isi .form") || !$("#popup").hidden) return;
+    HALAMAN_TAB[tab]();
+  } catch { /* data lama tetap tampil */ }
+}
+// Ambil data menu utama di belakang setelah masuk, supaya membuka menu pertama kali tidak menunggu.
+function ambilDulu() {
+  const daftar = ["/api/event", "/api/produk", "/api/kategori", "/api/stok", "/api/saluran", "/api/staf", "/api/karyawan", "/api/pengaturan/pos", "/api/promo", "/api/presale", "/api/pelanggan", "/api/perangkat", "/api/opname", "/api/terbuang", "/api/pemasok"];
+  for (const p of daftar) if (!simpanGet.has(p)) ambilSimpan(p).catch(() => {});
+}
+
+async function panggil(method, path, body) {
   const res = await fetch(path, {
     method,
     headers: body !== undefined ? { "content-type": "application/json" } : {},
@@ -380,7 +419,7 @@ formKirim($("#fGantiPw"), async (d) => {
 
 $("#akunBtn").onclick = () => { $("#akunMenu").hidden = !$("#akunMenu").hidden; };
 $("#mGantiPw").onclick = () => { $("#akunMenu").hidden = true; bukaGantiPw(false); };
-$("#mKeluar").onclick = async () => { await api("POST", "/api/keluar"); saya = null; tampil("layarMasuk"); };
+$("#mKeluar").onclick = async () => { await api("POST", "/api/keluar"); simpanGet.clear(); saya = null; tampil("layarMasuk"); };
 
 // ---------- Aplikasi ----------
 
@@ -404,6 +443,7 @@ function mulai(staff) {
   };
   tampil("layarApp");
   buka(menuSaya().some((m) => m.tab === tab) || tab === "karyawan" ? tab : "dashboard");
+  setTimeout(ambilDulu, 400);
 }
 
 // Menu samping seperti prototipe. Grup dengan "sub" punya submenu; [kunci, label menu, judul halaman bila beda].
@@ -444,8 +484,10 @@ function buka(t, sub) {
   for (const b of $("#area").children) b.classList.toggle("on", (b.dataset.area === "karyawan") === (t === "karyawan"));
   gambarNav();
   window.scrollTo(0, 0);
-  ({ dashboard: halDashboard, keuangan: halKeuangan, online: halOnline, pelanggan: halPelanggan, presale: halPresale, promosi: halPromosi, event: halEvent, laporan: halLaporan, penjualan: halPenjualan, pengaturan: halPengaturan, produk: halProduk, inventori: halInventori, karyawan: halKaryawan })[t](sub);
+  generasi++;
+  HALAMAN_TAB[t](sub);
 }
+const HALAMAN_TAB = { dashboard: halDashboard, keuangan: halKeuangan, online: halOnline, pelanggan: halPelanggan, presale: halPresale, promosi: halPromosi, event: halEvent, laporan: halLaporan, penjualan: halPenjualan, pengaturan: halPengaturan, produk: halProduk, inventori: halInventori, karyawan: halKaryawan };
 
 // ---------- Karyawan ----------
 
@@ -649,7 +691,20 @@ async function halRiwayat() {
 
 // ---------- Mulai ----------
 
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/dash-sw.js").catch(() => {});
+
 (async () => {
+  // Data Dashboard diminta bersamaan dengan cek login, bukan sesudahnya: satu perjalanan ke server lebih sedikit.
+  const awal = `/api/ringkasan?periode=harian&tanggal=${hariIni()}`;
+  const isiAwal = { waktu: Date.now(), dariSegar: true, selesai: false };
+  isiAwal.janji = fetch(awal, { credentials: "same-origin" }).then(async (r) => {
+    if (!r.ok) throw new Error("belum masuk");
+    const teks = JSON.stringify(await r.json());
+    isiAwal.selesai = true;
+    return teks;
+  });
+  isiAwal.janji.catch(() => simpanGet.get(awal) === isiAwal && simpanGet.delete(awal));
+  simpanGet.set(awal, isiAwal);
   try {
     const s = await fetch("/api/saya", { credentials: "same-origin" });
     if (s.ok) return mulai((await s.json()).staff);

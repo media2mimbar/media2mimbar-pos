@@ -337,6 +337,8 @@ Lokasi database (20 Oktober 2026): database pertama `hikayat` dibuat lewat API d
 
 Lokasi eksekusi Worker (20 Oktober 2026): statistik Cloudflare menunjukkan permintaan dari pengguna di Indonesia kadang masuk lewat Eropa (Madrid, Paris), bukan Singapura. Ini jalur penyedia internet ke Cloudflare dan tidak bisa diatur dari kode. Agar query ke D1 tidak ikut menyeberang, `deploy.py` memasang `placement.region = "aws:ap-northeast-3"` (Osaka, tempat `hikayat-asia` dilayani). Akibatnya Worker selalu berjalan di dekat database, dan perjalanan jauhnya cukup sekali per permintaan. Skrip dashboard juga ditanam ke halaman `/` saat build, jadi muat pertama cukup satu permintaan. Cara mengecek: GraphQL `workersInvocationsAdaptive` (wallTime per coloCode) dan `d1AnalyticsAdaptiveGroups`.
 
+Dashboard terasa cepat walau jaringannya jauh: `ui/dash-sw.js` menyimpan halaman `/` di browser (tampil seketika, versi baru diambil di belakang dan dipakai pada kunjungan berikutnya). `api()` di dashboard menyimpan hasil GET di memori. Menu yang pernah dibuka langsung tampil, data terbaru diambil di belakang, dan halaman digambar ulang kalau datanya berubah dan pengguna belum mengklik atau mengetik. Setiap POST/PATCH/DELETE mengosongkan simpanan. Setelah masuk, data menu utama diambil sekaligus (`ambilDulu`), dan data Dashboard diminta bersamaan dengan cek login. Diukur dengan jeda buatan 300 ms per permintaan: buka menu 850 ms menjadi sekitar 50 ms, muat ulang 1,8 detik menjadi 0,7 detik.
+
 Yang sengaja tidak dibuat:
 - **Reset Data:** terlalu berisiko untuk database produksi.
 - **Nomor transaksi dengan kode HP:** tetap seperti sekarang supaya bisa dibuat saat offline.
