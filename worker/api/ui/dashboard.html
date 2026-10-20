@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hikayat Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* Warna, ukuran, dan bentuk mengikuti prototipe (prototipe/dashboard.html). */
+:root{--accent:#FF6100;--accent-dark:#E5570A;--accent-bg:#FFF0E5;--accent-text:#E5570A;--bg:#F4F5F3;--card:#fff;--border:#E7E8E4;--border-strong:#D6D8D1;--text:#1E2321;--text-2:#5B615C;--text-mut:#93988F;--danger-bg:#FDECEA;--danger-text:#C0392B;--success-bg:#E4F7EF;--success-text:#00734E;--warn-bg:#FDF2DD;--warn-text:#B7791F;--info-bg:#E8F0FE;--info-text:#1F57C3}
+*{box-sizing:border-box}
+body{margin:0;font:13px/normal Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text)}
+button,input,select,textarea{font-family:inherit;font-size:13px}
+input[type=radio],input[type=checkbox]{accent-color:var(--accent);cursor:pointer}
+[hidden]{display:none!important}
+a{color:var(--accent-text);font-weight:600;text-decoration:none}a:hover{text-decoration:underline}
+h1{font-size:16px;font-weight:600;margin:0 0 4px}
+h2,h3{font-size:12.5px;font-weight:700;margin:0 0 12px}
+.muted{color:var(--text-mut)}.small{font-size:11.5px}
+.num{text-align:right;white-space:nowrap}
+
+/* Masuk, setup, ganti password */
+.center{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;background:var(--bg)}
+.center .card{border-radius:16px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.12)}
+.narrow{width:100%;max-width:420px}
+.merek{display:flex;gap:12px;align-items:center;margin-bottom:18px}.merek b{font-size:16px;display:block}
+.merek-logo{width:44px;height:44px;border-radius:12px;background:var(--accent);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;flex:none}
+.center h1{font-size:18px;font-weight:700;margin:0 0 4px}
+
+/* Isian */
+label{display:block;font-weight:500;font-size:12px;color:var(--text-2);margin:12px 0 5px}
+input[type=text],input[type=email],input[type=password],input[type=tel],input[type=number],input[type=date],input[type=search],input[type=time],input[type=file],select,textarea{width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:8px;background:#fff;color:var(--text)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-bg)}
+textarea{min-height:70px;resize:vertical}
+input[type=checkbox].sakelar{appearance:none;-webkit-appearance:none;width:32px;height:18px;border-radius:999px;background:var(--border-strong);position:relative;flex:none;margin:0;transition:background .15s;vertical-align:middle}
+input[type=checkbox].sakelar::after{content:"";position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .15s}
+input[type=checkbox].sakelar:checked{background:var(--accent)}
+input[type=checkbox].sakelar:checked::after{left:16px}
+input[type=checkbox].sakelar:focus{box-shadow:0 0 0 3px var(--accent-bg)}
+.checks{display:flex;gap:10px 18px;flex-wrap:wrap}
+.checks label{font-weight:500;color:var(--text);font-size:13px;display:flex;gap:8px;align-items:center;margin:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+
+/* Tombol */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 14px;border-radius:8px;border:1px solid var(--border-strong);background:#fff;font-weight:500;color:var(--text-2);cursor:pointer;white-space:nowrap;text-decoration:none}
+.btn:hover{border-color:var(--accent);color:var(--accent-text);text-decoration:none}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}.btn.primary:hover{background:var(--accent-dark);border-color:var(--accent-dark);color:#fff}
+.btn.danger{color:var(--danger-text)}.btn.danger:hover{border-color:var(--danger-text)}
+.btn.small{padding:5px 10px;font-size:12px}
+.btn.block{width:100%;margin-top:16px;padding:11px}
+.btn:disabled{opacity:.5;cursor:default}
+.back{display:inline-flex;align-items:center;gap:6px;background:none;border:0;color:var(--text-2);font-weight:600;font-size:13px;cursor:pointer;padding:0;margin-bottom:14px}.back:hover{color:var(--accent-text)}
+
+/* Pesan */
+.err{background:var(--danger-bg);color:var(--danger-text);padding:8px 10px;border-radius:8px;margin-top:12px;font-size:12.5px}
+.ok{background:var(--success-bg);color:var(--success-text);padding:8px 10px;border-radius:8px;margin-top:12px}
+.warn{background:var(--warn-bg);color:var(--warn-text);padding:8px 10px;border-radius:8px;margin-top:12px}
+
+/* Bilah atas */
+.top{display:flex;align-items:center;gap:16px;padding:0 18px;height:56px;background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20}
+.logo{display:flex;flex-direction:column;line-height:1.15;color:var(--accent);font-size:13px;width:291px;flex:none}.logo span{font-weight:500}.logo b{font-weight:800;font-size:14px}
+.area{display:flex;gap:4px;flex:1}
+.area button{padding:7px 14px;border-radius:8px;border:0;background:none;color:var(--text-2);font-weight:500;cursor:pointer}
+.area button.on{background:var(--accent);color:#fff;font-weight:700}
+.akun{position:relative}
+.akun>button{display:flex;align-items:center;gap:8px;background:none;border:0;cursor:pointer;text-align:left;padding:4px;color:var(--text)}
+.avatar{width:30px;height:30px;border-radius:50%;background:#EDEDED;color:#3a3a3a;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex:none}
+.who{display:flex;flex-direction:column;line-height:1.15}.who b{font-weight:600;font-size:12.5px}.who span{color:var(--text-mut);font-size:11px}
+.kebab{color:var(--text-2);padding:0 4px;font-size:15px}
+.menu{position:absolute;right:0;top:44px;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 10px 24px rgba(0,0,0,.14);min-width:170px;padding:6px;z-index:60}
+.menu button{display:block;width:100%;text-align:left;background:none;border:0;padding:8px 10px;border-radius:8px;cursor:pointer;color:var(--text)}
+.menu button:hover{background:var(--bg)}
+
+/* Menu samping */
+.app{display:flex;min-height:calc(100vh - 56px)}
+.side{width:300px;flex:none;background:var(--accent)}
+#nav{display:flex;flex-direction:column;position:sticky;top:56px;max-height:calc(100vh - 56px);overflow-y:auto;padding:12px 0}
+#nav{scrollbar-width:none}#nav::-webkit-scrollbar{display:none}
+.nav-group{margin-bottom:1px}
+.nav-head{display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;background:none;border:0;color:#fff;font-weight:600;font-size:14px;text-align:left;cursor:pointer;position:relative}
+.nav-head:hover,.nav-child:hover{background:rgba(0,0,0,.1);color:#fff}
+.nav-head.on,.nav-child.on{background:rgba(0,0,0,.18)}
+.nav-head.garis::after,.nav-child.on::after{content:"";position:absolute;top:0;bottom:0;right:0;width:3px;background:#FFD400}
+.nh-icon{width:28px;height:28px;flex:none;display:flex;align-items:center;justify-content:center}
+.nh-icon svg{width:28px;height:28px;display:block}
+.nh-icon.i-inventori,.nh-icon.i-inventori svg{width:33px;height:33px}
+.nh-icon.i-produk,.nh-icon.i-produk svg{width:32px;height:32px}
+.nh-icon.i-pelanggan,.nh-icon.i-pelanggan svg,.nh-icon.i-promo,.nh-icon.i-promo svg{width:34px;height:34px}
+.nh-label{flex:1}
+.chev{font-size:11px;color:rgba(255,255,255,.75);transition:transform .15s}.chev.buka{transform:rotate(180deg)}
+.nav-child{display:block;width:100%;padding:9px 14px 9px 46px;background:none;border:0;color:rgba(255,255,255,.78);font-weight:500;font-size:13px;text-align:left;cursor:pointer;position:relative}
+.nav-child.on{color:#fff;font-weight:600}
+#isi{flex:1;min-width:0}
+.app:has(#isi>.form) .side{display:none}
+main{padding:20px}
+.form{max-width:1000px;margin:0 auto;padding:20px}
+.form>.card,.form>form.card{padding:28px 32px}
+
+/* Kepala halaman */
+.head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.head h1{margin:0}
+.head>div>.muted,.head>div>p{font-size:13px;color:var(--text-mut);margin:4px 0 0}
+.head-aksi{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.head-aksi .subtabs{margin:0}
+.ket{color:var(--text-mut);margin:-6px 0 14px;line-height:1.45}
+.judul-baris{display:flex;align-items:center;gap:10px}.judul-baris .tag{margin:0}
+.dua-kolom{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:14px;align-items:start}
+.set{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}.set .card{margin-bottom:14px}.set>div:last-child{position:sticky;top:76px}
+@media (max-width:1100px){.set{grid-template-columns:1fr}.set>div:last-child{position:static}}
+.dua-kolom.lebar-kanan{grid-template-columns:minmax(0,2fr) minmax(0,3fr)}
+@media (max-width:1000px){.dua-kolom,.dua-kolom.lebar-kanan{grid-template-columns:1fr}}
+
+/* Kartu, tabel, label status */
+.card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;box-shadow:0 1px 2px rgba(20,30,25,.03)}
+.tablewrap{overflow-x:auto;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 1px 2px rgba(20,30,25,.03)}
+.card .tablewrap{border:0;box-shadow:none;border-radius:0}
+table{width:100%;border-collapse:collapse;background:#fff}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+th{color:var(--text-mut);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.02em;background:#FAFAF8}
+th.num{text-align:right}
+.tablewrap tbody tr:last-child td{border-bottom:0}
+tr.total td{border-top:1px solid var(--border);background:#FAFAF8}
+tr.klik{cursor:pointer}tr.klik:hover td{background:#FFF8F2}
+tfoot td{font-weight:700;background:#FAFAF8}
+td input,td select{padding:7px 9px}
+.tag{display:inline-block;padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700;margin:1px 4px 1px 0;background:#EEEFEC;color:var(--text-2);white-space:nowrap}
+.tag.owner,.tag.admin,.tag.kasir,.tag.peran{background:var(--accent-bg);color:var(--accent-text)}
+.tag.aktif{background:var(--success-bg);color:var(--success-text)}
+.tag.warn{background:var(--warn-bg);color:var(--warn-text)}
+.tag.off{background:var(--danger-bg);color:var(--danger-text)}
+.tag.info{background:var(--info-bg);color:var(--info-text)}
+
+/* Tab pil (prototipe: .tabs) */
+.subtabs,.pil{display:flex;gap:4px;margin-bottom:12px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:4px;width:fit-content;max-width:100%;overflow-x:auto}
+.subtabs button,.pil button{padding:7px 14px;border-radius:8px;border:0;background:none;color:var(--text-mut);font-weight:500;cursor:pointer;white-space:nowrap}
+.subtabs button:hover,.pil button:hover{color:var(--text-2)}
+.subtabs button.on,.pil button.on{background:var(--accent-bg);color:var(--accent-text);font-weight:700}
+.filters .pil{margin:0}
+.rentang{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:4px 10px;color:var(--text-2);font-size:12.5px}
+.rentang input{border:0;padding:5px 2px;width:auto;box-shadow:none}
+.rentang input:focus{box-shadow:none}
+
+/* Angka ringkas */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:12px}
+.kpi{background:#fff;border:1px solid var(--border);border-radius:8px;padding:14px;box-shadow:0 1px 2px rgba(20,30,25,.03)}
+.kpi>span:first-child{display:block;font-size:12px;color:var(--text-mut);margin-bottom:6px}
+.kpi>b{display:block;font-size:19px;font-weight:700;color:var(--text)}
+.kpi>b~span,.kpi>b~div{display:block;font-size:11.5px;color:var(--text-mut)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.filters>*,.filters input,.filters select{width:auto}
+.filters input[type=search]{min-width:240px}
+
+/* Ringkasan Dashboard (prototipe: .summary-banner) */
+.banner{background:var(--accent);border-radius:8px;padding:18px 20px;display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap}
+.banner-total{color:#fff;flex:1 1 220px;max-width:420px}
+.banner-total .lbl{font-size:12.5px;opacity:.92}.banner-total .val{font-size:30px;font-weight:800;margin:2px 0}.banner-total .sub{font-size:11.5px;opacity:.85}
+.banner-mini{display:flex;flex:1 1 560px;max-width:790px;background:#fff;border-radius:8px;overflow:hidden;margin-left:auto}
+.banner-mini>div{padding:11px 14px;flex:1;border-right:1px solid var(--border);min-width:0}.banner-mini>div:last-child{border-right:0}
+.banner-mini .lbl{font-size:10.5px;color:var(--text-mut);margin-bottom:4px;line-height:1.3}.banner-mini .val{font-size:17px;font-weight:700}
+.kartu4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+.kartu4 .kpi>b{font-size:21px}
+
+/* Grafik batang (prototipe: .stat-bars) */
+.grafik-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.card.grafik{padding:16px}
+.gb-baris{display:block;margin-bottom:14px;position:relative;outline:none}
+.gb-baris:last-child{margin-bottom:0}
+.gb-atas{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px;font-size:12px}
+.gb-label{color:var(--text-2);font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gb-nilai{color:var(--text);font-weight:700;white-space:nowrap}
+.gb-jalur{display:block;height:8px;background:var(--bg);border-radius:8px;overflow:hidden}
+.gb-batang{display:block;height:100%;background:var(--accent);border-radius:8px}
+.gb-baris:hover .gb-batang,.gb-baris:focus .gb-batang{background:var(--accent-dark)}
+.gb-baris:hover::after,.gb-baris:focus::after{content:attr(data-tip);position:absolute;left:0;bottom:100%;background:var(--text);color:#fff;font-size:11.5px;padding:5px 8px;border-radius:6px;white-space:nowrap;z-index:5;pointer-events:none}
+.kosong{padding:24px 0;text-align:center;color:var(--text-mut)}
+
+/* Event berlangsung (prototipe: .hk-live) */
+.live{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:14px}
+.live .card{border-left:4px solid var(--accent);cursor:pointer}
+.live-judul{display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:2px}
+.titik{display:inline-block;width:8px;height:8px;border-radius:50%;background:#1BA672;box-shadow:0 0 0 3px #D4F3E6;flex:none}.titik.kuning{background:var(--warn-text);box-shadow:0 0 0 3px var(--warn-bg)}
+.live-angka{display:flex;gap:18px;margin-top:10px}.live-angka b{display:block;font-size:16px}
+.pil .hitung{font-weight:400;color:var(--text-mut);font-size:11.5px}
+
+/* Lain-lain */
+.actions{display:flex;gap:8px;margin-top:20px;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap}
+.kode{font:700 34px/1.2 ui-monospace,Menlo,monospace;letter-spacing:4px;background:var(--accent-bg);color:var(--accent-dark);padding:16px;border-radius:10px;text-align:center;margin:12px 0}
+.cred{font:600 16px ui-monospace,Menlo,monospace;background:var(--bg);padding:2px 8px;border-radius:6px}
+.overlay{position:fixed;inset:0;background:rgba(20,25,20,.42);display:flex;align-items:center;justify-content:center;padding:16px;z-index:100}
+.overlay .card{max-width:520px;width:100%;max-height:90vh;overflow-y:auto;padding:20px;box-shadow:0 20px 50px rgba(0,0,0,.2)}
+.overlay h2{font-size:15px}
+.pilih{max-height:60vh;overflow:auto;border:1px solid var(--border-strong);border-radius:8px;margin-top:10px;background:#fff}
+.pilih label{display:flex;gap:10px;align-items:center;font-weight:400;color:var(--text-2);font-size:12.5px;margin:0;padding:9px 12px;border-bottom:1px solid var(--border)}
+.section{margin-top:22px}
+@media print{.side,.top,.ku-noprint,.subtabs,.back,#popup{display:none!important}body{background:#fff}.card,.kpi{break-inside:avoid;box-shadow:none}main{padding:0}}
+@media (max-width:1100px){.grafik-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.kartu4{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:900px){.logo{width:auto}.app{flex-direction:column}.side{width:auto}#nav{flex-direction:row;overflow-x:auto;position:static;max-height:none;padding:0}.nav-group,.nav-children{display:contents}.nav-head,.nav-child{width:auto;flex:none;white-space:nowrap;padding:10px 12px;font-size:13px}.nav-child{background:rgba(0,0,0,.08)}.nav-head.garis::after,.nav-child.on::after{top:auto;left:0;width:auto;height:3px}.nh-icon{display:none}.chev{display:none}.banner-mini{flex-wrap:wrap}}
+@media (max-width:640px){.grid2,.grafik-grid,.kartu4{grid-template-columns:1fr}.top{padding:0 12px;gap:8px}.who{display:none}}
+</style>
+</head>
+<body>
+
+<div id="layarSetup" class="center" hidden>
+  <form class="card narrow" id="fSetup">
+    <div class="merek"><div class="merek-logo">HK</div><div><b>Hikayat Merchandise</b><span class="small muted">Dashboard admin</span></div></div>
+    <h1>Siapkan akun Owner</h1>
+    <p class="muted">Ini hanya muncul sekali, saat belum ada akun sama sekali.</p>
+    <label>Kode setup</label><input type="text" name="kode" autocomplete="off" required>
+    <label>Nama</label><input type="text" name="nama" required>
+    <label>Email</label><input type="email" name="email" required>
+    <label>Password</label><input type="password" name="password" autocomplete="new-password" required>
+    <p class="small muted">Minimal 8 karakter, berisi huruf dan angka.</p>
+    <label>PIN POS (6 angka)</label><input type="password" name="pin" inputmode="numeric" maxlength="6" required>
+    <div class="err" hidden></div>
+    <button class="btn primary block">Buat akun Owner</button>
+  </form>
+</div>
+
+<div id="layarMasuk" class="center" hidden>
+  <form class="card narrow" id="fMasuk">
+    <div class="merek"><div class="merek-logo">HK</div><div><b>Hikayat Merchandise</b><span class="small muted">Dashboard admin</span></div></div>
+    <h1>Masuk</h1>
+    <label>Email</label><input type="email" name="email" autocomplete="username" required>
+    <label>Password</label><input type="password" name="password" autocomplete="current-password" required>
+    <div class="err" hidden></div>
+    <button class="btn primary block">Masuk</button>
+    <p class="small muted" style="margin:14px 0 0">Akun dibuat oleh Owner di menu Karyawan. Lupa password? Minta Owner meresetnya. Kasir tidak masuk dashboard, cukup PIN di POS.</p>
+  </form>
+</div>
+
+<div id="layarGantiPw" class="center" hidden>
+  <form class="card narrow" id="fGantiPw">
+    <div class="merek"><div class="merek-logo">HK</div><div><b>Hikayat Merchandise</b><span class="small muted">Dashboard admin</span></div></div>
+    <h1>Ganti password</h1>
+    <p class="muted" id="gantiPwInfo"></p>
+    <label>Password lama</label><input type="password" name="lama" autocomplete="current-password" required>
+    <label>Password baru</label><input type="password" name="baru" autocomplete="new-password" required>
+    <label>Ulangi password baru</label><input type="password" name="ulang" autocomplete="new-password" required>
+    <p class="small muted">Minimal 8 karakter, berisi huruf dan angka.</p>
+    <div class="err" hidden></div>
+    <button class="btn primary block">Simpan password</button>
+    <button type="button" class="btn block" id="batalGantiPw">Batal</button>
+  </form>
+</div>
+
+<div id="layarApp" hidden>
+  <header class="top">
+    <div class="logo"><span>Hikayat</span><b>Merchandise</b></div>
+    <div class="area" id="area"><button data-area="penjualan">Penjualan</button><button data-area="karyawan">Karyawan</button></div>
+    <div class="akun">
+      <button id="akunBtn" aria-label="Akun"><span class="avatar" id="akunInisial"></span><span class="who"><b id="akunNama"></b><span id="akunRole"></span></span><span class="kebab" aria-hidden="true">⋮</span></button>
+      <div class="menu" id="akunMenu" hidden>
+        <button id="mGantiPw">Ganti password</button>
+        <button id="mKeluar">Keluar</button>
+      </div>
+    </div>
+  </header>
+  <div class="app"><aside class="side"><nav id="nav"></nav></aside><div id="isi"></div></div>
+</div>
+
+<div class="overlay" id="popup" hidden><div class="card" id="popupIsi"></div></div>
+
+<script src="/dash-ikon.js"></script>
+<script src="/dash-katalog.js"></script>
+<script src="/dash-inventori.js"></script>
+<script src="/dash-penjualan.js"></script>
+<script src="/dash-event.js"></script>
+<script src="/dash-promo.js"></script>
+<script src="/dash-online.js"></script>
+<script src="/dash-laporan.js"></script>
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const NAMA_ROLE = { owner: "Owner", admin: "Admin", kasir: "Kasir" };
+const waktu = (iso) => iso ? new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "—";
+const rp = (n) => "Rp " + Number(n || 0).toLocaleString("id-ID");
+const tgl = (ymd) => ymd ? new Date(ymd + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }) : "—";
+const hariIni = () => new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
+const angka = (v) => (v === "" || v === null || v === undefined ? null : Number(String(v).replace(/[.\s]/g, "")));
+function subtabs(daftar, aktif) {
+  const m = MENU.find((x) => x.tab === tab && x.sub);
+  if (m && daftar.every(([k]) => m.sub.some(([s]) => s === k))) { subMenu[tab] = aktif; gambarNav(); return ""; }
+  return `<div class="subtabs">${daftar.map(([k, n]) => `<button type="button" data-sub="${k}" class="${k === aktif ? "on" : ""}">${n}</button>`).join("")}</div>`;
+}
+// Tab pil untuk filter di dalam halaman (prototipe: .tabs). attr = nama data-atribut tombol.
+function pil(daftar, aktif, attr) {
+  return `<div class="pil">${daftar.map(([k, n]) => `<button type="button" data-${attr}="${esc(k)}" class="${k === aktif ? "on" : ""}">${n}</button>`).join("")}</div>`;
+}
+// Judul halaman mengikuti submenu yang dibuka, misalnya "Laporan per Saluran".
+function judulMenu(t, sub) {
+  const m = MENU.find((x) => x.tab === t), s = m?.sub?.find(([k]) => k === sub);
+  return s ? s[2] ?? s[1] : m?.nama ?? "";
+}
+function pasangSubtabs(pilih) {
+  document.querySelectorAll("[data-sub]").forEach((b) => (b.onclick = () => pilih(b.dataset.sub)));
+}
+function unduhCsv(nama, baris) {
+  const isi = baris.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["\ufeff" + isi], { type: "text/csv" }));
+  a.download = nama;
+  a.click();
+}
+let saya = null;
+let tab = null;
+
+async function api(method, path, body) {
+  const res = await fetch(path, {
+    method,
+    headers: body !== undefined ? { "content-type": "application/json" } : {},
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    credentials: "same-origin",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && data.kode === "perlu_masuk") { tampil("layarMasuk"); throw new Error(data.error); }
+  if (res.status === 403 && data.kode === "wajib_ganti_password") { bukaGantiPw(true); throw new Error(data.error); }
+  if (!res.ok) throw new Error(data.error || "Gagal menghubungi server");
+  return data;
+}
+
+function tampil(id) {
+  for (const l of ["layarSetup", "layarMasuk", "layarGantiPw", "layarApp"]) $("#" + l).hidden = l !== id;
+}
+
+function formKirim(form, aksi) {
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const err = $(".err", form), btn = $("button.primary", form);
+    err.hidden = true; btn.disabled = true;
+    try { await aksi(Object.fromEntries(new FormData(form))); }
+    catch (x) { err.textContent = x.message; err.hidden = false; }
+    finally { btn.disabled = false; }
+  });
+}
+
+// Batas isian angka: pesan kecil "Maksimal ..." di bawah kolom yang angkanya diturunkan.
+function pesanMaks(input, teks) {
+  let el = input.nextElementSibling;
+  if (!el?.classList.contains("pesan-maks")) { el = document.createElement("div"); el.className = "pesan-maks small"; el.style.color = "var(--warn-text)"; input.after(el); }
+  el.textContent = "Maksimal " + teks;
+  clearTimeout(el._t); el._t = setTimeout(() => (el.textContent = ""), 2500);
+}
+
+function popup(html) {
+  $("#popupIsi").innerHTML = html + '<div class="actions"><button class="btn primary" id="tutupPopup">Tutup</button></div>';
+  $("#popup").hidden = false;
+  $("#tutupPopup").onclick = () => { $("#popup").hidden = true; };
+}
+
+// ---------- Masuk, setup, ganti password ----------
+
+formKirim($("#fSetup"), async (d) => {
+  await api("POST", "/api/setup", d);
+  $("#fMasuk").email.value = d.email;
+  tampil("layarMasuk");
+});
+
+formKirim($("#fMasuk"), async (d) => {
+  const r = await api("POST", "/api/masuk", d);
+  $("#fMasuk").reset();
+  mulai(r.staff);
+});
+
+function bukaGantiPw(wajib) {
+  $("#gantiPwInfo").textContent = wajib ? "Password Anda masih sementara dari Owner. Ganti dulu sebelum lanjut." : "";
+  $("#batalGantiPw").hidden = wajib;
+  $("#fGantiPw").reset();
+  tampil("layarGantiPw");
+}
+$("#batalGantiPw").onclick = () => tampil("layarApp");
+
+formKirim($("#fGantiPw"), async (d) => {
+  if (d.baru !== d.ulang) throw new Error("Ulangi password baru belum sama");
+  await api("POST", "/api/ganti-password", { lama: d.lama, baru: d.baru });
+  saya.wajib_ganti_password = false;
+  mulai(saya);
+});
+
+$("#akunBtn").onclick = () => { $("#akunMenu").hidden = !$("#akunMenu").hidden; };
+$("#mGantiPw").onclick = () => { $("#akunMenu").hidden = true; bukaGantiPw(false); };
+$("#mKeluar").onclick = async () => { await api("POST", "/api/keluar"); saya = null; tampil("layarMasuk"); };
+
+// ---------- Aplikasi ----------
+
+function mulai(staff) {
+  saya = staff;
+  if (staff.wajib_ganti_password) return bukaGantiPw(true);
+  $("#akunNama").textContent = staff.nama;
+  $("#akunInisial").textContent = staff.nama.split(/\s+/).slice(0, 2).map((x) => x[0]).join("").toUpperCase();
+  $("#akunRole").textContent = staff.role.map((r) => NAMA_ROLE[r]).join(", ") + " · Hikayat Merchandise";
+  $("#nav").onclick = (e) => {
+    const el = e.target.closest("[data-tab],[data-nav]");
+    if (!el) return;
+    if (el.dataset.nav) { const [t, s] = el.dataset.nav.split("/"); return buka(t, s); }
+    const t = el.dataset.tab, m = MENU.find((x) => x.tab === t);
+    if (m.sub && t === tab && grupBuka === t) { grupBuka = null; return gambarNav(); }
+    buka(t);
+  };
+  $("#area").onclick = (e) => {
+    const a = e.target.closest("[data-area]")?.dataset.area;
+    if (a) buka(a === "karyawan" ? "karyawan" : tabTerakhir);
+  };
+  tampil("layarApp");
+  buka(menuSaya().some((m) => m.tab === tab) || tab === "karyawan" ? tab : "dashboard");
+}
+
+// Menu samping seperti prototipe. Grup dengan "sub" punya submenu; [kunci, label menu, judul halaman bila beda].
+const MENU = [
+  { tab: "dashboard", nama: "Dashboard", ikon: "dashboard" },
+  { tab: "laporan", nama: "Laporan", ikon: "laporan", sub: [["saluran", "Per Saluran", "Laporan per Saluran"], ["event", "Per Event", "Laporan per Event"], ["kasir", "Per Kasir", "Laporan per Kasir"], ["produk", "Per Produk", "Laporan per Produk"], ["harian", "Rekap Harian"], ["kerugian", "Selisih & Kerugian"]] },
+  { tab: "keuangan", nama: "Keuangan", ikon: "keuangan", owner: true, sub: [["keseluruhan", "Laporan Keseluruhan", "Laporan Keuangan Keseluruhan"], ["event", "Laporan per Event", "Laporan Keuangan per Event"], ["biaya", "Biaya"]] },
+  { tab: "event", nama: "Event", ikon: "event" },
+  { tab: "presale", nama: "Pesanan Pre-sale", ikon: "presale" },
+  { tab: "online", nama: "Penjualan Online", ikon: "penjualan", sub: [["pesanan", "Daftar Pesanan", "Daftar Pesanan Online"], ["impor", "Riwayat Impor"], ["biaya", "Biaya Marketplace"]] },
+  { tab: "penjualan", nama: "Penjualan POS", ikon: "struk", sub: [["transaksi", "Transaksi POS"], ["setoran", "Setoran Kasir"], ["ditolak", "Kiriman Ditolak"]] },
+  { tab: "produk", nama: "Produk", ikon: "produk", sub: [["daftar", "Daftar Produk"], ["kategori", "Daftar Kategori"]] },
+  { tab: "inventori", nama: "Inventori", ikon: "inventori", sub: [["faktur", "Faktur Pembelian"], ["pemasok", "Daftar Pemasok"], ["stok", "Daftar Stok"], ["opname", "Stok Opname"], ["terbuang", "Stok Terbuang"]] },
+  { tab: "pelanggan", nama: "Pelanggan", ikon: "pelanggan" },
+  { tab: "promosi", nama: "Promosi", ikon: "promo" },
+  { tab: "pengaturan", nama: "Pengaturan POS", ikon: "setelan" },
+];
+IKON_MENU.struk = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5.5h12v19l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4-2 1.4z"/><path d="M12 10.5h6M12 14h6M12 17.5h4"/></g></svg>';
+const menuSaya = () => MENU.filter((m) => !m.owner || saya.role.includes("owner"));
+let tabTerakhir = "dashboard", grupBuka = null;
+const subMenu = {};
+
+function gambarNav() {
+  const diKaryawan = tab === "karyawan";
+  $("#nav").innerHTML = menuSaya().map((m) => {
+    const aktif = !diKaryawan && m.tab === tab, buka = m.sub && grupBuka === m.tab;
+    const kepala = `<button type="button" class="nav-head ${aktif ? "on" : ""} ${aktif && !buka ? "garis" : ""}" data-tab="${m.tab}">
+      <span class="nh-icon i-${m.ikon}" aria-hidden="true">${IKON_MENU[m.ikon] ?? ""}</span><span class="nh-label">${m.nama}</span>${m.sub ? `<span class="chev ${buka ? "buka" : ""}" aria-hidden="true">▼</span>` : ""}</button>`;
+    const anak = buka ? `<div class="nav-children">${m.sub.map(([k, n]) => `<button type="button" class="nav-child ${aktif && subMenu[m.tab] === k ? "on" : ""}" data-nav="${m.tab}/${k}">${n}</button>`).join("")}</div>` : "";
+    return `<div class="nav-group">${kepala}${anak}</div>`;
+  }).join("");
+}
+
+function buka(t, sub) {
+  tab = t;
+  // Hanya grup halaman yang sedang dibuka yang terbuka, seperti prototipe.
+  if (t !== "karyawan") { tabTerakhir = t; grupBuka = MENU.find((m) => m.tab === t)?.sub ? t : null; }
+  for (const b of $("#area").children) b.classList.toggle("on", (b.dataset.area === "karyawan") === (t === "karyawan"));
+  gambarNav();
+  window.scrollTo(0, 0);
+  ({ dashboard: halDashboard, keuangan: halKeuangan, online: halOnline, pelanggan: halPelanggan, presale: halPresale, promosi: halPromosi, event: halEvent, laporan: halLaporan, penjualan: halPenjualan, pengaturan: halPengaturan, produk: halProduk, inventori: halInventori, karyawan: halKaryawan })[t](sub);
+}
+
+// ---------- Karyawan ----------
+
+let subKaryawan = "daftar", filterRiwayat = "";
+const jamWibD = (iso) => new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+
+function halKaryawan(sub) {
+  if (typeof sub === "string") subKaryawan = sub;
+  if (subKaryawan === "riwayat" && !saya.role.includes("owner")) subKaryawan = "daftar";
+  ({ daftar: halDaftarKaryawan, bertugas: halBertugas, perangkat: halPerangkat, riwayat: halRiwayat })[subKaryawan]();
+}
+const kepalaKaryawan = (tombol = "", ket = "") => `<div class="head"><div><h1>Karyawan</h1></div><div class="head-aksi">${subtabs([["daftar", "Daftar Karyawan"], ["bertugas", "Bertugas Hari Ini"], ["perangkat", "Perangkat POS"], saya.role.includes("owner") && ["riwayat", "Riwayat Masuk"]].filter(Boolean), subKaryawan)}${tombol}</div></div>${ket ? `<p class="ket">${ket}</p>` : ""}`;
+
+async function halDaftarKaryawan() {
+  $("#isi").innerHTML = '<main><p class="muted">Memuat…</p></main>';
+  const owner = saya.role.includes("owner");
+  const [{ karyawan }, rw] = await Promise.all([api("GET", "/api/karyawan"), api("GET", `/api/riwayat-masuk?tempat=pos${filterRiwayat ? "&staff=" + filterRiwayat : ""}`)]);
+  const salah = (a) => a === "PIN salah" || a === "Password salah";
+  $("#isi").innerHTML = `<main>${kepalaKaryawan(owner ? '<button class="btn primary" id="tambahK">+ Tambah Karyawan</button>' : "", `${karyawan.filter((k) => k.aktif).length} karyawan aktif. Owner dan Admin masuk dashboard dengan email dan password; semua karyawan masuk POS dengan PIN 6 angka. Password dan PIN dari Owner bersifat sementara dan wajib diganti saat pertama kali masuk.${owner ? "" : " Admin hanya melihat. Perubahan akun dilakukan Owner."}`)}
+    <div class="tablewrap"><table><thead><tr><th>Nama</th><th>Email dashboard</th><th>Role</th><th>Status akun</th><th>Bertugas di event</th><th>Terakhir di POS</th><th>Status</th><th></th></tr></thead><tbody>
+    ${karyawan.map((k) => `<tr>
+      <td><b>${esc(k.nama)}</b><div class="small muted">${esc(k.telp) || ""}</div></td>
+      <td>${esc(k.email) || '<span class="muted small">POS saja</span>'}</td>
+      <td>${k.role.map((r) => `<span class="tag ${r}">${NAMA_ROLE[r]}</span>`).join("<br>")}</td>
+      <td>${k.password_sementara === null ? "" : k.password_sementara ? '<span class="tag warn">Password sementara</span>' : '<span class="tag aktif">Password diganti</span>'}<br>
+        ${k.pin_sementara ? '<span class="tag warn">PIN sementara</span>' : '<span class="tag aktif">PIN diganti</span>'}</td>
+      <td class="small">${k.bertugas.map(esc).join(", ") || '<span class="muted">—</span>'}</td>
+      <td class="small">${k.terakhir_pos ? waktu(k.terakhir_pos) : '<span class="muted">Belum pernah</span>'}</td>
+      <td>${k.aktif ? '<span class="tag aktif">Aktif</span>' : '<span class="tag off">Nonaktif</span>'}</td>
+      <td>${owner ? `<button class="btn small" data-ubah="${k.id}">Ubah</button>` : ""}</td></tr>`).join("")}
+    </tbody></table></div>
+    <div class="head" style="margin-top:24px"><h2 style="margin:0;font-size:14px">Riwayat Masuk POS ${rw.salah_hari_ini ? `<span class="tag off" style="margin-left:8px">${rw.salah_hari_ini}× PIN salah hari ini</span>` : ""}</h2>
+      <select id="filterRiwayat" style="width:auto;min-width:220px"><option value="">Semua karyawan</option>${karyawan.map((k) => `<option value="${k.id}" ${k.id === filterRiwayat ? "selected" : ""}>${esc(k.nama)}</option>`).join("")}</select></div>
+    <div class="tablewrap"><table><thead><tr><th>Waktu</th><th>Karyawan</th><th>Aktivitas</th><th>Tempat</th><th>Perangkat</th></tr></thead><tbody>
+    ${rw.riwayat.map((l) => `<tr><td>${waktu(l.waktu)}</td><td>${esc(l.nama) || "—"}</td><td><span class="tag ${salah(l.aksi) ? "off" : /Masuk|Buka|Gabung/.test(l.aksi) ? "aktif" : ""}">${esc(l.aksi)}</span></td>
+      <td>${esc(l.keterangan ?? "")}</td><td>${esc(l.perangkat ?? "—")}</td></tr>`).join("") || '<tr><td colspan="5" class="muted">Belum ada.</td></tr>'}
+    </tbody></table></div></main>`;
+  pasangSubtabs(halKaryawan);
+  $("#filterRiwayat").onchange = (e) => { filterRiwayat = e.target.value; halDaftarKaryawan(); };
+  if ($("#tambahK")) $("#tambahK").onclick = () => formKaryawan(null);
+  $("#isi").querySelectorAll("[data-ubah]").forEach((b) => (b.onclick = () => formKaryawan(karyawan.find((k) => k.id === b.dataset.ubah))));
+}
+
+async function halBertugas() {
+  $("#isi").innerHTML = '<main><p class="muted">Memuat…</p></main>';
+  const { kartu, ringkasan: r } = await api("GET", "/api/karyawan/bertugas");
+  const WARNA = { buka: "aktif", gabung: "aktif", masuk: "", keluar: "", belum: "off" };
+  $("#isi").innerHTML = `<main>${kepalaKaryawan("", "Siapa yang sedang bertugas di tiap lokasi hari ini, dari catatan masuk POS dan laci kasir.")}
+    <div class="kpis"><div class="kpi"><span class="muted small">Lokasi aktif</span><b>${r.lokasi}</b></div><div class="kpi"><span class="muted small">Laci terbuka</span><b>${r.laci}</b></div>
+      <div class="kpi"><span class="muted small">Ditugaskan, belum masuk POS</span><b style="${r.belum_masuk ? "color:var(--danger-text)" : ""}">${r.belum_masuk}</b></div>
+      <div class="kpi"><span class="muted small">Ditugaskan di dua event sekaligus</span><b>${r.ganda.length}</b>${r.ganda.length ? `<span class="small muted">${r.ganda.map(esc).join(", ")}</span>` : ""}</div></div>
+    <div class="grafik-grid">${kartu.map((k) => `<div class="card"><div class="head" style="margin:0 0 8px"><h2 style="margin:0">${esc(k.nama)}</h2>${k.jenis === "event" ? `<a href="#" data-ev="${k.id}">Detail event</a>` : ""}</div>
+      ${k.jenis === "event" ? `<div class="small muted">Penanggung jawab: ${esc(k.pj ?? "—")}</div>` : '<div class="small muted">Tidak punya petugas tetap.</div>'}
+      ${k.laci.map((l) => `<div class="ok small">Laci terbuka · ${esc(l.kasir)} sejak ${jamWibD(l.buka)} · ${l.transaksi} transaksi · ${rp(l.penjualan)}</div>`).join("") || '<div class="small muted" style="margin-top:8px">Belum ada laci terbuka.</div>'}
+      <table style="margin-top:8px">${k.orang.map((o) => `<tr><td>${esc(o.nama)}${o.ditugaskan ? "" : ' <span class="small muted">(tidak ditugaskan)</span>'}</td>
+        <td><span class="tag ${WARNA[o.status]}">${esc(o.status === "buka" ? "Membuka kasir" : o.teks)}</span>${o.waktu ? ` <span class="small muted">${jamWibD(o.waktu)}</span>` : ""}</td></tr>`).join("") || '<tr><td class="muted small">Belum ada yang memakai POS di sini hari ini.</td></tr>'}</table></div>`).join("")}</div></main>`;
+  pasangSubtabs(halKaryawan);
+  $("#isi").querySelectorAll("[data-ev]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); buka("event"); detailEvent(a.dataset.ev); }));
+}
+
+function formKaryawan(k) {
+  const baru = !k;
+  $("#isi").innerHTML = `<div class="form">
+    <button class="back" id="kembali">← Kembali</button>
+    <h1>${baru ? "Tambah Karyawan" : "Ubah Karyawan"}</h1>
+    <form class="card" id="fK" style="margin-top:12px">
+      <div class="grid2">
+        <div><label>Nama</label><input type="text" name="nama" value="${esc(k?.nama)}" required></div>
+        <div><label>No HP</label><input type="tel" name="telp" value="${esc(k?.telp)}"></div>
+      </div>
+      <label>Role</label>
+      <div class="checks">${["owner", "admin", "kasir"].map((r) => `<label><input type="checkbox" name="role" value="${r}" ${k?.role.includes(r) ? "checked" : ""}> ${NAMA_ROLE[r]}</label>`).join("")}</div>
+      <p class="small muted">Owner dan Admin masuk dashboard dengan email dan password. Semua karyawan masuk POS dengan PIN 6 angka.</p>
+      <label>Email</label><input type="email" name="email" value="${esc(k?.email)}">
+      <p class="small muted">Wajib untuk Owner dan Admin. Kosongkan untuk Kasir.</p>
+      ${baru ? `<div class="grid2">
+        <div><label>Password sementara</label><input type="text" name="password" autocomplete="off" placeholder="Kosongkan untuk dibuatkan otomatis"></div>
+        <div><label>PIN sementara</label><input type="text" name="pin" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="Kosongkan untuk dibuatkan otomatis"></div>
+      </div><p class="small muted">Karyawan wajib mengganti keduanya saat pertama masuk.</p>`
+      : `<label class="checks" style="margin-top:18px"><label><input type="checkbox" class="sakelar" name="aktif" ${k.aktif ? "checked" : ""}> Akun aktif</label></label>`}
+      <div class="err" hidden></div>
+      <div class="actions">
+        <button class="btn primary">Simpan</button>
+        <button type="button" class="btn" id="batal">Batal</button>
+        ${baru ? "" : `<span style="flex:1"></span>
+          ${k.email ? '<button type="button" class="btn" id="resetPw">Reset password</button>' : ""}
+          <button type="button" class="btn" id="resetPin">Reset PIN</button>`}
+      </div>
+    </form></div>`;
+  $("#kembali").onclick = $("#batal").onclick = halKaryawan;
+  const f = $("#fK");
+  formKirim(f, async (d) => {
+    const body = { nama: d.nama, telp: d.telp, email: d.email, role: [...f.querySelectorAll("[name=role]:checked")].map((c) => c.value) };
+    if (baru) {
+      if (d.password) body.password = d.password;
+      if (d.pin) body.pin = d.pin;
+      const r = await api("POST", "/api/karyawan", body);
+      await halKaryawan();
+      popupSementara(d.nama, r.password_sementara, r.pin_sementara);
+    } else {
+      body.aktif = f.aktif.checked;
+      const r = await api("PATCH", "/api/karyawan/" + k.id, body);
+      await halKaryawan();
+      if (r.password_sementara) popupSementara(d.nama, r.password_sementara, null);
+    }
+  });
+  if (!baru) {
+    const reset = (jenis) => async () => {
+      if (!confirm(`Reset ${jenis === "password" ? "password" : "PIN"} ${k.nama}? Yang lama langsung tidak berlaku.`)) return;
+      const r = await api("POST", `/api/karyawan/${k.id}/reset-${jenis}`, {});
+      popupSementara(k.nama, r.password_sementara ?? null, r.pin_sementara ?? null);
+    };
+    if ($("#resetPw")) $("#resetPw").onclick = reset("password");
+    $("#resetPin").onclick = reset("pin");
+  }
+}
+
+function popupSementara(nama, pw, pin) {
+  popup(`<h2>Catat untuk ${esc(nama)}</h2>
+    <p class="muted">Ini hanya ditampilkan sekali. Berikan langsung ke karyawan. Mereka wajib menggantinya saat pertama masuk.</p>
+    ${pw ? `<p>Password sementara: <span class="cred">${esc(pw)}</span></p>` : ""}
+    ${pin ? `<p>PIN sementara: <span class="cred">${esc(pin)}</span></p>` : ""}`);
+}
+
+// ---------- Perangkat ----------
+
+const STATUS_HP = {
+  aktif: '<span class="tag aktif">Aktif</span>',
+  menunggu: '<span class="tag warn">Menunggu kode diketik</span>',
+  kode_kadaluarsa: '<span class="tag warn">Kode kedaluwarsa</span>',
+  nonaktif: '<span class="tag off">Nonaktif</span>',
+};
+
+async function halPerangkat() {
+  $("#isi").innerHTML = '<main><p class="muted">Memuat…</p></main>';
+  const { perangkat } = await api("GET", "/api/perangkat");
+  const owner = saya.role.includes("owner");
+  $("#isi").innerHTML = `<main>${kepalaKaryawan('<button class="btn primary" id="tambahHp">+ Daftarkan HP</button>', "HP kasir yang boleh membuka POS. HP baru didaftarkan dengan kode sekali pakai yang berlaku 10 menit.")}
+    <div class="tablewrap"><table><thead><tr><th>Kode</th><th>Nama</th><th>Status</th><th>Terakhir dipakai</th><th>Didaftarkan</th><th></th></tr></thead><tbody>
+    ${perangkat.length ? perangkat.map((p) => `<tr>
+      <td><b>${esc(p.kode)}</b></td><td>${esc(p.nama)}</td><td>${STATUS_HP[p.status]}</td>
+      <td>${waktu(p.terakhir_dipakai)}</td><td>${waktu(p.dibuat_pada)}<div class="small muted">${esc(p.dibuat_oleh)}</div></td>
+      <td>${p.status === "menunggu" || p.status === "kode_kadaluarsa" ? `<button class="btn small" data-kode="${p.id}">Kode baru</button>` : ""}
+        ${owner && p.status !== "nonaktif" ? `<button class="btn small danger" data-off="${p.id}" data-nama="${esc(p.kode + " " + p.nama)}">Nonaktifkan</button>` : ""}</td></tr>`).join("")
+      : '<tr><td colspan="6" class="muted">Belum ada HP terdaftar.</td></tr>'}
+    </tbody></table></div></main>`;
+  pasangSubtabs(halKaryawan);
+  $("#tambahHp").onclick = formPerangkat;
+  $("#isi").querySelectorAll("[data-kode]").forEach((b) => (b.onclick = async () => popupKode(await api("POST", `/api/perangkat/${b.dataset.kode}/kode-baru`, {}))));
+  $("#isi").querySelectorAll("[data-off]").forEach((b) => (b.onclick = async () => {
+    if (!confirm(`Nonaktifkan ${b.dataset.nama}? HP ini langsung keluar dan tidak bisa membuka POS lagi.`)) return;
+    await api("POST", `/api/perangkat/${b.dataset.off}/nonaktifkan`, {});
+    halPerangkat();
+  }));
+}
+
+function formPerangkat() {
+  $("#isi").innerHTML = `<div class="form">
+    <button class="back" id="kembali">← Kembali</button>
+    <h1>Daftarkan HP</h1>
+    <form class="card" id="fHp" style="margin-top:12px">
+      <label>Nama HP</label><input type="text" name="nama" placeholder="Misalnya: HP Booth 1 (Samsung A15)" required>
+      <div class="err" hidden></div>
+      <div class="actions"><button class="btn primary">Buat kode</button><button type="button" class="btn" id="batal">Batal</button></div>
+    </form></div>`;
+  $("#kembali").onclick = $("#batal").onclick = halPerangkat;
+  formKirim($("#fHp"), async (d) => {
+    const r = await api("POST", "/api/perangkat", d);
+    await halPerangkat();
+    popupKode(r);
+  });
+}
+
+function popupKode(r) {
+  const posUrl = location.origin + "/pos";
+  popup(`<h2>Kode untuk HP ${esc(r.kode)}</h2>
+    <ol style="padding-left:18px;margin:0">
+      <li>Di HP kasir, buka <b>${esc(posUrl)}</b></li>
+      <li>Ketik kode ini:</li>
+    </ol>
+    <div class="kode">${esc(r.kode_daftar.slice(0, 4))}-${esc(r.kode_daftar.slice(4))}</div>
+    <p class="small muted">Berlaku sampai ${new Date(r.berlaku_sampai).toLocaleTimeString("id-ID", { timeStyle: "short" })} (10 menit) dan hanya bisa dipakai sekali.</p>`);
+  $("#tutupPopup").addEventListener("click", halPerangkat);
+}
+
+// ---------- Riwayat masuk ----------
+
+async function halRiwayat() {
+  $("#isi").innerHTML = '<main><p class="muted">Memuat…</p></main>';
+  const { riwayat } = await api("GET", "/api/riwayat-masuk");
+  const salah = (a) => a === "PIN salah" || a === "Password salah";
+  $("#isi").innerHTML = `<main>${kepalaKaryawan("", "200 catatan terakhir dari dashboard dan POS.")}
+    <div class="tablewrap"><table><thead><tr><th>Waktu</th><th>Nama</th><th>Aksi</th><th>Tempat</th><th>Keterangan</th><th>IP</th></tr></thead><tbody>
+    ${riwayat.map((l) => `<tr><td>${waktu(l.waktu)}</td><td>${esc(l.nama) || "—"}</td>
+      <td><span class="tag ${salah(l.aksi) ? "off" : /Masuk|Buka|Gabung/.test(l.aksi) ? "aktif" : ""}">${esc(l.aksi)}</span></td>
+      <td>${l.tempat === "pos" ? "POS" + (l.perangkat ? " · " + esc(l.perangkat) : "") : "Dashboard"}</td>
+      <td>${esc(l.keterangan)}</td><td class="small muted">${esc(l.ip)}</td></tr>`).join("")}
+    </tbody></table></div></main>`;
+  pasangSubtabs(halKaryawan);
+}
+
+// ---------- Mulai ----------
+
+(async () => {
+  try {
+    const s = await fetch("/api/saya", { credentials: "same-origin" });
+    if (s.ok) return mulai((await s.json()).staff);
+    const { perlu } = await (await fetch("/api/setup")).json();
+    tampil(perlu ? "layarSetup" : "layarMasuk");
+  } catch {
+    document.body.innerHTML = '<div class="center"><div class="card">Server tidak bisa dihubungi. Coba muat ulang.</div></div>';
+  }
+})();
+</script>
+</body>
+</html>

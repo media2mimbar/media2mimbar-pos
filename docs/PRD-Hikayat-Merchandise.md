@@ -895,7 +895,8 @@ Untuk kembali ke data awal, buka Dashboard › Pengaturan POS › Reset Data.
 82. Hanya Owner yang bisa mengubah dan menghapus biaya. Admin hanya bisa mencatat biaya event baru dari detail event.
 83. Potongan MDR QRIS dan biaya bank dicatat manual sebagai biaya, tidak dihitung otomatis.
 84. Pembagian biaya umum ke event bisa diaktifkan dan dimatikan Owner. Kalau aktif, dibagi sesuai porsi penjualan bersih per bulan.
-85. Versi produksi memakai Cloudflare paket gratis: Pages (aplikasi), Workers (server), D1 (database), R2 (foto). Rincian di dokumen Arsitektur-Cloudflare.md.
+85. Versi produksi memakai Cloudflare paket gratis: Pages (aplikasi), Workers (server), D1 (database dan foto). Rincian di dokumen Arsitektur-Cloudflare.md.
+86. R2 tidak dipakai. Foto disimpan di D1.
 
 ## 11. Pertanyaan terbuka
 
@@ -903,14 +904,14 @@ Belum ada. Semua pertanyaan sebelumnya sudah dijawab dan masuk ke bagian 10.
 
 ## 12. Menuju versi produksi
 
-Arsitektur produksi: **Cloudflare paket gratis** (Pages, Workers, D1, R2). Rincian komponen, tabel database, login, mode offline, backup, perkiraan kuota, dan urutan pembangunan ada di **Arsitektur-Cloudflare.md**.
+Arsitektur produksi: **Cloudflare paket gratis** (Pages, Workers, D1). Rincian komponen, tabel database, login, mode offline, backup, perkiraan kuota, dan urutan pembangunan ada di **Arsitektur-Cloudflare.md**.
 
 | Area | Yang dibutuhkan |
 |---|---|
 | Server dan database | Mengganti `localStorage` dengan Workers + D1. Setiap HP kasir menyimpan antrean transaksi saat offline (IndexedDB), lalu mengirimnya saat online. Nomor dokumen dari POS memakai kode perangkat supaya tidak bentrok |
 | Login | Dashboard: email + password (PBKDF2 + pepper). POS: HP didaftarkan Owner/Admin, lalu karyawan masuk dengan PIN. Hak akses dicek di server |
-| Foto | R2 privat, foto diambil lewat Worker setelah cek hak akses |
-| Backup | D1 Time Travel 7 hari + ekspor malam ke R2 lewat GitHub Actions, disimpan 30 hari |
+| Foto | Disimpan di D1, diambil lewat Worker setelah cek hak akses |
+| Backup | D1 Time Travel 7 hari + ekspor malam lewat GitHub Actions, disimpan 30 hari |
 | Marketplace | Integrasi API Shopee/Tokopedia/TikTok Shop, atau tetap impor file dengan jadwal rutin |
 | Pembayaran | QRIS dinamis dari penyedia pembayaran, dengan konfirmasi otomatis |
 | Perangkat | Printer struk Bluetooth, pemindai barcode lewat kamera |
