@@ -229,7 +229,7 @@ async function formHargaGudang() {
       ${baris.map((b) => `<tr><td>${esc(b.nama)}</td><td>${esc(b.sku)}</td><td class="num">${rp(b.normal)}</td><td><input type="number" min="0" name="${esc(b.sku)}" value="${harga[b.sku] ?? ""}" placeholder="${b.normal}"></td></tr>`).join("")}
       </tbody></table></div>
       <div class="err" hidden></div>
-      <div class="actions"><button class="btn primary">Simpan</button><button type="button" class="btn" id="batal">Batal</button></div>
+      <div class="actions"><button class="btn primary">Simpan</button><button type="button" class="btn batal" id="batal">Batal</button></div>
     </form></div>`;
   $("#kembali").onclick = $("#batal").onclick = () => halProduk("daftar");
   formKirim($("#fHg"), async (d) => {

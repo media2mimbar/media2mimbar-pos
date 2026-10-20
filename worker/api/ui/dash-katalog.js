@@ -96,7 +96,7 @@ async function formProduk(id) {
       </div>
       <div id="bagianHarga"></div>
       <div class="err" hidden></div>
-      <div class="actions"><button class="btn primary">Simpan</button><button type="button" class="btn" id="batal">Batal</button></div>
+      <div class="actions"><button class="btn primary">Simpan</button><button type="button" class="btn batal" id="batal">Batal</button></div>
     </form>
     ${p ? '<div id="bagianMp"></div>' : '<p class="small muted" style="margin-top:12px">Harga marketplace bisa diatur setelah produk disimpan.</p>'}
     ${p ? `<div class="section"><h2>Stok per lokasi</h2><div class="tablewrap"><table><thead><tr><th>SKU</th><th>Lokasi</th><th class="num">Stok</th><th class="num">Dalam perjalanan</th></tr></thead><tbody>
@@ -220,7 +220,7 @@ function ubahKategori(k) {
 // Popup berisi form kecil (konfirmasi dengan isian). Tertutup lewat Batal atau setelah berhasil.
 function popupForm(html, tombol, aksi) {
   $("#popupIsi").innerHTML = `<form id="fPopup">${html}<div class="err" hidden></div>
-    <div class="actions"><button class="btn primary">${esc(tombol)}</button><button type="button" class="btn" id="batalPopup">Batal</button></div></form>`;
+    <div class="actions"><button class="btn primary">${esc(tombol)}</button><button type="button" class="btn batal" id="batalPopup">Batal</button></div></form>`;
   $("#popup").hidden = false;
   const f = $("#fPopup");
   $("#batalPopup").onclick = () => { $("#popup").hidden = true; };

@@ -361,7 +361,7 @@ async function formBiaya(lama, lokasiTetap, kembali) {
           <div><label>Bukti (foto, opsional)</label><input type="file" name="bukti" accept="image/*">${lama?.bukti ? '<p class="small muted">Sudah ada bukti. Pilih file baru untuk mengganti.</p>' : ""}</div></div>
         <label>Keterangan</label><input name="keterangan" required maxlength="200" value="${esc(lama?.keterangan ?? "")}">
         <p class="small muted">Potongan MDR QRIS dan biaya bank dicatat manual sesuai mutasi rekening atau laporan aplikasi merchant.</p>
-        <div class="err" hidden></div><div class="actions"><button class="btn primary">Simpan</button><button type="button" class="btn" id="batal">Batal</button></div></form></div>`;
+        <div class="err" hidden></div><div class="actions"><button class="btn primary">Simpan</button><button type="button" class="btn batal" id="batal">Batal</button></div></form></div>`;
     const f = $("#fBiaya");
     f.lokasi_id.onchange = () => { lokasi = f.lokasi_id.value; gambar(); };
     $("#kembali").onclick = $("#batal").onclick = kembali;

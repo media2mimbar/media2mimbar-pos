@@ -78,6 +78,9 @@ def unggah_worker(db_id):
         "bindings": [{"type": "d1", "name": "DB", "id": db_id}],
         "keep_bindings": ["secret_text"],
         "observability": {"enabled": True},
+        # Jalankan Worker di dekat database (D1 hikayat-asia dilayani dari Osaka), bukan di pusat data tempat
+        # permintaan masuk. Pengguna di Indonesia kadang masuk lewat Eropa; tanpa ini setiap query ikut menyeberang.
+        "placement": {"region": "aws:ap-northeast-3"},
     }
     b = uuid.uuid4().hex
     bagian = [f'--{b}\r\nContent-Disposition: form-data; name="metadata"\r\nContent-Type: application/json\r\n\r\n{json.dumps(meta)}\r\n'.encode()]

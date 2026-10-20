@@ -8,7 +8,7 @@ import { readFileSync, rmSync, writeFileSync } from "node:fs";
 
 const dir = new URL(".", import.meta.url).pathname;
 const halaman = {
-  "/": "dashboard.html", "/dash-katalog.js": "dash-katalog.js", "/dash-inventori.js": "dash-inventori.js", "/dash-penjualan.js": "dash-penjualan.js", "/dash-event.js": "dash-event.js", "/dash-promo.js": "dash-promo.js", "/dash-online.js": "dash-online.js", "/dash-laporan.js": "dash-laporan.js", "/dash-ikon.js": "dash-ikon.js",
+  "/": "dashboard.html", "/dash-katalog.js": "dash-katalog.js", "/dash-inventori.js": "dash-inventori.js", "/dash-penjualan.js": "dash-penjualan.js", "/dash-event.js": "dash-event.js", "/dash-promo.js": "dash-promo.js", "/dash-online.js": "dash-online.js", "/dash-laporan.js": "dash-laporan.js", "/dash-ikon.js": "dash-ikon.js", "/dash-sw.js": "dash-sw.js",
   "/pos": "pos.html", "/pos-app.js": "pos-app.js", "/pos-data.js": "pos-data.js", "/pos-struk.js": "pos-struk.js", "/pos-lengkap.js": "pos-lengkap.js", "/pos-tambahan.js": "pos-tambahan.js", "/pos-jsqr.js": "pos-jsqr.js",
   "/pos-qrcode.js": "pos-qrcode.js", "/pos-sw.js": "pos-sw.js", "/pos.webmanifest": "pos.webmanifest", "/pos-ikon.svg": "pos-ikon.svg",
 };
@@ -32,6 +32,9 @@ isiFile["/pos-promo.js"] = `// Dibuat oleh build.mjs dari src/promo.ts. Jangan d
 // Versi service worker = sidik isi semua file POS, supaya HP mengambil versi baru setiap ada perubahan.
 const versi = createHash("sha256").update(Object.entries(isiFile).filter(([p]) => p.startsWith("/pos")).map(([, v]) => v).join("\n")).digest("hex").slice(0, 12);
 for (const p of Object.keys(isiFile)) isiFile[p] = isiFile[p].replace("__VERSI__", versi);
+
+// Skrip dashboard ditanam ke halamannya: satu permintaan, bukan sembilan. Dari jaringan yang jauh setiap permintaan mahal.
+isiFile["/"] = isiFile["/"].replace(/<script src="(\/dash-[a-z]+\.js)"><\/script>/g, (_, p) => `<script>\n${isiFile[p].replace(/<\/script/gi, "<\\/script")}\n</script>`);
 // ETag per file: browser cukup bertanya "masih sama?" dan dijawab 304 tanpa isi file.
 const etag = Object.fromEntries(Object.entries(isiFile).map(([p, v]) => [p, '"' + createHash("sha256").update(v).digest("hex").slice(0, 16) + '"']));
 writeFileSync(dir + "dist/halaman.js", `// Dibuat oleh build.mjs dari ui/. Jangan diubah langsung.\nexport const HALAMAN = ${JSON.stringify(isiFile)};\nexport const ETAG = ${JSON.stringify(etag)};\n`);

@@ -86,7 +86,7 @@ async function formFaktur() {
         </div>
         <label>Catatan</label><textarea name="catatan">${esc(d.catatan)}</textarea>
         <div class="err" hidden></div>
-        <div class="actions"><button class="btn primary">Simpan faktur</button><button type="button" class="btn" id="batal">Batal</button></div>
+        <div class="actions"><button class="btn primary">Simpan faktur</button><button type="button" class="btn batal" id="batal">Batal</button></div>
       </form></div>`;
     const f = $("#fF");
     // Simpan isian ke draft setiap berubah, supaya tetap ada saat form digambar ulang.
@@ -132,7 +132,7 @@ function pilihProduk(daftar, terpilih, simpan) {
     <div class="card" style="margin-top:12px">
       <input type="search" id="cariPilih" placeholder="Cari nama atau SKU">
       <div class="pilih" id="daftarPilih"></div>
-      <div class="actions"><button class="btn primary" id="simpanPilih">Simpan</button><button class="btn" id="batalPilih">Batal</button><span class="muted" id="jumlahPilih"></span></div>
+      <div class="actions"><button class="btn primary" id="simpanPilih">Simpan</button><button class="btn batal" id="batalPilih">Batal</button><span class="muted" id="jumlahPilih"></span></div>
     </div></div>`;
   const gambar = () => {
     const q = $("#cariPilih").value.toLowerCase();
@@ -228,7 +228,7 @@ function formPemasok(p, selesai) {
       </div>
       <label>Catatan</label><textarea name="catatan">${esc(p?.catatan)}</textarea>
       <div class="err" hidden></div>
-      <div class="actions"><button class="btn primary">Simpan</button><button type="button" class="btn" id="batal">Batal</button></div>
+      <div class="actions"><button class="btn primary">Simpan</button><button type="button" class="btn batal" id="batal">Batal</button></div>
     </form></div>`;
   $("#kembali").onclick = $("#batal").onclick = () => selesai();
   formKirim($("#fPm"), async (d) => {
