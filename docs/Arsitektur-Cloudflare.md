@@ -335,6 +335,8 @@ Tampilan dashboard disamakan dengan prototipe (`prototipe/dashboard.html`): bila
 
 Lokasi database (20 Oktober 2026): database pertama `hikayat` dibuat lewat API dari server pengembangan, sehingga Cloudflare menaruhnya di Amerika Utara bagian timur (ENAM). Dari Indonesia, setiap query D1 harus bolak-balik ke Virginia, dan satu halaman dashboard bisa butuh beberapa kali. Isinya sudah dipindah ke `hikayat-asia` yang dibuat dengan `primary_location_hint: "apac"`. `deploy.py` dan `scripts/backup-d1.py` memakai nama baru ini. Database lama masih ada sebagai cadangan dan boleh dihapus setelah aplikasi berjalan normal. Cek sesi juga dirampingkan: peran staf dibaca di query yang sama dengan sesi, dan di POS cek HP serta sesi berjalan bersamaan.
 
+Lokasi eksekusi Worker (20 Oktober 2026): statistik Cloudflare menunjukkan permintaan dari pengguna di Indonesia kadang masuk lewat Eropa (Madrid, Paris), bukan Singapura. Ini jalur penyedia internet ke Cloudflare dan tidak bisa diatur dari kode. Agar query ke D1 tidak ikut menyeberang, `deploy.py` memasang `placement.region = "aws:ap-northeast-3"` (Osaka, tempat `hikayat-asia` dilayani). Akibatnya Worker selalu berjalan di dekat database, dan perjalanan jauhnya cukup sekali per permintaan. Skrip dashboard juga ditanam ke halaman `/` saat build, jadi muat pertama cukup satu permintaan. Cara mengecek: GraphQL `workersInvocationsAdaptive` (wallTime per coloCode) dan `d1AnalyticsAdaptiveGroups`.
+
 Yang sengaja tidak dibuat:
 - **Reset Data:** terlalu berisiko untuk database produksi.
 - **Nomor transaksi dengan kode HP:** tetap seperti sekarang supaya bisa dibuat saat offline.
