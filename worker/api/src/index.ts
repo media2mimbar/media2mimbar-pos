@@ -11,7 +11,7 @@ import * as opname from "./opname.js";
 import * as pelanggan from "./pelanggan.js";
 import * as inventori from "./inventori.js";
 import * as katalog from "./katalog.js";
-import { HALAMAN } from "./halaman.js";
+import { ETAG, HALAMAN } from "./halaman.js";
 import * as karyawan from "./karyawan.js";
 import * as kasir from "./kasir.js";
 import * as pengaturan from "./pengaturan.js";
@@ -199,7 +199,11 @@ export default {
       const jenis = path.endsWith(".js") ? "text/javascript; charset=utf-8"
         : path.endsWith(".webmanifest") ? "application/manifest+json"
         : path.endsWith(".svg") ? "image/svg+xml" : "text/html; charset=utf-8";
-      if (req.method === "GET" && html) return new Response(html, { headers: { ...HEADER_HALAMAN, "content-type": jenis } });
+      if (req.method === "GET" && html) {
+        const tag = ETAG[path];
+        if (tag && req.headers.get("if-none-match") === tag) return new Response(null, { status: 304, headers: { ...HEADER_HALAMAN, etag: tag } });
+        return new Response(html, { headers: { ...HEADER_HALAMAN, "content-type": jenis, ...(tag ? { etag: tag } : {}) } });
+      }
       return new Response("Tidak ditemukan", { status: 404 });
     }
 

@@ -15,7 +15,7 @@ const halaman = {
 const baca = (f) => readFileSync(dir + "ui/" + f, "utf8");
 
 // halaman.ts sementara supaya tsc bisa memeriksa tipe; isinya ditulis ulang setelah tsc.
-writeFileSync(dir + "src/halaman.ts", "// Dibuat oleh build.mjs. Jangan diubah langsung.\nexport const HALAMAN: Record<string, string> = {};\n");
+writeFileSync(dir + "src/halaman.ts", "// Dibuat oleh build.mjs. Jangan diubah langsung.\nexport const HALAMAN: Record<string, string> = {};\nexport const ETAG: Record<string, string> = {};\n");
 rmSync(dir + "dist", { recursive: true, force: true });
 try {
   execSync("tsc -p " + dir, { stdio: "inherit" });
@@ -32,5 +32,7 @@ isiFile["/pos-promo.js"] = `// Dibuat oleh build.mjs dari src/promo.ts. Jangan d
 // Versi service worker = sidik isi semua file POS, supaya HP mengambil versi baru setiap ada perubahan.
 const versi = createHash("sha256").update(Object.entries(isiFile).filter(([p]) => p.startsWith("/pos")).map(([, v]) => v).join("\n")).digest("hex").slice(0, 12);
 for (const p of Object.keys(isiFile)) isiFile[p] = isiFile[p].replace("__VERSI__", versi);
-writeFileSync(dir + "dist/halaman.js", `// Dibuat oleh build.mjs dari ui/. Jangan diubah langsung.\nexport const HALAMAN = ${JSON.stringify(isiFile)};\n`);
+// ETag per file: browser cukup bertanya "masih sama?" dan dijawab 304 tanpa isi file.
+const etag = Object.fromEntries(Object.entries(isiFile).map(([p, v]) => [p, '"' + createHash("sha256").update(v).digest("hex").slice(0, 16) + '"']));
+writeFileSync(dir + "dist/halaman.js", `// Dibuat oleh build.mjs dari ui/. Jangan diubah langsung.\nexport const HALAMAN = ${JSON.stringify(isiFile)};\nexport const ETAG = ${JSON.stringify(etag)};\n`);
 console.log("dist/ siap");
