@@ -84,7 +84,7 @@ try {
   await hp.locator("#pillPelanggan", { hasText: "Fajar Ramadhan" }).waitFor();
   await hp.locator("#btnSimpan").click();
   await tunggu("#totalBelanja", "Rp 0");
-  assert.match(await hp.locator("#btnOrder").textContent(), /\(1\)/);
+  assert.equal(await hp.locator("#nOrder").textContent(), "1");
   await hp.locator("#btnOrder").click();
   await hp.locator("[data-o]").click();
   await hp.locator("#bukaO").click();
@@ -105,7 +105,7 @@ try {
   await hp.getByText("Lunas Rp 90.000").waitFor();
   await hp.screenshot({ path: SHOTS + "l1-sukses-pisah.png" });
   await hp.locator("#baru").click();
-  assert.doesNotMatch(await hp.locator("#btnOrder").textContent(), /\(/);
+  assert.equal(await hp.locator("#nOrder").textContent(), "0");
 
   // 4. Transaksi kedua untuk void.
   await hp.locator(".kartu", { hasText: "Totebag" }).click();

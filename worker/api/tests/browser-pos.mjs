@@ -63,7 +63,7 @@ try {
   // Katalog Gudang Pusat memakai harga gudang.
   const kartuTot = hp.locator(".kartu", { hasText: "Totebag" });
   await kartuTot.waitFor();
-  assert.match(await kartuTot.textContent(), /sisa 10.*Rp 42\.000.*harga khusus/s);
+  assert.match(await kartuTot.textContent(), /Rp 42\.000.*Sisa 10.*harga khusus/s);
   await kartuTot.click();
   await kartuTot.click();
   await hp.locator(".kartu", { hasText: "Kaos Burtuqol" }).click();
@@ -101,14 +101,14 @@ try {
   await hp.locator("#lunas").click();
   await hp.getByText("Tersimpan di HP").waitFor();
   await hp.getByRole("button", { name: "Transaksi baru" }).click();
-  assert.match(await kartuTot.textContent(), /sisa 7/);
+  assert.match(await kartuTot.textContent(), /Sisa 7/);
   await hp.getByText("1 belum terkirim").waitFor();
   assert.match(await hp.locator(".bar").textContent(), /Offline/);
 
   // Aplikasi tetap terbuka saat dimuat ulang tanpa sinyal.
   await hp.reload();
   await kartuTot.waitFor();
-  assert.match(await kartuTot.textContent(), /sisa 7/);
+  assert.match(await kartuTot.textContent(), /Sisa 7/);
   assert.equal(sql("SELECT COUNT(*) AS n FROM trx")[0].n, 1);
 
   // Sinyal kembali: antrean terkirim sendiri.

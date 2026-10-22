@@ -320,8 +320,10 @@ let tab = null;
 
 // Simpanan GET di memori: menu yang pernah dibuka langsung tampil, lalu data terbaru diambil di belakang.
 // Kalau datanya berubah dan pengguna belum menyentuh halaman, halaman digambar ulang. Setiap simpan/ubah/hapus mengosongkan simpanan.
-const simpanGet = new Map(); // path -> { waktu, janji: Promise<string> }
-const UMUR_SIMPAN = 5 * 60_000, JEDA_SEGAR = 2000; // data hasil penyegaran tidak disegarkan lagi selama 2 detik
+const simpanGet = new Map(); // path -> { waktu, janji: Promise<string>, gen }
+// Data hasil penyegaran tidak disegarkan lagi sampai pengguna mengeklik atau mengetik (gen sama dengan generasi),
+// supaya gambar ulang tidak memicu penyegaran berulang. Data awal saat membuka dashboard memakai jeda 2 detik.
+const UMUR_SIMPAN = 5 * 60_000, JEDA_SEGAR = 2000;
 let generasi = 0; // naik setiap pindah halaman atau setiap klik/ketik; gambar ulang hanya kalau belum berubah
 for (const ev of ["click", "input", "keydown"]) document.addEventListener(ev, () => generasi++, true);
 
@@ -329,13 +331,14 @@ async function api(method, path, body) {
   if (method !== "GET") { const r = await panggil(method, path, body); simpanGet.clear(); return r; }
   const ada = simpanGet.get(path), umur = ada ? Date.now() - ada.waktu : Infinity;
   if (ada && umur < UMUR_SIMPAN) {
-    if (ada.selesai && !(ada.dariSegar && umur < JEDA_SEGAR)) segarkanDiBelakang(path, ada);
+    const baruDisegarkan = ada.dariSegar && (ada.gen === undefined ? umur < JEDA_SEGAR : ada.gen === generasi);
+    if (ada.selesai && !baruDisegarkan) segarkanDiBelakang(path, ada);
     return JSON.parse(await ada.janji);
   }
   return JSON.parse(await ambilSimpan(path));
 }
 function ambilSimpan(path, dariSegar = false) {
-  const isi = { waktu: Date.now(), dariSegar, selesai: false };
+  const isi = { waktu: Date.now(), dariSegar, gen: dariSegar ? generasi : undefined, selesai: false };
   const janji = panggil("GET", path).then((d) => { isi.selesai = true; return JSON.stringify(d); });
   isi.janji = janji;
   simpanGet.set(path, isi);

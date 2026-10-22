@@ -24,8 +24,25 @@ function tampil(html, nama) {
   tutupLembar();
   window.scrollTo(0, 0);
 }
+// Header halaman. Tombol Kembali tampil sebagai panah di kiri seperti prototipe; tombol lain tetap di kanan.
 function bar(judul, sub, kanan = "") {
-  return `<div class="bar"><div class="judul"><b>${judul}</b><span>${sub}</span></div>${kanan}</div>`;
+  let kiri = "";
+  kanan = kanan.replace('<button id="kembali">Kembali</button>', () => { kiri = '<button id="kembali" class="kembali" aria-label="Kembali">←</button>'; return ""; });
+  return `<div class="bar">${kiri}<div class="judul"><b>${judul}</b><span>${sub}</span></div>${kanan ? `<div class="kanan">${kanan}</div>` : ""}</div>`;
+}
+// Header layar masuk: logo HK, nama toko, status HP.
+const barMerek = (sub, kanan = "") => `<div class="bar merek"><div class="logo">HK</div><div class="judul"><b>Hikayat Merchandise</b><span>${sub}</span></div>${kanan ? `<div class="kanan">${kanan}</div>` : ""}</div>`;
+
+// Gambar produk: belum ada foto di katalog, jadi pakai ikon dan warna lembut yang tetap per produk.
+const WARNA_THUMB = ["#DCE9FD", "#FDE8DC", "#FBDDE4", "#E1F0EA", "#EFE1D6", "#DDEEFB", "#ECE4F7", "#FFF0E5"];
+function thumb(p = {}) {
+  const n = ((p.nama ?? "") + " " + (A.snap?.kategori ?? []).find((k) => k.id === p.kategori_id)?.nama).toLowerCase();
+  const ikon = /kaos|jersey|kemeja|hoodie|baju|jaket|polo|sweater|shirt|gamis|koko/.test(n) ? "👕" : /topi|cap\b|kupluk|peci|bucket/.test(n) ? "🧢"
+    : /tas\b|totebag|tote|pouch|ransel|sling/.test(n) ? "👜" : /tumbler|botol|mug|gelas|cangkir|cup\b/.test(n) ? "🥤" : /buku|novel|komik|majalah|kitab/.test(n) ? "📖"
+    : /stiker|sticker|gantungan|ganci|\bpin\b|bros|emblem/.test(n) ? "🏷️" : /kalung|gelang|cincin|tasbih/.test(n) ? "📿" : /masker|kerudung|hijab|syal|scarf/.test(n) ? "🧣" : "🛍️";
+  let h = 0;
+  for (const c of String(p.id ?? p.nama)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return `<span class="thumb" style="background:${WARNA_THUMB[h % WARNA_THUMB.length]}">${ikon}</span>`;
 }
 const statusSinyal = () => `<span class="titik-on ${S.online ? "" : "off"}"></span>${S.online ? "Online" : "Offline"}`;
 function bukaLembar(html) {
@@ -69,16 +86,16 @@ async function mulai() {
 // ---------- Daftarkan HP ----------
 
 function layarDaftar() {
-  tampil(`${bar("Hikayat POS", "HP belum terdaftar")}
+  tampil(`<div class="halaman-masuk">${barMerek("HP belum terdaftar")}
     <div class="wrap"><div class="card">
       <h1>Daftarkan HP ini</h1>
-      <p class="muted">Minta Owner atau Admin membuka Dashboard › Perangkat POS › Daftarkan HP, lalu ketik kode yang muncul.</p>
+      <p class="muted small">Minta Owner atau Admin membuka Dashboard › Perangkat POS › Daftarkan HP, lalu ketik kode yang muncul.</p>
       <form id="fDaftar">
         <input class="kode" name="kode" placeholder="XXXX-XXXX" maxlength="9" autocomplete="off" autocapitalize="characters" required>
         <div class="err" hidden></div>
         <button class="btn primary">Daftarkan</button>
       </form>
-    </div></div>`, "daftar");
+    </div></div></div>`, "daftar");
   const f = $("#fDaftar");
   f.kode.addEventListener("input", (e) => {
     const v = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8);
@@ -102,8 +119,9 @@ function layarDaftar() {
 // ---------- Pilih nama dan PIN ----------
 
 async function layarPilihNama(pesan) {
-  tampil(`${bar("Hikayat POS", `HP ${esc(S.perangkat?.kode)} · ${statusSinyal()}`)}
-    <div class="wrap"><h1>Siapa yang bertugas?</h1>${pesan ? `<div class="ok">${esc(pesan)}</div>` : ""}<div class="daftar" id="orang"><p class="muted">Memuat…</p></div></div>`, "nama");
+  tampil(`<div class="halaman-masuk">${barMerek(`Aplikasi kasir event · HP ${esc(S.perangkat?.kode)} · ${statusSinyal()}`)}
+    <div class="wrap">${pesan ? `<div class="ok">${esc(pesan)}</div>` : ""}<div class="label-bagian">Siapa yang bertugas?</div><div class="daftar" id="orang"><p class="muted small">Memuat…</p></div>
+      <div class="petunjuk">Kasir dan PIN diatur di Dashboard › Karyawan</div></div></div>`, "nama");
   let karyawan = await kv.get("karyawan");
   try {
     karyawan = (await api("GET", "/api/pos/karyawan")).karyawan;
@@ -111,29 +129,32 @@ async function layarPilihNama(pesan) {
   } catch (e) { if (!putus(e)) throw e; }
   if (A.layar !== "nama") return;
   $("#orang").innerHTML = (karyawan ?? []).map((k) => `<button data-id="${k.id}">
-    <span class="av">${esc(inisial(k.nama))}</span><span><b>${esc(k.nama)}</b><br><span class="small muted">${k.role.map((r) => NAMA_ROLE[r]).join(", ")}${k.petunjuk ? " · " + esc(k.petunjuk) : ""}</span></span></button>`).join("")
-    || '<p class="muted">Daftar karyawan belum ada di HP ini. Sambungkan ke internet sekali untuk memuatnya.</p>';
+    <span class="av">${esc(inisial(k.nama))}</span><span class="isi"><b>${esc(k.nama)}</b><br><span class="small muted">${k.role.map((r) => NAMA_ROLE[r]).join(", ")}${k.petunjuk ? " · " + esc(k.petunjuk) : ""}</span></span><span class="panah">›</span></button>`).join("")
+    || '<p class="muted small">Daftar karyawan belum ada di HP ini. Sambungkan ke internet sekali untuk memuatnya.</p>';
   $$("#orang button").forEach((b) => (b.onclick = () => masukPin(karyawan.find((k) => k.id === b.dataset.id))));
 }
 
 let pinAksi = null;
+// Papan PIN bulat seperti prototipe: C menghapus semua, ⌫ menghapus satu angka.
+const padPin = (id) => `<div class="pad" id="${id}">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫"].map((k) => `<button class="${k === "C" || k === "⌫" ? "fungsi" : ""}" data-k="${k}">${k}</button>`).join("")}</div>`;
+const titikPin = (n) => [0, 1, 2, 3, 4, 5].map((i) => `<span class="${i < n ? "isi" : ""}"></span>`).join("");
 function mintaPin(o) {
   pinAksi = { ...o, isi: "" };
-  tampil(`${bar("Hikayat POS", `HP ${esc(S.perangkat?.kode)} · ${statusSinyal()}`)}
-    <div class="wrap center">
-      ${o.av ? `<div class="av" style="margin:8px auto;width:56px;height:56px;font-size:20px">${esc(o.av)}</div>` : ""}
-      <h1>${esc(o.judul)}</h1><div class="muted">${esc(o.info)}</div>
+  tampil(`<div class="kunci-view">
+      <h1>${esc(o.judul)}</h1><div class="sub">${esc(o.info)}</div>
+      ${o.batal ? `<button class="tautan" id="pinBatal">${esc(o.tautan ?? "Batal")}</button>` : ""}
+      ${o.av ? `<div class="av">${esc(o.av)}</div>` : `<div class="ilustrasi">${o.ikon ?? "🔐"}</div>`}
       <div class="titik" id="titik"></div>
       <div class="err" id="pinErr" hidden></div>
-      <div class="pad" id="pad">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"].map((k) => `<button class="${k ? "" : "kosong"}" data-k="${k}">${k}</button>`).join("")}</div>
-      ${o.batal ? '<button class="btn" id="pinBatal">Kembali</button>' : ""}
+      ${padPin("pad")}
+      <div class="kaki-kunci"><span>HP ${esc(S.perangkat?.kode ?? "")} · ${statusSinyal()}</span></div>
     </div>`, "pin");
   gambarTitik();
   $("#pad").onclick = padKlik;
   if (o.batal) $("#pinBatal").onclick = o.batal;
 }
 function gambarTitik() {
-  $("#titik").innerHTML = [0, 1, 2, 3, 4, 5].map((i) => `<span class="${i < pinAksi.isi.length ? "isi" : ""}"></span>`).join("");
+  $("#titik").innerHTML = titikPin(pinAksi.isi.length);
 }
 function salahPin(pesan) {
   const el = $("#pinErr");
@@ -142,9 +163,10 @@ function salahPin(pesan) {
   el.hidden = false;
 }
 async function padKlik(e) {
-  const k = e.target.dataset?.k;
-  if (k === undefined || k === "" || !pinAksi) return;
+  const k = e.target.closest("[data-k]")?.dataset.k;
+  if (!k || !pinAksi) return;
   if (k === "⌫") pinAksi.isi = pinAksi.isi.slice(0, -1);
+  else if (k === "C") pinAksi.isi = "";
   else if (pinAksi.isi.length < 6) pinAksi.isi += k;
   gambarTitik();
   if (pinAksi.isi.length === 6) {
@@ -156,7 +178,7 @@ async function padKlik(e) {
 
 function masukPin(k) {
   mintaPin({
-    judul: k.nama, info: "Masukkan PIN 6 angka", av: inisial(k.nama), batal: () => layarPilihNama(),
+    judul: "Halo, " + k.nama.split(/\s+/)[0], info: "Masukkan PIN 6 angka", tautan: "Bukan Anda? Ganti kasir", batal: () => layarPilihNama(),
     selesai: async (pin) => {
       try {
         const r = await api("POST", "/api/pos/masuk", { staff_id: k.id, pin });
@@ -187,11 +209,11 @@ function gantiPin(wajib) {
   const ulang = (pesan) => { gantiPin(wajib); salahPin(pesan); };
   const kembali = wajib ? null : () => masukKasir();
   mintaPin({
-    judul: "Ganti PIN", info: (wajib ? "PIN Anda masih sementara. " : "") + "Masukkan PIN lama", batal: kembali,
+    judul: "Ganti PIN", info: (wajib ? "PIN Anda masih sementara. " : "") + "Masukkan PIN lama", batal: kembali, ikon: "🔑",
     selesai: async (lama) => mintaPin({
-      judul: "Ganti PIN", info: "Masukkan PIN baru", batal: kembali,
+      judul: "Ganti PIN", info: "Masukkan PIN baru", batal: kembali, ikon: "🔑",
       selesai: async (baru) => mintaPin({
-        judul: "Ganti PIN", info: "Ulangi PIN baru", batal: kembali,
+        judul: "Ganti PIN", info: "Ulangi PIN baru", batal: kembali, ikon: "🔑",
         selesai: async (lagi) => {
           if (lagi !== baru) return ulang("PIN baru tidak sama. Ulangi dari awal");
           try { await api("POST", "/api/pos/ganti-pin", { pin_lama: lama, pin_baru: baru }); } catch (x) { return ulang(x.message); }
@@ -227,18 +249,22 @@ async function keluar(pesan) {
 
 // ---------- Pilih tempat dan buka kasir ----------
 
+const tagTempat = (label) => (label === "Berlangsung" ? "ok" : label.startsWith("Pre-sale") ? "warn" : label.startsWith("Belum") ? "off" : "");
+const ikonTempat = (t) => (t.jenis === "gudang" ? "🏬" : "📍");
 function layarTempat() {
   const tempat = A.umum?.tempat ?? [];
   const owner = A.sesi.staff.role.includes("owner");
-  tampil(`${bar("Pilih tempat jualan", `${esc(A.sesi.staff.nama)} · ${statusSinyal()}`, '<button id="btnKeluar">Keluar</button>')}
+  tampil(`<div class="halaman-masuk">${barMerek(`${esc(A.sesi.staff.nama)} · ${statusSinyal()}`, '<button id="btnKeluar">Keluar</button>')}
     <div class="wrap">
+      <h1>Pilih tempat jualan</h1><div class="muted small">${owner ? "Owner bisa berjualan di event mana pun atau langsung dari gudang." : "Pilih event, lalu hitung modal awal di laci."}</div>
       ${A.sesi.offline ? '<div class="warn">Masuk offline. Daftar tempat dari data terakhir di HP ini.</div>' : ""}
+      ${tempat.length ? `<div class="label-bagian">${owner ? "Event dan tempat jualan" : "Event"}</div>` : ""}
       <div class="daftar">${tempat.map((t) => `<button data-id="${t.id}" ${t.boleh_jual ? "" : "disabled"}>
-        <span class="av">${t.jenis === "gudang" ? "G" : "E"}</span>
-        <span><b>${esc(t.nama)}</b><br><span class="small muted">${esc(t.label)}${t.shift_terbuka ? ` · Kasir terbuka · ${esc(t.shift_terbuka.kasir)}` : ""}</span></span></button>`).join("")}</div>
-      ${owner ? tempat.filter((t) => t.jenis === "event" && t.label !== "Akan Datang" && !t.label.startsWith("Pre-sale") && !t.label.startsWith("Belum")).map((t) => `<p class="small" style="margin:6px 0 0">Selesai di ${esc(t.nama)}? <a href="#" data-tutupev="${t.id}">Tutup event</a></p>`).join("") : ""}
-      ${tempat.length ? "" : `<div class="card" style="margin-top:12px"><b>Belum ada tempat jualan</b><p class="muted small">${owner ? "Muat ulang saat ada sinyal." : "Anda belum ditugaskan di event yang sedang berlangsung. Minta Admin menambahkan Anda di form event."}</p></div>`}
-    </div>`, "tempat");
+        <span class="ikon">${ikonTempat(t)}</span>
+        <span class="isi"><b>${esc(t.nama)}</b><br><span class="tag ${tagTempat(t.label)}">${esc(t.label)}</span>${t.shift_terbuka ? ` <span class="small muted">Kasir terbuka · ${esc(t.shift_terbuka.kasir)}</span>` : ""}</span><span class="panah">›</span></button>`).join("")}</div>
+      ${owner ? tempat.filter((t) => t.jenis === "event" && t.label !== "Akan Datang" && !t.label.startsWith("Pre-sale") && !t.label.startsWith("Belum")).map((t) => `<p class="small muted" style="margin:10px 0 0">Selesai di ${esc(t.nama)}? <a href="#" data-tutupev="${t.id}" style="color:var(--danger);font-weight:700">Tutup event</a></p>`).join("") : ""}
+      ${tempat.length ? "" : `<div class="card kosong" style="margin-top:16px"><div class="ki">📍</div><b>Belum ada tempat jualan</b>${owner ? "Muat ulang saat ada sinyal." : "Anda belum ditugaskan di event yang sedang berlangsung. Minta Admin menambahkan Anda di form event."}</div>`}
+    </div></div>`, "tempat");
   $("#btnKeluar").onclick = () => keluar();
   $$(".daftar button[data-id]").forEach((b) => (b.onclick = () => pilihTempat(tempat.find((t) => t.id === b.dataset.id))));
   $$("[data-tutupev]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); A.snap ??= { lokasi: { nama: "" } }; layarTutupEventPos(a.dataset.tutupev, layarTempat); }));
@@ -254,13 +280,21 @@ async function pilihTempat(t) {
     await catatLog(A.sesi.staff.id, "Gabung kasir", t.nama);
     return masukKasir();
   }
-  tampil(`${bar("Buka kasir", esc(t.nama))}
-    <div class="wrap"><form class="card" id="fBuka">
-      <h1>Buka kasir</h1><p class="muted">Satu tempat jualan punya satu laci. Hitung uang di laci sebelum mulai.</p>
-      <label>Modal awal (uang di laci)</label><input name="modal" type="number" inputmode="numeric" min="0" placeholder="0" required>
-      <button class="btn primary">Buka Kasir</button>
-      <button type="button" class="btn" id="batal">Kembali</button>
-    </form></div>`, "buka");
+  tampil(`<div class="halaman-masuk">${barMerek(`${esc(A.sesi.staff.nama)} · ${statusSinyal()}`)}
+    <div class="wrap"><form id="fBuka">
+      <h1>Buka kasir</h1><div class="muted small">Satu tempat jualan punya satu laci. Hitung uang di laci sebelum mulai.</div>
+      <div class="item-pilih"><span class="ikon">${ikonTempat(t)}</span><span class="isi"><b>${esc(t.nama)}</b><br><span class="tag ${tagTempat(t.label)}">${esc(t.label)}</span></span></div>
+      <label>Modal awal di laci</label><input name="modal" type="number" inputmode="numeric" min="0" placeholder="0" required>
+      <div class="chips" id="modalCepat" style="flex-wrap:wrap">${[0, 200000, 300000, 500000].map((v) => `<button type="button" data-modal="${v}">${v ? rp(v).replace("Rp ", "") : "Tanpa modal"}</button>`).join("")}</div>
+      <button class="btn primary" style="margin-top:18px">Buka Kasir</button>
+      <button type="button" class="btn hantu" id="batal">Kembali</button>
+    </form></div></div>`, "buka");
+  $("#modalCepat").onclick = (e) => {
+    const b = e.target.closest("[data-modal]");
+    if (!b) return;
+    $("#fBuka").modal.value = b.dataset.modal;
+    $$("#modalCepat button").forEach((x) => x.classList.toggle("on", x === b));
+  };
   $("#batal").onclick = layarTempat;
   $("#fBuka").onsubmit = async (e) => {
     e.preventDefault();
@@ -323,24 +357,52 @@ function modePresale() {
   return !!e && e.presale_aktif === 1 && e.presale_mode === "ambil" && hariIniWib() < e.mulai;
 }
 
+// Header oranye kasir, dipakai tab Penjualan dan tab Daftar Order.
+function appbarKasir() {
+  return `<div class="bar appbar">
+    <div class="baris1"><span class="logo-kecil">HK</span>
+      <div class="judul"><b>${esc(A.snap.lokasi.nama)}</b><span>${esc(A.sesi.staff.nama)} · <span id="sinyal">${statusSinyal()}</span> <span id="antre"></span></span></div>
+      <button class="ikon-btn" id="btnMode" title="${modeKatalog() === "sku" ? "Tampilan grid" : "Mode SKU (scan barcode)"}">${modeKatalog() === "sku" ? "⊞" : "▦"}</button>
+      <button class="ikon-btn" id="btnKunci" title="Kunci layar">🔒</button><button class="ikon-btn" id="btnMenu" title="Menu">☰</button></div>
+    <div class="pills">${pillTempat()}<button id="pillPelanggan" class="pill"></button></div>
+  </div>`;
+}
+const tabKasir = (aktif) => `<div class="tabs"><button id="${aktif === "jual" ? "tabJual" : "kembali"}" class="${aktif === "jual" ? "on" : ""}">Penjualan</button>
+  <button id="btnOrder" class="${aktif === "order" ? "on" : ""}">Daftar Order <span class="lencana" id="nOrder">${(A.orderDaftar ?? []).length}</span></button></div>`;
+function pasangAppbar() {
+  $("#pillTempat").onclick = lembarTempat;
+  $("#pillPelanggan").onclick = lembarPelanggan;
+  $("#btnMenu").onclick = lembarMenu;
+  $("#btnKunci").onclick = () => kunciLayar(false);
+  $("#btnMode").onclick = () => { A.mode = modeKatalog() === "sku" ? "grid" : "sku"; gambarKasir(); };
+  if ($("#infoKiriman")) $("#infoKiriman").onclick = lembarTempat;
+  isiPillPelanggan();
+  gambarAntrean();
+}
+function isiPillPelanggan() {
+  const el = $("#pillPelanggan");
+  if (!el) return;
+  const pel = A.ord?.pelanggan;
+  el.classList.toggle("set", !!pel);
+  el.innerHTML = `<span class="pi">👤</span><span class="pt"><span class="l1">Pelanggan${modePresale() && !pel ? " · wajib" : ""}</span><span class="l2">${pel ? esc(pel.nama) : "+ Pelanggan"}</span></span><span class="caret">▼</span>`;
+}
+
 function gambarKasir() {
-  const t = A.sesi;
   const kat = (A.snap.kategori ?? []).filter((k) => k.tampil_menu);
   const adaPromo = promoBerlakuSekarang().length > 0;
   tampil(`<div class="kasir">
-    ${bar(esc(A.snap.lokasi.nama), `${esc(t.staff.nama)} · <span id="sinyal">${statusSinyal()}</span> <span id="antre"></span>`, `<button id="btnMode" title="Mode tampilan">${modeKatalog() === "sku" ? "Grid" : "SKU"}</button><button id="btnKunci">Kunci</button><button id="btnMenu">Menu</button>`)}
-    <div class="atas">
-      ${pillTempat()}
-      <button id="pillPelanggan" class="card small" style="width:100%;text-align:left;margin-bottom:8px;padding:9px 12px"></button>
-      <input type="search" id="cari" placeholder="${modeKatalog() === "sku" ? "Scan barcode atau ketik SKU, lalu Enter" : "Cari produk atau SKU"}" value="${esc(A.cari)}" enterkeyhint="go">
-      <div class="chips" id="chips"><button data-k="semua">Semua</button>${(A.snap.terlaris ?? []).length ? '<button data-k="terlaris">Terlaris</button>' : ""}${adaPromo ? '<button data-k="promo">Promo</button>' : ""}${kat.map((k) => `<button data-k="${k.id}">${esc(k.nama)}</button>`).join("")}</div>
+    ${appbarKasir()}
+    <div class="isi-kasir">
+      ${catatanTempat()}
+      ${tabKasir("jual")}
+      <div class="cari"><span>🔍</span><input type="search" id="cari" placeholder="${modeKatalog() === "sku" ? "Scan barcode atau ketik SKU, lalu Enter" : "Cari nama produk / SKU…"}" value="${esc(A.cari)}" enterkeyhint="go"></div>
+      <div class="chips" id="chips"><button data-k="semua">▦ Semua</button>${(A.snap.terlaris ?? []).length ? '<button data-k="terlaris">🔥 Terlaris</button>' : ""}${adaPromo ? '<button data-k="promo">🏷️ Promo</button>' : ""}${kat.map((k) => `<button data-k="${k.id}">${esc(k.nama)}</button>`).join("")}</div>
+      <div class="grid" id="grid"></div>
     </div>
-    <div class="grid" id="grid"></div>
-    <div class="aksi"><button id="btnHapus">••• Hapus</button><button id="btnPromo">Promosi</button><button id="btnSimpan">Simpan</button><button id="btnOrder">Daftar Order</button></div>
-    <div class="bawah"><button class="total" id="btnTotal"><small id="jmlBarang"></small><b id="totalBelanja"></b></button><button class="btn primary" id="btnBayar">Bayar</button></div>
+    <div class="aksi" id="aksiMini"><button id="btnHapus">Hapus</button><button id="btnPromo">Promosi</button><button id="btnSimpan" class="aktif">Simpan</button></div>
+    <div class="cartbar" id="cartbar"><button class="total" id="btnTotal"><span class="lencana-jml" id="jmlBadge">0</span><span class="tl"><small id="jmlBarang"></small><b id="totalBelanja"></b></span></button><button class="bayar" id="btnBayar">Bayar →</button></div>
   </div>`, "kasir");
-  $("#pillTempat").onclick = lembarTempat;
-  $("#btnMode").onclick = () => { A.mode = modeKatalog() === "sku" ? "grid" : "sku"; gambarKasir(); };
+  pasangAppbar();
   // Scan barcode: pemindai mengetik SKU lalu Enter. SKU yang cocok persis langsung masuk keranjang.
   $("#cari").onkeydown = (e) => {
     if (e.key !== "Enter") return;
@@ -350,11 +412,8 @@ function gambarKasir() {
     tambah(v.sku);
     e.target.value = ""; A.cari = ""; gambarKatalog();
   };
-  $("#pillPelanggan").onclick = lembarPelanggan;
-  $("#chips").onclick = (e) => { if (e.target.dataset.k) { A.kategori = e.target.dataset.k; gambarKatalog(); } };
+  $("#chips").onclick = (e) => { const b = e.target.closest("[data-k]"); if (b) { A.kategori = b.dataset.k; gambarKatalog(); } };
   $("#cari").oninput = (e) => { A.cari = e.target.value; gambarKatalog(); };
-  $("#btnMenu").onclick = lembarMenu;
-  $("#btnKunci").onclick = () => kunciLayar(false);
   $("#btnTotal").onclick = lembarKeranjang;
   $("#btnPromo").onclick = lembarPromo;
   $("#btnSimpan").onclick = () => simpanOrder();
@@ -367,7 +426,6 @@ function gambarKasir() {
     gambarKatalog();
   };
   gambarKatalog();
-  gambarAntrean();
 }
 
 function kosongkanKeranjang() {
@@ -385,12 +443,14 @@ function labelTempat() {
   return "Event";
 }
 function pillTempat() {
-  const e = A.snap.lokasi.event;
-  const tgl = (d) => new Date(d + "T00:00:00").toLocaleDateString("id-ID", { day: "numeric", month: "short" });
-  return `<button id="pillTempat" class="card small" style="width:100%;text-align:left;margin-bottom:8px;padding:10px 12px">
-    <span class="tag ${labelTempat().startsWith("Pre-sale") ? "warn" : ""}">${esc(labelTempat())}</span> <b>${esc(e ? e.nama : A.snap.lokasi.nama)}</b>${e ? ` · ${esc(e.venue ?? "")} · ${tgl(e.mulai)}${e.selesai !== e.mulai ? "–" + tgl(e.selesai) : ""}` : " · jual langsung"}
-    ${modePresale() ? '<div class="warn" style="margin-top:6px;padding:6px 10px">Pre-sale · ambil nanti. Pembeli wajib punya no HP, stok berkurang saat barang diserahkan</div>' : ""}
-    ${A.snap.kiriman_menunggu ? `<div class="warn" style="margin-top:6px;padding:6px 10px">${A.snap.kiriman_menunggu} kiriman stok belum diterima. Ketuk untuk menerima</div>` : ""}</button>`;
+  const stok = Object.values(A.snap.varian).filter((v) => v.aktif && A.snap.produk[v.produk_id]?.aktif).reduce((a, v) => a + Math.max(0, A.stok[v.sku] ?? 0), 0);
+  return `<button id="pillTempat" class="pill"><span class="pi">${A.snap.lokasi.jenis === "gudang" ? "🏬" : "📍"}</span>
+    <span class="pt"><span class="l1">${esc(labelTempat())}</span><span class="l2">${modePresale() ? "Stok tidak dibatasi" : `${stok} pcs stok`}</span></span><span class="caret">▼</span></button>`;
+}
+// Pengingat di bawah header: mode pre-sale dan kiriman stok yang belum diterima. Kiriman diketuk: sheet tempat untuk menerima.
+function catatanTempat() {
+  return `${modePresale() ? '<div class="catatan">Pre-sale · ambil nanti. Pembeli wajib punya no HP, stok berkurang saat barang diserahkan</div>' : ""}
+    ${A.snap.kiriman_menunggu ? `<button class="catatan" id="infoKiriman">📦 ${A.snap.kiriman_menunggu} kiriman stok belum diterima. Ketuk untuk menerima</button>` : ""}`;
 }
 function lembarTempat() {
   const e = A.snap.lokasi.event, owner = A.sesi.staff.role.includes("owner");
@@ -412,12 +472,11 @@ function lembarTempat() {
 function gambarKatalog() {
   if (A.layar !== "kasir") return;
   $$("#chips button").forEach((b) => b.classList.toggle("on", b.dataset.k === A.kategori));
-  const pel = A.ord?.pelanggan;
-  $("#pillPelanggan").innerHTML = pel ? `Pelanggan: <b>${esc(pel.nama)}</b>${pel.telp ? " · " + esc(pel.telp) : ""}` : `<span class="muted">+ Pilih pelanggan${modePresale() ? " (wajib untuk pre-sale)" : ""}</span>`;
+  isiPillPelanggan();
   const t = tagihan();
   $("#btnPromo").textContent = t.promo_nama ? "✓ " + t.promo_nama : "Promosi";
-  const n = (A.orderDaftar ?? []).length;
-  $("#btnOrder").textContent = n ? `Daftar Order (${n})` : "Daftar Order";
+  $("#btnPromo").classList.toggle("pakai", !!t.promo_nama);
+  $("#nOrder").textContent = (A.orderDaftar ?? []).length;
   if (A.kategori === "promo") return gambarTabPromo();
   const q = A.cari.trim().toLowerCase();
   const tampilStok = pengaturan().tampil_stok !== false;
@@ -430,9 +489,9 @@ function gambarKatalog() {
   // Mode SKU: satu baris per varian, cocok untuk scan barcode.
   if (modeKatalog() === "sku") {
     const baris = daftar.flatMap((p) => varianDari(p.id).filter((v) => !q || (p.nama + " " + v.sku + " " + v.nama).toLowerCase().includes(q)));
-    $("#grid").innerHTML = `<div class="daftar" style="grid-column:1/-1;margin-top:0">${baris.map((v) => { const s = A.stok[v.sku] ?? 0, n = diKeranjang(v.sku); return `<button data-sku="${esc(v.sku)}" ${s <= 0 && !pre ? 'style="opacity:.5"' : ""}>
-      <span class="isi"><b>${esc(namaBarang(v))}</b>${n ? ` <span class="tag ok">${n}</span>` : ""}<br><span class="small muted">${esc(v.sku)} · ${pre ? "pre-sale" : tampilStok ? (s > 0 ? "sisa " + s : "habis") : ""}</span></span>
-      <span><b>${rp(v.harga)}</b>${v.harga !== v.harga_normal ? `<br><span class="tag warn">${tandaHarga}</span>` : ""}</span></button>`; }).join("") || '<p class="muted">Tidak ada produk.</p>'}</div>`;
+    $("#grid").innerHTML = `<div class="sku-daftar">${baris.map((v) => { const s = A.stok[v.sku] ?? 0, n = diKeranjang(v.sku); return `<button data-sku="${esc(v.sku)}" ${s <= 0 && !pre ? 'style="opacity:.5"' : ""}>
+      ${thumb(A.snap.produk[v.produk_id])}<span class="isi"><b>${esc(namaBarang(v))}</b><span class="kode">${esc(v.sku)}${pre ? " · pre-sale" : tampilStok ? ` · ${s > 0 ? "sisa " + s : "habis"}` : ""}${v.harga !== v.harga_normal ? ` · <span class="khusus">${tandaHarga}</span>` : ""}</span></span>
+      <span class="kanan"><b>${rp(v.harga)}</b>${n ? `<span class="tag ok">${n}</span>` : ""}</span></button>`; }).join("") || '<div class="kosong-kat">Tidak ada produk.</div>'}</div>`;
     $$("#grid [data-sku]").forEach((b) => (b.onclick = () => tambah(b.dataset.sku)));
     return gambarTotal();
   }
@@ -444,12 +503,13 @@ function gambarKatalog() {
     const min = Math.min(...harga), maks = Math.max(...harga);
     const jml = v.reduce((a, x) => a + diKeranjang(x.sku), 0);
     const khusus = v.some((x) => x.harga !== x.harga_normal);
+    const infoStok = pre ? "Pre-sale · ambil saat event" : tampilStok ? (stok > 0 ? `Sisa ${stok}` : "Stok habis") : "";
     return `<button class="kartu ${stok <= 0 && !pre ? "habis" : ""}" data-p="${p.id}">
-      ${jml ? `<span class="jml">${jml}</span>` : ""}
-      <b>${esc(p.nama)}</b>
-      <span class="stok">${p.punya_varian ? `${v.length} varian · ` : ""}${pre ? "Pre-sale · ambil saat event" : tampilStok ? (stok > 0 ? `sisa ${stok}` : "Habis") : ""}</span>
-      <span class="harga">${min === maks ? rp(min) : `${rp(min)}+`}${khusus ? ` <span class="tag warn">${tandaHarga}</span>` : ""}</span></button>`;
-  }).join("") || '<p class="muted" style="grid-column:1/-1">Tidak ada produk.</p>';
+      ${jml ? `<span class="jml">${jml}</span>` : ""}${p.punya_varian ? `<span class="nvar">${v.length} varian</span>` : ""}
+      ${thumb(p)}<b>${esc(p.nama)}</b>
+      <span class="harga">${min === maks ? rp(min) : `${rp(min)}+`}</span>
+      <span class="stok ${!pre && tampilStok && stok > 0 && stok <= 3 ? "menipis" : ""}">${infoStok}${khusus ? `${infoStok ? " · " : ""}<span class="khusus">${tandaHarga}</span>` : ""}</span></button>`;
+  }).join("") || '<div class="kosong-kat">Tidak ada produk.</div>';
   $$("#grid .kartu").forEach((b) => (b.onclick = () => ketukProduk(A.snap.produk[b.dataset.p])));
   gambarTotal();
 }
@@ -457,8 +517,12 @@ function gambarKatalog() {
 function gambarTotal() {
   const t = tagihan();
   const n = t.items.reduce((a, i) => a + i.qty, 0);
-  $("#jmlBarang").textContent = n ? `${n} barang${t.diskon ? " · hemat " + rp(t.diskon) : ""} · ketuk untuk lihat` : "Keranjang kosong";
+  $("#jmlBadge").textContent = n;
+  $("#jmlBarang").textContent = `${t.diskon ? "Hemat " + rp(t.diskon) : "Total belanja"} · ketuk untuk ubah`;
   $("#totalBelanja").textContent = rp(t.total);
+  // Bar keranjang dan tombol kecil di atasnya baru muncul setelah ada barang, seperti prototipe.
+  $("#cartbar").classList.toggle("show", n > 0);
+  $("#aksiMini").classList.toggle("show", n > 0);
 }
 
 async function gambarAntrean() {
@@ -496,9 +560,11 @@ function ketukProduk(p, judul) {
   const v = varianDari(p.id);
   if (!judul && !p.punya_varian && v.length === 1) return tambah(v[0].sku);
   const pre = modePresale();
-  const gambar = () => bukaLembar(`<h2>${esc(p.nama)}</h2><div class="muted small">${esc(judul ?? "Ketuk ukuran untuk menambah. Ketuk lagi untuk menambah jumlah.")}</div>
-    ${v.map((x) => { const s = A.stok[x.sku] ?? 0; return `<div class="baris"><div class="isi"><b>${esc(x.nama || p.nama)}</b><div class="small muted">${rp(x.harga)} · ${pre ? "pre-sale" : s > 0 ? "sisa " + s : "habis"}</div></div>
-      <div class="qty"><button data-k="-" data-sku="${esc(x.sku)}">−</button><span>${diKeranjang(x.sku)}</span><button data-k="+" data-sku="${esc(x.sku)}" ${!pre && s - diKeranjang(x.sku) <= 0 ? "disabled" : ""}>+</button></div></div>`; }).join("")}
+  // Ukuran tampil sebagai kotak: ketuk untuk menambah, tombol − di pojok untuk mengurangi.
+  const gambar = () => bukaLembar(`<h2>${esc(p.nama)}</h2><div class="sub">${esc(judul ?? "Pilih ukuran. Ketuk lagi untuk menambah jumlah.")}</div>
+    <div class="vgrid">${v.map((x) => { const s = A.stok[x.sku] ?? 0, n = diKeranjang(x.sku); return `<div class="vsel ${n ? "on" : ""}">
+      <button class="vbtn" data-k="+" data-sku="${esc(x.sku)}" ${!pre && s - n <= 0 ? "disabled" : ""}><b>${esc(x.nama || p.nama)}</b><small>${rp(x.harga).replace("Rp ", "")} · ${pre ? "pre-sale" : s - n > 0 ? "sisa " + (s - n) : "habis"}</small></button>
+      ${n ? `<span class="vq">${n}</span><button class="vkurang" data-k="-" data-sku="${esc(x.sku)}" aria-label="Kurangi ${esc(x.nama || p.nama)}">−</button>` : ""}</div>`; }).join("")}</div>
     <button class="btn primary" id="selesaiVarian">Selesai</button>`);
   gambar();
   $("#lembar").onclick = (e) => {
@@ -541,16 +607,17 @@ function tagihan() {
 function lembarKeranjang() {
   const gambar = () => {
     const t = tagihan();
-    bukaLembar(`<h2>Keranjang${t.order ? " · " + esc(t.order.no) : ""}</h2>
-      ${t.items.length ? t.items.map((i) => `<div class="baris"><div class="isi"><b>${esc(i.nama)}</b><div class="small muted">${rp(i.harga)} × ${i.qty} = ${rp(i.harga * i.qty)}${i.bonus ? ` · 🎁 gratis ${i.bonus}` : ""}</div></div>
-        <div class="qty"><button data-k="-" data-sku="${esc(i.sku)}">−</button><span>${i.qty}</span><button data-k="+" data-sku="${esc(i.sku)}">+</button></div></div>`).join("") : '<p class="muted">Keranjang kosong.</p>'}
+    bukaLembar(`<h2>Keranjang${t.order ? " · " + esc(t.order.no) : ""}</h2><div class="sub">Ubah jumlah atau hapus barang. Jumlah 0 berarti dihapus.</div>
+      ${t.items.length ? t.items.map((i) => { const v = A.snap.varian[i.sku], p = A.snap.produk[i.produk_id] ?? { nama: i.nama }; return `<div class="baris">${thumb(p)}
+        <div class="isi"><b>${esc(p.nama)}${v?.nama ? ` <span>· ${esc(v.nama)}</span>` : ""}</b><div class="small muted">${rp(i.harga)}${i.qty > 1 ? ` × ${i.qty} = ${rp(i.harga * i.qty)}` : ""}${i.bonus ? ` · 🎁 gratis ${i.bonus}` : ""}</div></div>
+        <div class="qty"><button data-k="-" data-sku="${esc(i.sku)}">−</button><span>${i.qty}</span><button data-k="+" data-sku="${esc(i.sku)}">+</button></div></div>`; }).join("") : '<div class="kosong">Keranjang kosong.</div>'}
       ${rincianTagihan(t)}
       <button class="btn primary" id="keBayar" ${t.items.length ? "" : "disabled"}>Bayar ${rp(t.sisa)}</button>`);
   };
   gambar();
   $("#lembar").onclick = (e) => {
     const b = e.target.closest("button[data-sku]");
-    if (b) { tambah(b.dataset.sku, b.dataset.k === "+" ? 1 : -1); gambar(); }
+    if (b) { tambah(b.dataset.sku, b.dataset.k === "+" ? 1 : -1); return A.keranjang.length ? gambar() : tutupLembar(); }
     if (e.target.id === "keBayar") layarBayar();
   };
 }
@@ -576,51 +643,64 @@ function layarBayar(bagian) {
   const p = pengaturan();
   const tagih = bagian ?? t.sisa;
   const metode = ["tunai", "qris", "transfer"].filter((m) => p.metode?.[m] !== false);
-  let pilih = metode[0], tunai = 0, ref = "";
+  // tunai: uang diterima. ketik: isian "Nominal lain" (kosong kalau kasir memilih kotak nominal).
+  let pilih = metode[0], tunai = 0, ketik = "", ref = "";
+  const NAMA = { tunai: "Tunai", qris: "QRIS", transfer: "Transfer" }, IKON = { tunai: "💵", qris: "🔳", transfer: "🏦" };
   const gambar = async () => {
     const qris = pilih === "qris" ? await kv.get("qris_gambar") : null;
-    tampil(`${bar(bagian ? "Pisah bayar" : "Pembayaran", esc(A.snap.lokasi.nama), '<button id="kembali">Kembali</button>')}
-      <div class="wrap">
-        <div class="card">${rincianTagihan(t)}${bagian ? `<div class="warn">Bayar sebagian: ${rp(bagian)}. Sisanya dilunasi nanti dari Daftar Order.</div>` : ""}</div>
-        <div class="metode">${metode.map((m) => `<button data-m="${m}" class="${m === pilih ? "on" : ""}">${{ tunai: "Tunai", qris: "QRIS", transfer: "Transfer" }[m]}</button>`).join("")}</div>
-        <div class="card" id="isiBayar">${pilih === "tunai" ? `
-          <label>Uang diterima</label><input id="uang" type="number" inputmode="numeric" min="0" value="${tunai || ""}" placeholder="0">
-          <div class="cepat">${nominalCepat(tagih, p.nominal_cepat).map((n) => `<button data-n="${n}">${n === tagih ? "Uang pas" : rp(n)}</button>`).join("")}</div>
-          <div class="ok" id="kembalian" hidden></div>
-          <button class="btn primary" id="lunas" disabled>Selesaikan</button>`
-        : pilih === "qris" ? `
-          <div class="qris">${qris ? `<img src="${URL.createObjectURL(qris.blob)}" alt="QRIS">` : '<span class="contoh"><img src="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27240%27 height=%27240%27%3E%3Crect width=%27240%27 height=%27240%27 fill=%27%23eee%27/%3E%3C/svg%3E" alt=""></span><div class="err">Gambar QRIS belum diunggah. Minta Admin mengunggahnya di Dashboard › Pengaturan POS.</div>'}
-            <div><b>${esc(p.qris?.nama ?? "")}</b>${p.qris?.nmid ? ` · NMID ${esc(p.qris.nmid)}` : ""}</div>
-            <h1 style="margin-top:8px">${rp(tagih)}</h1><p class="muted small">Pembeli mengetik nominal ini sendiri di aplikasinya.</p></div>
-          <label>4 digit terakhir no. referensi (dari notifikasi aplikasi merchant)</label>
-          <input id="ref" inputmode="numeric" maxlength="4" value="${esc(ref)}" placeholder="0000">
-          <button class="btn primary" id="lunas" ${/^\d{4}$/.test(ref) ? "" : "disabled"}>Dana Sudah Masuk</button>`
-        : `
-          ${(p.rekening ?? []).map((r) => `<div class="baris"><div class="isi"><b>${esc(r.bank)} ${esc(r.no)}</b><div class="small muted">a.n. ${esc(r.nama)}</div></div><button class="btn kecil" data-salin="${esc(r.no)}">Salin</button></div>`).join("")}
-          <h1 style="margin-top:12px">${rp(tagih)}</h1>
-          <button class="btn primary" id="lunas">Dana Sudah Masuk</button>`}
-        </div>
-        ${bagian ? "" : '<button class="btn" id="pisah">Pisah Bayar (sebagian tagihan)</button>'}
-      </div>`, "bayar");
+    // Isian metode yang dipilih tampil tepat di bawah tombolnya, seperti prototipe.
+    const panel = (m) => (m !== pilih ? "" : m === "tunai" ? `<div class="panel">
+        <div class="panel-label">Nominal tunai diterima</div>
+        <div class="cepat">${nominalCepat(tagih, p.nominal_cepat).map((n) => `<button data-n="${n}">${n === tagih ? `<small>Uang pas</small> ${rp(n)}` : rp(n)}</button>`).join("")}</div>
+        <label for="uang">Nominal lain</label><input id="uang" type="number" inputmode="numeric" min="0" value="${esc(ketik)}" placeholder="Ketik jumlah uang">
+        <div class="sisa-baris" id="kembalian"></div></div>`
+      : m === "qris" ? `<div class="panel qris">
+        ${qris ? `<img src="${URL.createObjectURL(qris.blob)}" alt="QRIS">` : '<span class="contoh"><img src="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27240%27 height=%27240%27%3E%3Crect width=%27240%27 height=%27240%27 fill=%27%23eee%27/%3E%3C/svg%3E" alt=""></span><div class="err">Gambar QRIS belum diunggah. Minta Admin mengunggahnya di Dashboard › Pengaturan POS.</div>'}
+        <div class="small" style="margin-top:6px"><b>${esc(p.qris?.nama ?? "")}</b>${p.qris?.nmid ? ` · NMID ${esc(p.qris.nmid)}` : ""}</div>
+        <div class="nominal-besar">${rp(tagih)}</div><div class="small muted">Pembeli mengetik nominal ini sendiri di aplikasinya.</div>
+        <label for="ref" style="text-align:left">4 digit terakhir no. referensi (dari notifikasi aplikasi merchant)</label>
+        <input id="ref" inputmode="numeric" maxlength="4" value="${esc(ref)}" placeholder="0000"></div>`
+      : `<div class="panel">
+        ${(p.rekening ?? []).map((r) => `<div class="rek"><span><b>${esc(r.bank)} ${esc(r.no)}</b>a.n. ${esc(r.nama)}</span><button class="btn kecil" data-salin="${esc(r.no)}">Salin</button></div>`).join("") || '<div class="small muted">Rekening belum diisi di Dashboard › Pengaturan POS.</div>'}
+        <div class="nominal-besar">${rp(tagih)}</div><div class="small muted center">Cek mutasi rekening sebelum menekan Dana Sudah Masuk.</div></div>`);
+    tampil(`${bar(bagian ? "Pisah bayar" : "Pembayaran", `${esc(A.snap.lokasi.nama)} · ${esc(A.sesi.staff.nama)}`, '<button id="kembali">Kembali</button>')}
+      <div class="wrap bayar-wrap">
+        <div class="statbar"><div><small>Total tagihan</small><b>${rp(tagih)}</b></div><div class="sisa"><small>Sisa tagihan</small><b id="statSisa">${rp(tagih)}</b></div><div class="kemb"><small>Kembalian</small><b id="statKemb">Rp 0</b></div></div>
+        <div class="nota"><span class="label">🧾 ${t.order ? esc(t.order.no) : "Order"}</span>${A.ord?.pelanggan ? ` <span class="small muted">Pelanggan: ${esc(A.ord.pelanggan.nama)}</span>` : ""}
+          ${t.items.map((i) => `<div class="brs"><span>${esc(i.nama)} ×${i.qty}</span><b>${rp(i.harga * i.qty)}</b></div>`).join("")}</div>
+        ${bagian ? `<div class="warn" style="margin:0 0 12px">Bayar sebagian: ${rp(bagian)}. Sisanya dilunasi nanti dari Daftar Order.</div>` : '<button class="aksi-bayar" id="pisah">↔️ Pisah Bayar</button>'}
+        <div class="ringkas">${rincianTagihan(t)}</div>
+        <h3>Metode pembayaran</h3>
+        <div class="metode pm">${metode.map((m) => `<button data-m="${m}" class="${m === pilih ? "on" : ""}"><span class="ikon">${IKON[m]}</span>${NAMA[m]}<span class="cek">✓</span></button>${panel(m)}`).join("")}</div>
+      </div>
+      <div class="cta-bawah"><button class="btn primary" id="lunas">${pilih === "tunai" ? "Proses Bayar" : "Dana Sudah Masuk"}</button></div>`, "bayar");
     $("#kembali").onclick = () => { gambarKasir(); };
     if ($("#pisah")) $("#pisah").onclick = lembarPisahBayar;
-    $$(".metode button").forEach((b) => (b.onclick = () => { pilih = b.dataset.m; gambar(); }));
+    $$(".metode.pm > [data-m]").forEach((b) => (b.onclick = () => { if (pilih !== b.dataset.m) { pilih = b.dataset.m; gambar(); } }));
+    const cta = $("#lunas");
     const uang = $("#uang");
     const cekTunai = () => {
-      tunai = Number(uang.value || 0);
-      $("#kembalian").hidden = tunai < tagih;
-      $("#kembalian").textContent = `Kembalian ${rp(tunai - tagih)}`;
-      $("#lunas").disabled = tunai < tagih;
+      const kurang = tunai < tagih;
+      $("#kembalian").className = "sisa-baris" + (kurang ? " kurang" : "");
+      $("#kembalian").innerHTML = kurang ? `<span>Kurang bayar</span> <b>${rp(tagih - tunai)}</b>` : `<span>Kembalian</span> <b>${rp(tunai - tagih)}</b>`;
+      $("#statSisa").textContent = rp(Math.max(0, tagih - tunai));
+      $("#statKemb").textContent = rp(Math.max(0, tunai - tagih));
+      $$(".cepat button").forEach((b) => b.classList.toggle("on", Number(b.dataset.n) === tunai));
+      cta.disabled = kurang;
+      cta.textContent = kurang ? (tunai ? "Uang belum cukup" : "Pilih nominal tunai") : "Proses Bayar";
     };
     if (uang) {
-      uang.oninput = cekTunai;
-      $$(".cepat button").forEach((b) => (b.onclick = () => { uang.value = b.dataset.n; cekTunai(); }));
+      uang.oninput = () => { ketik = uang.value; tunai = Number(ketik || 0); cekTunai(); };
+      $$(".cepat button").forEach((b) => (b.onclick = () => { ketik = ""; uang.value = ""; tunai = Number(b.dataset.n); cekTunai(); }));
       cekTunai();
+    } else {
+      $("#statSisa").textContent = "Rp 0";
     }
     const r = $("#ref");
-    if (r) r.oninput = () => { r.value = r.value.replace(/\D/g, "").slice(0, 4); ref = r.value; $("#lunas").disabled = !/^\d{4}$/.test(ref); };
+    const cekRef = () => { cta.disabled = !/^\d{4}$/.test(ref); cta.textContent = cta.disabled ? "Isi 4 digit referensi" : "Dana Sudah Masuk"; };
+    if (r) { r.oninput = () => { r.value = r.value.replace(/\D/g, "").slice(0, 4); ref = r.value; cekRef(); }; cekRef(); }
     $$("[data-salin]").forEach((b) => (b.onclick = () => navigator.clipboard?.writeText(b.dataset.salin.replace(/\s/g, "")).then(() => toast("Nomor rekening disalin"))));
-    $("#lunas").onclick = () => {
+    cta.onclick = () => {
       const bayar = pilih === "tunai" ? { metode: "Tunai", jumlah: tunai } : pilih === "qris" ? { metode: "QRIS", jumlah: tagih, ref } : { metode: "Transfer", jumlah: tagih };
       if (bagian) return bayarSebagian(t, { ...bayar, jumlah: bagian, diterima: bayar.jumlah });
       selesaikan(t, bayar);
@@ -680,13 +760,13 @@ function htmlStruk(t) {
   const st = pengaturan().struk ?? {};
   return `<div class="struk">
     <div class="tengah"><b>${esc(st.nama)}</b>${st.info ? `<div>${esc(st.info)}</div>` : ""}${st.tampil_event ? `<div>${esc(t.lokasi_nama)}</div>` : ""}</div>
-    <table class="rinci"><tr><td>No.</td><td>${esc(t.no)}</td></tr><tr><td>Waktu</td><td>${tglJam(t.waktu)}</td></tr>${st.tampil_kasir ? `<tr><td>Kasir</td><td>${esc(t.kasir_nama)}</td></tr>` : ""}
-      ${t.pelanggan_nama ? `<tr><td>Pembeli</td><td>${esc(t.pelanggan_nama)}</td></tr>` : ""}${t.status !== "Lunas" ? `<tr><td>Status</td><td><b>${esc(t.status)}</b></td></tr>` : ""}</table>
-    <table class="rinci">${t.items.map((i) => `<tr><td>${esc(i.nama)}<br><span class="muted">${i.qty} × ${rp(i.harga)}</span></td><td>${rp(i.qty * i.harga)}</td></tr>`).join("")}</table>
-    ${rincianTagihan(t)}
+    <table class="rinci" style="margin-top:8px"><tr><td>No. transaksi</td><td>${esc(t.no)}</td></tr><tr><td>Waktu</td><td>${tglJam(t.waktu)}</td></tr>${st.tampil_kasir ? `<tr><td>Kasir</td><td>${esc(t.kasir_nama)}</td></tr>` : ""}
+      ${t.pelanggan_nama ? `<tr><td>Pembeli</td><td>${esc(t.pelanggan_nama)}</td></tr>` : ""}${t.status !== "Lunas" ? `<tr><td>Status</td><td><b>${esc(t.status)}</b></td></tr>` : ""}</table><hr>
+    <table class="rinci">${t.items.map((i) => `<tr><td>${esc(i.nama)} ×${i.qty}</td><td>${rp(i.qty * i.harga)}</td></tr>`).join("")}</table><hr>
+    ${rincianTagihan(t)}<hr>
     <table class="rinci">${t.pembayaran.map((b) => `<tr><td>${esc(b.metode)}${b.ref ? ` (ref ${esc(b.ref)})` : ""}</td><td>${rp(b.jumlah)}</td></tr>`).join("")}${t.kembalian ? `<tr><td>Kembalian</td><td>${rp(t.kembalian)}</td></tr>` : ""}</table>
-    ${t.presale ? `<div class="tengah" style="margin-top:10px"><b>PRE-SALE · QR PENGAMBILAN</b><div class="qr-struk">${svgQr(isiQr(t))}</div><div class="small">${esc(catatanPresale(t))}</div></div>` : ""}
-    ${st.footer ? `<div class="tengah muted" style="margin-top:8px">${esc(st.footer)}</div>` : ""}</div>`;
+    ${t.presale ? `<hr><div class="tengah"><b>PRE-SALE · QR PENGAMBILAN</b><div class="qr-struk">${svgQr(isiQr(t))}</div><div class="small">${esc(catatanPresale(t))}</div></div>` : ""}
+    ${st.footer ? `<hr><div class="tengah">${esc(st.footer)}</div>` : ""}</div>`;
 }
 
 const pdfStruk = (t) => strukPdf({ ...t, qr: t.presale ? isiQr(t) : null, catatan_presale: t.presale ? catatanPresale(t) : null }, { nama: t.lokasi_nama }, pengaturan().struk ?? {});
@@ -711,17 +791,17 @@ async function bagikanStruk(t, nomor) {
 }
 
 function layarSukses(t) {
-  tampil(`${bar("Pembayaran berhasil", esc(t.no))}
-    <div class="wrap">
-      <div class="ok center"><b>Lunas ${rp(t.total)}</b>${t.kembalian ? `<br>Kembalian ${rp(t.kembalian)}` : ""}</div>
+  tampil(`<div class="sukses">
+      <div class="cincin"><svg viewBox="0 0 24 24" fill="none" stroke="#FF6100" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg></div>
+      <h1>Transaksi Berhasil</h1>
+      <div class="sub"><b>Lunas ${rp(t.total)}</b>${t.kembalian ? `<br>Kembalian ${rp(t.kembalian)}` : ""}<br>Pesanan sudah tercatat. Struk siap dibagikan ke pelanggan.</div>
       ${t.offline ? '<div class="warn">Tersimpan di HP. Dikirim ke server saat ada sinyal.</div>' : ""}
       ${t.presale ? '<div class="warn">Pre-sale: kirim struk PDF berisi QR ke WhatsApp pembeli. QR ini dipakai saat mengambil barang.</div>' : ""}
-      <div style="margin-top:12px">${htmlStruk(t)}</div>
-      <label>Kirim struk PDF ke WhatsApp</label>
-      <input id="wa" inputmode="tel" placeholder="08xx atau +62" value="${esc(t.pelanggan_telp ?? "")}">
-      <button class="btn ${t.presale ? "primary" : ""}" id="kirimWa">Kirim dari WhatsApp HP ini</button>
-      <button class="btn" id="unduh">Unduh PDF</button>
-      <button class="btn ${t.presale ? "" : "primary"}" id="baru">Transaksi baru</button>
+      ${htmlStruk(t)}
+      <div class="wabox"><div class="lbl">Kirim struk PDF ke WhatsApp</div>
+        <div class="brs"><input id="wa" inputmode="tel" placeholder="08xx atau +62" value="${esc(t.pelanggan_telp ?? "")}"><button class="btn primary" id="kirimWa">Kirim</button></div></div>
+      <button class="btn" id="unduh">📄 Unduh PDF</button>
+      <button class="btn primary" id="baru">Transaksi baru</button>
     </div>`, "sukses");
   $("#kirimWa").onclick = () => bagikanStruk(t, $("#wa").value);
   $("#unduh").onclick = () => pdfStruk(t).save(`Struk-${t.no}.pdf`);
@@ -731,28 +811,30 @@ function layarSukses(t) {
 // ---------- Menu ----------
 
 function lembarMenu() {
-  const owner = A.sesi.staff.role.includes("owner");
-  bukaLembar(`<h2>Menu</h2><div class="daftar">
-    <button data-m="riwayat">Penjualan shift ini (detail, void, retur)</button>
-    <button data-m="pesanan">${A.snap.lokasi.jenis === "gudang" ? "Ambil di kantor (pre-sale)" : "Pesanan pre-sale"}</button>
-    <button data-m="laporan">Laporan: kasir, kas, produk terjual</button>
-    <button data-m="kas">Kas kasir</button>
-    ${A.snap.lokasi.jenis === "event" ? '<button data-m="inventori">Inventori: terima kiriman, stok opname</button>' : ""}
-    <button data-m="sinkron">Status sinkron</button>
-    <button data-m="riwayatmasuk">Riwayat masuk</button>
-    <button data-m="pengaturan">Pengaturan</button>
-    ${owner ? '<button data-m="tempat">Ganti tempat jualan</button>' : ""}
-    ${owner && A.snap.lokasi.jenis === "event" ? '<button data-m="tutupevent">Tutup event</button>' : ""}
-    <button data-m="pin">Ganti PIN</button>
-    <button data-m="tutup">Tutup kasir</button>
-    <button data-m="keluar">Keluar kasir (laci tetap terbuka)</button>
+  const owner = A.sesi.staff.role.includes("owner"), ev = A.snap.lokasi.jenis === "event";
+  const item = (m, ikon, judul, ket, kelas = "") => `<button data-m="${m}" class="${kelas}"><span class="ikon">${ikon}</span><span><b>${judul}</b><small>${ket}</small></span></button>`;
+  bukaLembar(`<h2>${esc(A.snap.lokasi.nama)}</h2><div class="sub">${esc(A.sesi.staff.nama)}${A.sesi.shift?.buka ? " · kasir dibuka " + jam(A.sesi.shift.buka) : ""}</div><div class="menu-daftar">
+    ${item("kasir", "👤", "Kasir", "Halaman aktif saat ini", "aktif")}
+    ${item("riwayat", "🧾", "Penjualan", "Transaksi shift ini, kirim ulang struk, void, retur")}
+    ${item("pesanan", "🛍️", ev ? "Pesanan pre-sale" : "Ambil di kantor (pre-sale)", "Serahkan barang pre-sale dengan scan QR")}
+    ${item("laporan", "📊", "Laporan", "Laporan kasir, kas, dan produk terjual")}
+    ${item("kas", "💵", "Kas kasir", "Catat uang masuk dan keluar laci")}
+    ${ev ? item("inventori", "📦", "Inventori", "Terima kiriman stok dan stok opname") : ""}
+    ${item("sinkron", "🔄", "Status sinkron", "Data yang belum terkirim ke server")}
+    ${item("riwayatmasuk", "🔐", "Riwayat masuk", "Siapa masuk ke POS, kapan, dan di HP mana")}
+    ${item("pengaturan", "⚙️", "Pengaturan", "Info HP dan preferensi aplikasi")}
+    ${owner ? item("tempat", "🏬", "Ganti tempat jualan", "Pindah ke event atau gudang lain") : ""}
+    ${owner && ev ? item("tutupevent", "🏁", "Tutup event", "Tutup semua kasir dan kembalikan sisa stok ke gudang") : ""}
+    ${item("pin", "🔑", "Ganti PIN", "Ubah PIN 6 angka Anda")}
+    ${item("tutup", "🧮", "Tutup kasir", "Hitung uang laci dan setor")}
+    ${item("keluar", "🚪", "Keluar kasir", "Laci tetap terbuka untuk dilanjutkan")}
   </div>`);
   $("#lembar").onclick = (e) => {
     const m = e.target.closest("[data-m]")?.dataset.m;
     if (!m) return;
     tutupLembar();
     ({
-      riwayat: layarRiwayat, pesanan: () => layarPesanan(gambarKasir), kas: layarKas, inventori: () => layarInventori(), sinkron: layarSinkron,
+      kasir: () => {}, riwayat: layarRiwayat, pesanan: () => layarPesanan(gambarKasir), kas: layarKas, inventori: () => layarInventori(), sinkron: layarSinkron,
       laporan: () => layarLaporanPos(), riwayatmasuk: () => layarRiwayatMasuk(), pengaturan: layarPengaturanPos, tutupevent: () => layarTutupEventPos(),
       pin: () => (S.online ? gantiPin(false) : toast("Ganti PIN butuh sinyal")),
       tutup: layarTutupKasir, keluar: () => keluar(),
@@ -1101,19 +1183,20 @@ function kunciLayar(otomatis) {
   const el = $("#kunci");
   el.hidden = false;
   let isi = "";
-  el.innerHTML = `${bar("Layar terkunci", esc(A.snap?.lokasi?.nama ?? ""))}<div class="wrap center">
-    <div class="av" style="margin:8px auto;width:56px;height:56px;font-size:20px">${esc(inisial(st.nama))}</div>
-    <h1>${esc(st.nama)}</h1><div class="muted">Masukkan PIN untuk membuka</div>
+  el.innerHTML = `<div class="kunci-view">
+    <h1>Halo, ${esc(st.nama.split(/\s+/)[0])}</h1><div class="sub">Layar terkunci. Masukkan PIN untuk membuka</div>
+    <button class="tautan" id="gantiOrang">Bukan Anda? Ganti kasir</button>
+    <div class="ilustrasi">🔒</div>
     <div class="titik" id="titikK"></div><div class="err" id="errK" hidden></div>
-    <div class="pad" id="padK">${["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"].map((k) => `<button class="${k ? "" : "kosong"}" data-k="${k}">${k}</button>`).join("")}</div>
-    <button class="btn" id="gantiOrang">Ganti kasir</button></div>`;
-  const titik = () => ($("#titikK").innerHTML = [0, 1, 2, 3, 4, 5].map((i) => `<span class="${i < isi.length ? "isi" : ""}"></span>`).join(""));
+    ${padPin("padK")}
+    <div class="kaki-kunci"><span class="av">${esc(inisial(st.nama))}</span><span>${esc(A.snap?.lokasi?.nama ?? "")}</span></div></div>`;
+  const titik = () => ($("#titikK").innerHTML = titikPin(isi.length));
   titik();
   $("#gantiOrang").onclick = () => { el.hidden = true; keluar(); };
   $("#padK").onclick = async (e) => {
-    const k = e.target.dataset?.k;
-    if (k === undefined || k === "") return;
-    isi = k === "⌫" ? isi.slice(0, -1) : (isi + k).slice(0, 6);
+    const k = e.target.closest("[data-k]")?.dataset.k;
+    if (!k) return;
+    isi = k === "⌫" ? isi.slice(0, -1) : k === "C" ? "" : (isi + k).slice(0, 6);
     titik();
     if (isi.length < 6) return;
     const pin = isi;
