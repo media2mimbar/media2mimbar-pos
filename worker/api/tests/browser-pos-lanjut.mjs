@@ -86,6 +86,8 @@ try {
   const tambah = async (n) => { await kartu.click(); for (let i = 0; i < n; i++) await hp.locator('#lembar button[data-k="+"]').click(); await hp.locator("#selesaiVarian").click(); };
   await tambah(2);
   await hp.locator("#btnBayar").click();
+  await hp.locator('.metode [data-m="tunai"]').click();
+  await hp.locator("#lanjutPembayaran").click();
   await hp.getByRole("button", { name: "Uang pas" }).click();
   await hp.locator("#lunas").click();
   await hp.locator("#baru").click();

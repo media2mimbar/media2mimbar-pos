@@ -643,70 +643,95 @@ function layarBayar(bagian) {
   const p = pengaturan();
   const tagih = bagian ?? t.sisa;
   const metode = ["tunai", "qris", "transfer"].filter((m) => p.metode?.[m] !== false);
-  // tunai: uang diterima. ketik: isian "Nominal lain" (kosong kalau kasir memilih kotak nominal).
-  let pilih = metode[0], tunai = 0, ketik = "", ref = "";
   const NAMA = { tunai: "Tunai", qris: "QRIS", transfer: "Transfer" }, IKON = { tunai: "💵", qris: "🔳", transfer: "🏦" };
-  const gambar = async () => {
-    const qris = pilih === "qris" ? await kv.get("qris_gambar") : null;
-    // Isian metode yang dipilih tampil tepat di bawah tombolnya, seperti prototipe.
-    const panel = (m) => (m !== pilih ? "" : m === "tunai" ? `<div class="panel">
-        <div class="panel-label">Nominal tunai diterima</div>
-        <div class="cepat">${nominalCepat(tagih, p.nominal_cepat).map((n) => `<button data-n="${n}">${n === tagih ? `<small>Uang pas</small> ${rp(n)}` : rp(n)}</button>`).join("")}</div>
-        <label for="uang">Nominal lain</label><input id="uang" type="number" inputmode="numeric" min="0" value="${esc(ketik)}" placeholder="Ketik jumlah uang">
-        <div class="sisa-baris" id="kembalian"></div></div>`
-      : m === "qris" ? `<div class="panel qris">
+  // Langkah 1: kasir memilih metode, lalu Lanjut Pembayaran. Langkah 2: sheet sesuai metode, lalu selesaikan.
+  let pilih = metode.length === 1 ? metode[0] : null;
+  const ke = (t.order?.bayar ?? []).length + 1;
+  const sisaNanti = t.sisa - tagih;
+  tampil(`${bar(bagian || t.sudah_dibayar ? `Pembayaran ke-${ke}` : "Pembayaran", `${esc(A.snap.lokasi.nama)} · ${esc(A.sesi.staff.nama)}`, '<button id="kembali">Kembali</button>')}
+    <div class="wrap bayar-wrap">
+      <div class="statbar"><div><small>Total tagihan</small><b>${rp(t.total)}</b></div><div class="kemb"><small>Dibayar sekarang</small><b>${rp(tagih)}</b></div><div class="${sisaNanti > 0 ? "sisa" : ""}"><small>Sisa setelah ini</small><b>${rp(sisaNanti)}</b></div></div>
+      <div class="nota"><span class="label">🧾 ${t.order ? esc(t.order.no) : "Order"}</span>${A.ord?.pelanggan ? ` <span class="small muted">Pelanggan: ${esc(A.ord.pelanggan.nama)}</span>` : ""}
+        ${t.items.map((i) => `<div class="brs"><span>${esc(i.nama)} ×${i.qty}</span><b>${rp(i.harga * i.qty)}</b></div>`).join("")}</div>
+      ${bagian ? `<div class="warn" style="margin:0 0 12px">Pisah bayar. Selesaikan pembayaran ${rp(bagian)} ini dulu, lalu sisa ${rp(sisaNanti)} dibayar setelahnya.</div>` : '<button class="aksi-bayar" id="pisah">↔️ Pisah Bayar</button>'}
+      <div class="ringkas">${rincianTagihan(t)}</div>
+      <h3>Metode pembayaran</h3>
+      <div class="metode pm">${metode.map((m) => `<button data-m="${m}" class="${m === pilih ? "on" : ""}"><span class="ikon">${IKON[m]}</span>${NAMA[m]}<span class="cek">✓</span></button>`).join("")}</div>
+    </div>
+    <div class="cta-bawah"><button class="btn primary" id="lanjutPembayaran"></button></div>`, "bayar");
+  $("#kembali").onclick = () => { gambarKasir(); };
+  if ($("#pisah")) $("#pisah").onclick = lembarPisahBayar;
+  const lanjut = $("#lanjutPembayaran");
+  const gambarPilih = () => {
+    $$(".metode.pm > [data-m]").forEach((b) => b.classList.toggle("on", b.dataset.m === pilih));
+    lanjut.disabled = !pilih;
+    lanjut.textContent = pilih ? "Lanjut Pembayaran" : "Pilih metode pembayaran";
+  };
+  $$(".metode.pm > [data-m]").forEach((b) => (b.onclick = () => { pilih = b.dataset.m; gambarPilih(); }));
+  gambarPilih();
+  lanjut.onclick = () => pilih && lembarBayar(pilih, t, tagih, bagian, p);
+}
+
+// Langkah 2 pembayaran: isian sesuai metode di sheet. Batal kembali ke pilihan metode.
+async function lembarBayar(metode, t, tagih, bagian, p) {
+  let tunai = 0, ref = "";
+  const kepala = (judul, sub) => `<h2>${judul}</h2><div class="sub">${sub}</div>`;
+  const tombol = (teks) => `<button class="btn primary" id="lunas" disabled>${teks}</button><button class="btn hantu" id="gantiMetode">Ganti metode</button>`;
+  if (metode === "tunai") {
+    bukaLembar(`${kepala("Bayar tunai", bagian ? "Pembayaran sebagian. Sisanya dibayar setelah ini." : "Hitung uang dari pembeli.")}
+      <div class="nominal-besar">${rp(tagih)}</div>
+      <div class="panel-label" style="margin-top:12px">Nominal tunai diterima</div>
+      <div class="cepat">${nominalCepat(tagih, p.nominal_cepat).map((n) => `<button data-n="${n}">${n === tagih ? `<small>Uang pas</small> ${rp(n)}` : rp(n)}</button>`).join("")}</div>
+      <label for="uang">Nominal lain</label><input id="uang" type="number" inputmode="numeric" min="0" placeholder="Ketik jumlah uang">
+      <div class="sisa-baris" id="kembalian"></div>
+      ${tombol("Pilih nominal tunai")}`);
+  } else if (metode === "qris") {
+    const qris = await kv.get("qris_gambar");
+    bukaLembar(`${kepala("QRIS", "Minta pembeli memindai QRIS ini, lalu cek notifikasi di aplikasi merchant.")}
+      <div class="panel qris">
         ${qris ? `<img src="${URL.createObjectURL(qris.blob)}" alt="QRIS">` : '<span class="contoh"><img src="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27240%27 height=%27240%27%3E%3Crect width=%27240%27 height=%27240%27 fill=%27%23eee%27/%3E%3C/svg%3E" alt=""></span><div class="err">Gambar QRIS belum diunggah. Minta Admin mengunggahnya di Dashboard › Pengaturan POS.</div>'}
         <div class="small" style="margin-top:6px"><b>${esc(p.qris?.nama ?? "")}</b>${p.qris?.nmid ? ` · NMID ${esc(p.qris.nmid)}` : ""}</div>
         <div class="nominal-besar">${rp(tagih)}</div><div class="small muted">Pembeli mengetik nominal ini sendiri di aplikasinya.</div>
-        <label for="ref" style="text-align:left">4 digit terakhir no. referensi (dari notifikasi aplikasi merchant)</label>
-        <input id="ref" inputmode="numeric" maxlength="4" value="${esc(ref)}" placeholder="0000"></div>`
-      : `<div class="panel">
-        ${(p.rekening ?? []).map((r) => `<div class="rek"><span><b>${esc(r.bank)} ${esc(r.no)}</b>a.n. ${esc(r.nama)}</span><button class="btn kecil" data-salin="${esc(r.no)}">Salin</button></div>`).join("") || '<div class="small muted">Rekening belum diisi di Dashboard › Pengaturan POS.</div>'}
-        <div class="nominal-besar">${rp(tagih)}</div><div class="small muted center">Cek mutasi rekening sebelum menekan Dana Sudah Masuk.</div></div>`);
-    tampil(`${bar(bagian ? "Pisah bayar" : "Pembayaran", `${esc(A.snap.lokasi.nama)} · ${esc(A.sesi.staff.nama)}`, '<button id="kembali">Kembali</button>')}
-      <div class="wrap bayar-wrap">
-        <div class="statbar"><div><small>Total tagihan</small><b>${rp(tagih)}</b></div><div class="sisa"><small>Sisa tagihan</small><b id="statSisa">${rp(tagih)}</b></div><div class="kemb"><small>Kembalian</small><b id="statKemb">Rp 0</b></div></div>
-        <div class="nota"><span class="label">🧾 ${t.order ? esc(t.order.no) : "Order"}</span>${A.ord?.pelanggan ? ` <span class="small muted">Pelanggan: ${esc(A.ord.pelanggan.nama)}</span>` : ""}
-          ${t.items.map((i) => `<div class="brs"><span>${esc(i.nama)} ×${i.qty}</span><b>${rp(i.harga * i.qty)}</b></div>`).join("")}</div>
-        ${bagian ? `<div class="warn" style="margin:0 0 12px">Bayar sebagian: ${rp(bagian)}. Sisanya dilunasi nanti dari Daftar Order.</div>` : '<button class="aksi-bayar" id="pisah">↔️ Pisah Bayar</button>'}
-        <div class="ringkas">${rincianTagihan(t)}</div>
-        <h3>Metode pembayaran</h3>
-        <div class="metode pm">${metode.map((m) => `<button data-m="${m}" class="${m === pilih ? "on" : ""}"><span class="ikon">${IKON[m]}</span>${NAMA[m]}<span class="cek">✓</span></button>${panel(m)}`).join("")}</div>
       </div>
-      <div class="cta-bawah"><button class="btn primary" id="lunas">${pilih === "tunai" ? "Proses Bayar" : "Dana Sudah Masuk"}</button></div>`, "bayar");
-    $("#kembali").onclick = () => { gambarKasir(); };
-    if ($("#pisah")) $("#pisah").onclick = lembarPisahBayar;
-    $$(".metode.pm > [data-m]").forEach((b) => (b.onclick = () => { if (pilih !== b.dataset.m) { pilih = b.dataset.m; gambar(); } }));
-    const cta = $("#lunas");
-    const uang = $("#uang");
-    const cekTunai = () => {
+      <label for="ref">4 digit terakhir no. referensi (dari notifikasi aplikasi merchant)</label>
+      <input id="ref" inputmode="numeric" maxlength="4" placeholder="0000">
+      ${tombol("Isi 4 digit referensi")}`);
+  } else {
+    bukaLembar(`${kepala("Transfer", "Pembeli mentransfer ke rekening ini. Cek mutasi rekening sebelum menekan Dana Sudah Masuk.")}
+      <div class="panel">
+        ${(p.rekening ?? []).map((r) => `<div class="rek"><span><b>${esc(r.bank)} ${esc(r.no)}</b>a.n. ${esc(r.nama)}</span><button class="btn kecil" data-salin="${esc(r.no)}">Salin</button></div>`).join("") || '<div class="small muted">Rekening belum diisi di Dashboard › Pengaturan POS.</div>'}
+        <div class="nominal-besar">${rp(tagih)}</div>
+      </div>
+      ${tombol("Dana Sudah Masuk")}`);
+    $("#lunas").disabled = false;
+  }
+  $("#lembar").onclick = null;
+  const cta = $("#lunas");
+  $("#gantiMetode").onclick = tutupLembar;
+  const uang = $("#uang");
+  if (uang) {
+    const cek = () => {
       const kurang = tunai < tagih;
       $("#kembalian").className = "sisa-baris" + (kurang ? " kurang" : "");
       $("#kembalian").innerHTML = kurang ? `<span>Kurang bayar</span> <b>${rp(tagih - tunai)}</b>` : `<span>Kembalian</span> <b>${rp(tunai - tagih)}</b>`;
-      $("#statSisa").textContent = rp(Math.max(0, tagih - tunai));
-      $("#statKemb").textContent = rp(Math.max(0, tunai - tagih));
       $$(".cepat button").forEach((b) => b.classList.toggle("on", Number(b.dataset.n) === tunai));
       cta.disabled = kurang;
-      cta.textContent = kurang ? (tunai ? "Uang belum cukup" : "Pilih nominal tunai") : "Proses Bayar";
+      cta.textContent = kurang ? (tunai ? "Uang belum cukup" : "Pilih nominal tunai") : bagian ? `Selesaikan pembayaran ${rp(tagih)}` : "Selesaikan";
     };
-    if (uang) {
-      uang.oninput = () => { ketik = uang.value; tunai = Number(ketik || 0); cekTunai(); };
-      $$(".cepat button").forEach((b) => (b.onclick = () => { ketik = ""; uang.value = ""; tunai = Number(b.dataset.n); cekTunai(); }));
-      cekTunai();
-    } else {
-      $("#statSisa").textContent = "Rp 0";
-    }
-    const r = $("#ref");
-    const cekRef = () => { cta.disabled = !/^\d{4}$/.test(ref); cta.textContent = cta.disabled ? "Isi 4 digit referensi" : "Dana Sudah Masuk"; };
-    if (r) { r.oninput = () => { r.value = r.value.replace(/\D/g, "").slice(0, 4); ref = r.value; cekRef(); }; cekRef(); }
-    $$("[data-salin]").forEach((b) => (b.onclick = () => navigator.clipboard?.writeText(b.dataset.salin.replace(/\s/g, "")).then(() => toast("Nomor rekening disalin"))));
-    cta.onclick = () => {
-      const bayar = pilih === "tunai" ? { metode: "Tunai", jumlah: tunai } : pilih === "qris" ? { metode: "QRIS", jumlah: tagih, ref } : { metode: "Transfer", jumlah: tagih };
-      if (bagian) return bayarSebagian(t, { ...bayar, jumlah: bagian, diterima: bayar.jumlah });
-      selesaikan(t, bayar);
-    };
+    uang.oninput = () => { tunai = Number(uang.value || 0); cek(); };
+    // Kotak nominal dan isian "Nominal lain" tidak dipakai bersamaan.
+    $$(".cepat button").forEach((b) => (b.onclick = () => { uang.value = ""; tunai = Number(b.dataset.n); cek(); }));
+    cek();
+  }
+  const r = $("#ref");
+  if (r) r.oninput = () => { r.value = r.value.replace(/\D/g, "").slice(0, 4); ref = r.value; cta.disabled = !/^\d{4}$/.test(ref); cta.textContent = cta.disabled ? "Isi 4 digit referensi" : "Dana Sudah Masuk"; };
+  $$("[data-salin]").forEach((b) => (b.onclick = () => navigator.clipboard?.writeText(b.dataset.salin.replace(/\s/g, "")).then(() => toast("Nomor rekening disalin"))));
+  cta.onclick = () => {
+    const bayar = metode === "tunai" ? { metode: "Tunai", jumlah: tunai } : metode === "qris" ? { metode: "QRIS", jumlah: tagih, ref } : { metode: "Transfer", jumlah: tagih };
+    tutupLembar();
+    if (bagian) return bayarSebagian(t, { ...bayar, jumlah: bagian, diterima: bayar.jumlah });
+    selesaikan(t, bayar);
   };
-  gambar();
 }
 
 let sedangBayar = false;

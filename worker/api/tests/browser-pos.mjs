@@ -77,6 +77,8 @@ try {
   await hp.screenshot({ path: SHOTS + "p1-kasir.png" });
 
   await hp.locator("#btnBayar").click();
+  await hp.locator('.metode [data-m="tunai"]').click();
+  await hp.locator("#lanjutPembayaran").click();
   await hp.getByRole("button", { name: "Rp 310.000" }).click();
   assert.equal(await hp.locator("#kembalian").textContent(), "Kembalian Rp 6.000");
   await hp.screenshot({ path: SHOTS + "p2-bayar.png" });
@@ -94,6 +96,7 @@ try {
   await kartuTot.click();
   await hp.locator("#btnBayar").click();
   await hp.locator('.metode button[data-m="qris"]').click();
+  await hp.locator("#lanjutPembayaran").click();
   await hp.locator(".qris img").waitFor();
   assert.equal(await hp.locator("#lunas").isDisabled(), true);
   await hp.locator("#ref").fill("4821");

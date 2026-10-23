@@ -374,13 +374,16 @@ async function bayarSebagian(t, bayar) {
   await simpanDaftarOrder();
   await simpanSesi();
   const kembali = bayar.metode === "Tunai" ? bayar.diterima - bayar.jumlah : 0;
+  const sisa = tagihan().sisa;
   tampil(`<div class="sukses">
       <div class="cincin"><svg viewBox="0 0 24 24" fill="none" stroke="#02194F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg></div>
-      <h1>Pembayaran sebagian</h1>
-      <div class="sub"><b>Diterima ${rp(bayar.jumlah)}</b>${kembali > 0 ? `<br>Kembalian ${rp(kembali)}` : ""}<br>Sisanya tetap di Daftar Order ${esc(o.no)} sampai lunas.</div>
+      <h1>Pembayaran ${o.bayar.length} berhasil</h1>
+      <div class="sub"><b>Diterima ${rp(bayar.jumlah)}</b>${kembali > 0 ? `<br>Kembalian ${rp(kembali)}` : ""}<br>${esc(bayar.metode)} · pesanan ${esc(o.no)}</div>
+      <div class="sisa-kotak"><span>Sisa tagihan</span><b>${rp(sisa)}</b></div>
       <div class="card" style="align-self:stretch;text-align:left;margin-top:10px">${rincianTagihan(tagihan())}</div>
-      <button class="btn primary" id="lanjutBayar">Bayar sisa sekarang</button>
-      <button class="btn" id="keKasir">Simpan, bayar nanti</button></div>`, "sebagian");
+      <button class="btn primary" id="lanjutBayar">Lanjut bayar sisa ${rp(sisa)}</button>
+      <button class="btn" id="keKasir">Simpan, bayar nanti</button>
+      <p class="small muted" style="margin-top:8px">Kalau disimpan, sisanya bisa dilunasi nanti dari Daftar Order.</p></div>`, "sebagian");
   $("#lanjutBayar").onclick = () => layarBayar();
   $("#keKasir").onclick = () => { kosongkanKeranjang(); gambarKasir(); };
 }

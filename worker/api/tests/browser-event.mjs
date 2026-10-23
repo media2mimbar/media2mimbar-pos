@@ -112,6 +112,8 @@ try {
   await hp.locator('#lembar button[data-k="+"][data-sku="KB-S"]').click();
   await hp.locator("#selesaiVarian").click();
   await hp.locator("#btnBayar").click();
+  await hp.locator('.metode [data-m="tunai"]').click();
+  await hp.locator("#lanjutPembayaran").click();
   await hp.getByRole("button", { name: "Uang pas" }).click();
   await hp.locator("#lunas").click();
   await hp.getByText("Lunas Rp 99.000").waitFor();
