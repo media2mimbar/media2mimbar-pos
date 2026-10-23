@@ -734,7 +734,7 @@ async function lembarBayar(metode, t, tagih, bagian, p) {
       <div class="qris-isi qris">
         ${nama || p.qris?.nmid ? `<div class="qris-merchant">${nama ? `<b>${esc(nama)}</b>` : ""}${kota ? `<div class="kota">${esc(kota)}</div>` : ""}${p.qris?.nmid ? `<div class="nmid">NMID: ${esc(p.qris.nmid)}</div>` : ""}</div>` : ""}
         <div class="qris-kartu">
-          <svg class="qris-logo" viewBox="0 0 100 40" role="img" aria-label="QRIS"><path d="M2 12V2h10M98 28v10H88" fill="none" stroke="currentColor" stroke-width="3"/><text x="50" y="30" text-anchor="middle" font-size="27" font-weight="900" letter-spacing="1.5" fill="currentColor">QRIS</text></svg>
+          <div class="qris-logo" role="img" aria-label="QRIS"></div>
           <div class="qris-nominal"><small>Rp</small>${tagih.toLocaleString("id-ID")}</div>
           <div class="qr-bingkai">${gambarQr}</div>
           ${qris ? "" : '<div class="err">Gambar QRIS belum diunggah. Minta Admin mengunggahnya di Dashboard › Pengaturan POS.</div>'}
