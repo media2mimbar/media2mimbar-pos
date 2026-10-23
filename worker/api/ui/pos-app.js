@@ -672,9 +672,41 @@ function layarBayar(bagian) {
   lanjut.onclick = () => pilih && lembarBayar(pilih, t, tagih, bagian, p);
 }
 
+// Teks QRIS dibaca sekali dari gambar yang diunggah Admin lalu disimpan di HP, supaya tetap jalan tanpa sinyal.
+// null kalau gambar belum ada, QR-nya tidak terbaca, atau isinya bukan QRIS yang bisa dipakai.
+async function teksQris() {
+  const g = await kv.get("qris_gambar");
+  if (!g) return null;
+  const simpan = await kv.get("qris_teks");
+  if (simpan?.id === g.id) return simpan.teks;
+  try {
+    const img = await createImageBitmap(g.blob);
+    let teks = null;
+    for (const batas of [1200, 600]) {
+      const s = Math.min(1, batas / Math.max(img.width, img.height)), w = Math.round(img.width * s), h = Math.round(img.height * s);
+      teks = await bacaQrDari(img, w, h);
+      if (!teks) {
+        // Pembaca bawaan HP kadang tidak menemukan apa pun; coba juga dengan jsQR.
+        await muatJsQr();
+        const c = document.createElement("canvas");
+        c.width = w; c.height = h;
+        const k = c.getContext("2d", { willReadFrequently: true });
+        k.drawImage(img, 0, 0, w, h);
+        teks = jsQR(k.getImageData(0, 0, w, h).data, w, h)?.data ?? null;
+      }
+      if (teks) break;
+    }
+    const pakai = teks && !HkQris.periksa(teks) ? teks : null;
+    await kv.set("qris_teks", { id: g.id, teks: pakai });
+    return pakai;
+  } catch {
+    return null; // pemindai belum termuat: coba lagi di pembayaran berikutnya
+  }
+}
+
 // Langkah 2 pembayaran: isian sesuai metode di sheet. Batal kembali ke pilihan metode.
 async function lembarBayar(metode, t, tagih, bagian, p) {
-  let tunai = 0, ref = "";
+  let tunai = 0;
   const kepala = (judul, sub) => `<h2>${judul}</h2><div class="sub">${sub}</div>`;
   const tombol = (teks) => `<button class="btn primary" id="lunas" disabled>${teks}</button><button class="btn hantu" id="gantiMetode">Ganti metode</button>`;
   if (metode === "tunai") {
@@ -687,15 +719,19 @@ async function lembarBayar(metode, t, tagih, bagian, p) {
       ${tombol("Pilih nominal tunai")}`);
   } else if (metode === "qris") {
     const qris = await kv.get("qris_gambar");
-    bukaLembar(`${kepala("QRIS", "Minta pembeli memindai QRIS ini, lalu cek notifikasi di aplikasi merchant.")}
+    // QR berisi nominal dibuat dari QRIS statis yang diunggah Admin. Kalau QRIS-nya tidak terbaca, QR statis tetap dipakai.
+    const teks = await teksQris();
+    const qrNominal = teks && HkQris.buat(teks, tagih);
+    bukaLembar(`${kepala("QRIS", qrNominal ? "Minta pembeli memindai QR ini. Nominal sudah ada di QR, pembeli tinggal membayar." : "Minta pembeli memindai QRIS ini dan mengetik nominal di bawah.")}
       <div class="panel qris">
-        ${qris ? `<img src="${URL.createObjectURL(qris.blob)}" alt="QRIS">` : '<span class="contoh"><img src="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27240%27 height=%27240%27%3E%3Crect width=%27240%27 height=%27240%27 fill=%27%23eee%27/%3E%3C/svg%3E" alt=""></span><div class="err">Gambar QRIS belum diunggah. Minta Admin mengunggahnya di Dashboard › Pengaturan POS.</div>'}
+        ${qrNominal ? `<div class="qr-nominal" id="qrNominal">${svgQr(qrNominal, 5)}</div>`
+          : qris ? `<img src="${URL.createObjectURL(qris.blob)}" alt="QRIS">` : '<span class="contoh"><img src="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27240%27 height=%27240%27%3E%3Crect width=%27240%27 height=%27240%27 fill=%27%23eee%27/%3E%3C/svg%3E" alt=""></span><div class="err">Gambar QRIS belum diunggah. Minta Admin mengunggahnya di Dashboard › Pengaturan POS.</div>'}
         <div class="small" style="margin-top:6px"><b>${esc(p.qris?.nama ?? "")}</b>${p.qris?.nmid ? ` · NMID ${esc(p.qris.nmid)}` : ""}</div>
-        <div class="nominal-besar">${rp(tagih)}</div><div class="small muted">Pembeli mengetik nominal ini sendiri di aplikasinya.</div>
+        <div class="nominal-besar">${rp(tagih)}</div><div class="small muted">${qrNominal ? "Nominal sudah terkunci di QR." : "Pembeli mengetik nominal ini sendiri di aplikasinya."}</div>
       </div>
-      <label for="ref">4 digit terakhir no. referensi (dari notifikasi aplikasi merchant)</label>
-      <input id="ref" inputmode="numeric" maxlength="4" placeholder="0000">
-      ${tombol("Isi 4 digit referensi")}`);
+      <p class="small muted">Tekan Dana Sudah Masuk setelah notifikasi pembayaran muncul di aplikasi merchant.</p>
+      ${tombol("Dana Sudah Masuk")}`);
+    $("#lunas").disabled = false;
   } else {
     bukaLembar(`${kepala("Transfer", "Pembeli mentransfer ke rekening ini. Cek mutasi rekening sebelum menekan Dana Sudah Masuk.")}
       <div class="panel">
@@ -723,11 +759,9 @@ async function lembarBayar(metode, t, tagih, bagian, p) {
     $$(".cepat button").forEach((b) => (b.onclick = () => { uang.value = ""; tunai = Number(b.dataset.n); cek(); }));
     cek();
   }
-  const r = $("#ref");
-  if (r) r.oninput = () => { r.value = r.value.replace(/\D/g, "").slice(0, 4); ref = r.value; cta.disabled = !/^\d{4}$/.test(ref); cta.textContent = cta.disabled ? "Isi 4 digit referensi" : "Dana Sudah Masuk"; };
   $$("[data-salin]").forEach((b) => (b.onclick = () => navigator.clipboard?.writeText(b.dataset.salin.replace(/\s/g, "")).then(() => toast("Nomor rekening disalin"))));
   cta.onclick = () => {
-    const bayar = metode === "tunai" ? { metode: "Tunai", jumlah: tunai } : metode === "qris" ? { metode: "QRIS", jumlah: tagih, ref } : { metode: "Transfer", jumlah: tagih };
+    const bayar = metode === "tunai" ? { metode: "Tunai", jumlah: tunai } : metode === "qris" ? { metode: "QRIS", jumlah: tagih } : { metode: "Transfer", jumlah: tagih };
     tutupLembar();
     if (bagian) return bayarSebagian(t, { ...bayar, jumlah: bagian, diterima: bayar.jumlah });
     selesaikan(t, bayar);

@@ -266,6 +266,8 @@ input.kode{font:700 24px ui-monospace,Menlo,monospace;letter-spacing:4px;text-al
 .rek b{display:block;font-size:14px;color:var(--text);letter-spacing:.3px}
 .nominal-besar{text-align:center;font-size:22px;font-weight:800;color:var(--accent-dark);margin:8px 0 2px}
 .qris{text-align:center}
+.qr-nominal{display:inline-block;background:#fff;border:1px solid var(--border);border-radius:12px;padding:6px;line-height:0}
+.qr-nominal svg{width:232px;max-width:100%;height:auto}
 .qris img{max-width:220px;width:100%;border:1px solid var(--border);border-radius:12px;background:#fff}
 .contoh{position:relative;display:inline-block}
 .contoh:after{content:"CONTOH";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--danger);font-weight:800;font-size:34px;transform:rotate(-20deg)}
@@ -307,6 +309,7 @@ input.kode{font:700 24px ui-monospace,Menlo,monospace;letter-spacing:4px;text-al
 <div id="lapis" class="lapis" hidden><div class="lembar" id="lembar"></div></div>
 <div id="kunci" class="kunci" hidden></div>
 <script src="/pos-qrcode.js"></script>
+<script src="/pos-qris.js"></script>
 <script src="/pos-struk.js"></script>
 <script src="/pos-promo.js"></script>
 <script src="/pos-data.js"></script>

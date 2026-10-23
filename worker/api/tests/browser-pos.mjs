@@ -98,8 +98,6 @@ try {
   await hp.locator('.metode button[data-m="qris"]').click();
   await hp.locator("#lanjutPembayaran").click();
   await hp.locator(".qris img").waitFor();
-  assert.equal(await hp.locator("#lunas").isDisabled(), true);
-  await hp.locator("#ref").fill("4821");
   await hp.screenshot({ path: SHOTS + "p4-qris.png", fullPage: true });
   await hp.locator("#lunas").click();
   await hp.getByText("Tersimpan di HP").waitFor();
@@ -119,7 +117,7 @@ try {
   await hp.evaluate(() => dispatchEvent(new Event("online")));
   for (let i = 0; i < 80 && sql("SELECT COUNT(*) AS n FROM trx")[0].n < 2; i++) await hp.waitForTimeout(100);
   const q = sql("SELECT t.offline, b.ref FROM trx t JOIN trx_bayar b ON b.trx_id = t.id WHERE b.metode = 'QRIS'");
-  assert.deepEqual(q, [{ offline: 1, ref: "4821" }]);
+  assert.deepEqual(q, [{ offline: 1, ref: null }]); // QRIS tidak perlu 4 digit referensi lagi
 
   // Kunci layar manual, buka dengan PIN.
   await hp.locator("#btnKunci").click();

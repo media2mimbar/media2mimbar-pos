@@ -100,7 +100,7 @@ test("sinkron: kiriman ganda tidak tercatat dua kali", async () => {
 test("sinkron: dokumen tidak wajar ditolak dan disimpan untuk diperiksa", async () => {
   const r = ok(await sinkron([
     { jenis: "trx", data: trxContoh({ id: ulid(), no: `HK-261008-${kode}-0002`, total: 1 }) },
-    { jenis: "trx", data: trxContoh({ id: ulid(), no: `HK-261008-${kode}-0003`, pembayaran: [{ metode: "QRIS", jumlah: 215000 }] }) },
+    { jenis: "trx", data: trxContoh({ id: ulid(), no: `HK-261008-${kode}-0003`, pembayaran: [{ metode: "QRIS", jumlah: 215000, ref: "12" }] }) },
     { jenis: "trx", data: trxContoh({ id: ulid(), no: `HK-261008-${kode}-0001` }) },
     { jenis: "trx", data: trxContoh({ id: ulid(), no: `HK-261008-${kode}-0004`, items: [{ sku: "TIDAK-ADA", nama: "x", qty: 1, harga: 194000 }] }) },
     { jenis: "hapus_semua", data: {} },
