@@ -326,7 +326,9 @@ Pelengkap dari PRD (sesudah itu):
 - **Pesanan online:** stok Gudang Pusat diperiksa di dalam `db.batch` yang sama.
 - **Katalog:**
   - baris varian bisa dibuka;
-  - harga marketplace per varian;
+  - harga marketplace per varian, diisi di form produk yang sama sejak produk dibuat (`marketplace` dan `harga_marketplace` di `POST`/`PATCH /api/produk`, satu `db.batch`);
+  - sakelar Aktif per varian, juga saat produk dibuat;
+  - tombol Ubah di ujung setiap baris Daftar Produk;
   - sakelar tampil di POS (`PATCH /api/produk/:id/tampil`).
 - **Pengaturan POS:** tersimpan otomatis dan ada pratinjau struk.
 - **Foto:** dikecilkan di browser (maksimal 1600 px, JPEG) sebelum disimpan ke D1.
