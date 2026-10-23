@@ -167,7 +167,7 @@ export async function ambilProduk(db: D1Database, id: string) {
 export async function detailProduk(req: Request, env: Env, id: string) {
   await sesiSiap(env.DB, req, "owner", "admin");
   const produk = await ambilProduk(env.DB, id);
-  const [stok, hpp] = await Promise.all([
+  const [stok, hpp, marketplace] = await Promise.all([
     env.DB.prepare(
       `SELECT s.sku, s.lokasi_id, l.nama AS lokasi, s.qty, s.transit FROM stok s JOIN lokasi l ON l.id = s.lokasi_id
        JOIN varian v ON v.sku = s.sku WHERE v.produk_id = ? ORDER BY l.jenis DESC, l.nama`,
@@ -177,8 +177,9 @@ export async function detailProduk(req: Request, env: Env, id: string) {
        LEFT JOIN faktur f ON h.ref_tabel = 'faktur' AND f.id = h.ref_id LEFT JOIN staff a ON a.id = h.oleh
        WHERE h.produk_id = ? ORDER BY h.waktu DESC LIMIT 50`,
     ).bind(id).all(),
+    marketplaceProduk(env.DB, id),
   ]);
-  return json({ produk, stok_lokasi: stok.results, hpp_riwayat: hpp.results });
+  return json({ produk, stok_lokasi: stok.results, hpp_riwayat: hpp.results, marketplace });
 }
 
 interface IsiVarian {
@@ -187,6 +188,49 @@ interface IsiVarian {
   harga_jual: number;
   aktif: boolean;
   stok_awal: number;
+  harga_marketplace: HargaMp;
+}
+
+// ---------- Harga marketplace per varian ----------
+// Produk dijual di marketplace kalau punya baris saluran_varian di sana. Harga null berarti ikut harga jual.
+
+export type HargaMp = Record<string, number | null>;
+
+function isiHargaMp(o: unknown, label: string): HargaMp {
+  if (o === undefined || o === null) return {};
+  if (typeof o !== "object" || Array.isArray(o)) throw new Gagal(400, `${label} tidak valid`);
+  return Object.fromEntries(Object.keys(o).map((k) => [k, bulat(o as Obj, k, `${label} ${k}`, { max: MAKS_HARGA, wajib: false })]));
+}
+
+export async function marketplaceProduk(db: D1Database, id: string) {
+  const [saluran, harga] = await Promise.all([
+    db.prepare("SELECT id, nama, aktif FROM saluran WHERE marketplace = 1 ORDER BY urutan").all<{ id: string; nama: string; aktif: number }>(),
+    db.prepare("SELECT x.saluran_id, x.sku, x.harga FROM saluran_varian x JOIN varian v ON v.sku = x.sku WHERE v.produk_id = ?").bind(id).all<{ saluran_id: string; sku: string; harga: number | null }>(),
+  ]);
+  return saluran.results.map((s) => {
+    const h = harga.results.filter((x) => x.saluran_id === s.id);
+    return { id: s.id, nama: s.nama, toko_aktif: s.aktif === 1, dijual: h.length > 0, harga: Object.fromEntries(h.map((x) => [x.sku, x.harga])) };
+  });
+}
+
+// Tulis ulang harga satu produk di marketplace yang disebut. Satu INSERT memuat 24 baris karena D1 membatasi 100 parameter per query.
+export function tulisHargaMp(db: D1Database, produkId: string, saluran: { id: string; dijual: boolean }[], baris: { sku: string; harga: HargaMp }[], t: string) {
+  if (!saluran.length) return [];
+  const tulis = [db.prepare(`DELETE FROM saluran_varian WHERE saluran_id IN (${saluran.map(() => "?").join(",")}) AND sku IN (SELECT sku FROM varian WHERE produk_id = ?)`)
+    .bind(...saluran.map((x) => x.id), produkId)];
+  const isi = saluran.filter((x) => x.dijual).flatMap((x) => baris.map((b) => [x.id, b.sku, b.harga[x.id] ?? null, t]));
+  for (let i = 0; i < isi.length; i += 24) {
+    const potong = isi.slice(i, i + 24);
+    tulis.push(db.prepare(`INSERT INTO saluran_varian (saluran_id, sku, harga, diubah_pada) VALUES ${potong.map(() => "(?, ?, ?, ?)").join(", ")}`).bind(...potong.flat()));
+  }
+  return tulis;
+}
+
+async function idMarketplace(db: D1Database, dipilih: string[]) {
+  const { results } = await db.prepare("SELECT id FROM saluran WHERE marketplace = 1").all<{ id: string }>();
+  const ada = results.map((x) => x.id);
+  for (const id of dipilih) if (!ada.includes(id)) throw new Gagal(400, `Marketplace ${id} tidak dikenal`);
+  return ada;
 }
 
 function isiProduk(b: Obj) {
@@ -198,7 +242,14 @@ function isiProduk(b: Obj) {
     harga_jual: wajibBulat(v, "harga_jual", `Harga varian ${i + 1}`, { max: MAKS_HARGA }),
     aktif: benar(v, "aktif", true),
     stok_awal: bulat(v, "stok_awal", `Stok awal varian ${i + 1}`, { max: 1_000_000, wajib: false }) ?? 0,
+    harga_marketplace: isiHargaMp(v.harga_marketplace, `Harga marketplace varian ${i + 1}`),
   }));
+  // marketplace: daftar id marketplace tempat produk dijual. Tidak dikirim berarti harga marketplace tidak diubah.
+  let marketplace: string[] | null = null;
+  if (b.marketplace !== undefined && b.marketplace !== null) {
+    if (!Array.isArray(b.marketplace) || b.marketplace.some((x) => typeof x !== "string")) throw new Gagal(400, "Daftar marketplace tidak valid");
+    marketplace = [...new Set(b.marketplace as string[])];
+  }
   // D1 membatasi 100 parameter per query; skuDipakai() memakai dua parameter per SKU.
   if (varian.length > 40) throw new Gagal(400, "Satu produk maksimal 40 varian");
   const nama = new Set<string>();
@@ -217,6 +268,8 @@ function isiProduk(b: Obj) {
     aktif: benar(b, "aktif", true),
     harga_jual: bulat(b, "harga_jual", "Harga jual", { max: MAKS_HARGA, wajib: varian.length === 0 }),
     stok_awal: bulat(b, "stok_awal", "Stok awal", { max: 1_000_000, wajib: false }) ?? 0,
+    harga_marketplace: isiHargaMp(b.harga_marketplace, "Harga marketplace"),
+    marketplace,
     varian,
   };
 }
@@ -242,10 +295,11 @@ export async function tambahProduk(req: Request, env: Env) {
 
   const varian = p.varian.length
     ? p.varian.map((v) => ({ ...v, sku: v.sku ? rapikanSku(v.sku) : skuVarian(sku, v.nama) }))
-    : [{ sku, nama: "", harga_jual: p.harga_jual!, aktif: true, stok_awal: p.stok_awal }];
+    : [{ sku, nama: "", harga_jual: p.harga_jual!, aktif: true, stok_awal: p.stok_awal, harga_marketplace: p.harga_marketplace }];
   const semua = [...new Set([sku, ...varian.map((v) => v.sku)])];
   if (semua.length !== (p.varian.length ? varian.length + 1 : 1)) throw new Gagal(400, "SKU varian tidak boleh sama dengan SKU lain di produk ini");
   await skuDipakai(env.DB, semua);
+  if (p.marketplace?.length) await idMarketplace(env.DB, p.marketplace);
 
   const id = ulid(), t = sekarang();
   const tulis = [
@@ -267,6 +321,8 @@ export async function tambahProduk(req: Request, env: Env) {
         .bind(ulid(), v.sku, v.stok_awal, id, t, staff.id),
     );
   }
+  // Harga marketplace ikut tersimpan bersama produk, dalam batch yang sama.
+  tulis.push(...tulisHargaMp(env.DB, id, (p.marketplace ?? []).map((x) => ({ id: x, dijual: true })), varian.map((v) => ({ sku: v.sku, harga: v.harga_marketplace })), t));
   tulis.push(logAktivitas(env.DB, staff, "Tambah produk", { tabel: "produk", id, keterangan: `${sku} ${p.nama}` }));
   await env.DB.batch(tulis);
   return json({ id, sku, varian: varian.map((v) => v.sku) }, 201);
@@ -292,8 +348,11 @@ export async function ubahProduk(req: Request, env: Env, id: string) {
       .bind(ulid(), id, lama.hpp, p.hpp, t, staff.id));
   }
 
+  // SKU dan harga marketplace setiap varian di form, untuk ditulis ulang kalau marketplace ikut dikirim.
+  const barisMp: { sku: string; harga: HargaMp }[] = [];
   if (!lama.punya_varian) {
     tulis.push(env.DB.prepare("UPDATE varian SET harga_jual = ?, diubah_pada = ? WHERE sku = ?").bind(p.harga_jual, t, lama.sku));
+    barisMp.push({ sku: lama.sku, harga: p.harga_marketplace });
   } else {
     const adaSku = new Set(lama.varian.map((v) => v.sku));
     const dipakai = new Set<string>();
@@ -304,8 +363,11 @@ export async function ubahProduk(req: Request, env: Env, id: string) {
         dipakai.add(v.sku);
         tulis.push(env.DB.prepare("UPDATE varian SET nama = ?, harga_jual = ?, urutan = ?, aktif = ?, diubah_pada = ? WHERE sku = ? AND produk_id = ?")
           .bind(v.nama, v.harga_jual, i, v.aktif ? 1 : 0, t, v.sku, id));
+        barisMp.push({ sku: v.sku, harga: v.harga_marketplace });
       } else {
-        baru.push({ sku: v.sku ? rapikanSku(v.sku) : skuVarian(lama.sku, v.nama), v, urutan: i });
+        const sku = v.sku ? rapikanSku(v.sku) : skuVarian(lama.sku, v.nama);
+        baru.push({ sku, v, urutan: i });
+        barisMp.push({ sku, harga: v.harga_marketplace });
       }
     });
     if (new Set(baru.map((x) => x.sku)).size !== baru.length) throw new Gagal(400, "Ada SKU varian baru yang dobel");
@@ -317,6 +379,10 @@ export async function ubahProduk(req: Request, env: Env, id: string) {
     for (const sku of adaSku) {
       if (!dipakai.has(sku)) tulis.push(env.DB.prepare("UPDATE varian SET aktif = 0, diubah_pada = ? WHERE sku = ?").bind(t, sku));
     }
+  }
+  if (p.marketplace) {
+    const semuaMp = await idMarketplace(env.DB, p.marketplace);
+    tulis.push(...tulisHargaMp(env.DB, id, semuaMp.map((x) => ({ id: x, dijual: p.marketplace!.includes(x) })), barisMp, t));
   }
   const hargaBerubah = !lama.punya_varian ? lama.varian[0]?.harga_jual !== p.harga_jual
     : p.varian.some((v) => { const l = lama.varian.find((x) => x.sku === v.sku); return !l || l.harga_jual !== v.harga_jual; });

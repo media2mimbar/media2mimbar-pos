@@ -190,17 +190,17 @@ function lembarPelanggan() {
   const pre = modePresale();
   const gambar = async (q = "") => {
     const pel = A.ord.pelanggan;
-    bukaLembar(`<h2>Pelanggan</h2>${pre ? '<div class="warn small">Pre-sale wajib pelanggan dengan no HP.</div>' : ""}
-      ${pel ? `<div class="card small" style="margin-top:8px">Dipilih: <b>${esc(pel.nama)}</b>${pel.telp ? " · " + esc(pel.telp) : ""} <button class="btn kecil" id="lepasPel">Hapus</button></div>` : ""}
-      <input type="search" id="cariPel" placeholder="Cari nama atau no HP" value="${esc(q)}" style="margin-top:10px">
-      <div class="daftar" id="hasilPel"><p class="muted small">Mencari…</p></div>
-      <button class="btn" id="pelBaru">+ Pelanggan baru</button>`);
+    bukaLembar(`<div class="kepala-sheet"><div><h2>Pelanggan</h2><div class="sub">Cari pelanggan lama atau tambah yang baru.</div></div><button class="btn kecil" id="pelBaru">+ Baru</button></div>
+      ${pre ? '<div class="warn small" style="margin:0 0 10px">Pre-sale wajib pelanggan dengan no HP.</div>' : ""}
+      ${pel ? `<div class="item-pilih" style="margin:0 0 10px"><span class="av">${esc(inisial(pel.nama))}</span><span class="isi"><b>${esc(pel.nama)}</b><br><span class="small muted">Dipilih${pel.telp ? " · " + esc(pel.telp) : ""}</span></span><button class="btn kecil" id="lepasPel">Hapus</button></div>` : ""}
+      <div class="cari" style="margin-top:0"><span>🔍</span><input type="search" id="cariPel" placeholder="Cari nama atau no HP" value="${esc(q)}"></div>
+      <div class="daftar" id="hasilPel"><p class="muted small">Mencari…</p></div>`);
     const isi = async () => {
       const hasil = await cariPelanggan($("#cariPel")?.value.trim() ?? "");
       const el = $("#hasilPel");
       if (!el) return;
-      el.innerHTML = hasil.map((p) => `<button data-pel="${p.id}"><span class="isi"><b>${esc(p.nama)}</b><br><span class="small muted">${esc(p.telp ?? "tanpa no HP")}${p.kota ? " · " + esc(p.kota) : ""}</span></span></button>`).join("")
-        || '<p class="muted small">Tidak ditemukan.</p>';
+      el.innerHTML = hasil.map((p) => `<button data-pel="${p.id}"><span class="av">${esc(inisial(p.nama))}</span><span class="isi"><b>${esc(p.nama)}</b><br><span class="small muted">${esc(p.telp ?? "tanpa no HP")}${p.kota ? " · " + esc(p.kota) : ""}</span></span></button>`).join("")
+        || '<div class="kosong">Tidak ditemukan. Ketuk <b style="display:inline">+ Baru</b> untuk menambah pelanggan.</div>';
       $$("[data-pel]", el).forEach((b) => (b.onclick = () => {
         const p = hasil.find((x) => x.id === b.dataset.pel);
         if (pre && !p.telp) return toast("Pelanggan ini belum punya no HP. Buat pelanggan baru dengan no HP");
@@ -281,20 +281,25 @@ function nilaiOrder(o) {
   return { n: o.keranjang.reduce((a, i) => a + i.qty, 0), sub, jenis: items.length, sudah: o.bayar.reduce((a, b) => a + b.jumlah, 0) };
 }
 
+// Daftar Order tampil sebagai tab di halaman kasir, seperti prototipe. Tab Penjualan (#kembali) kembali ke katalog.
 function layarOrder(saring = "semua") {
   const daftar = A.orderDaftar.filter((o) => saring === "semua" || (saring === "belum" ? !o.bayar.length : o.bayar.length > 0));
-  tampil(`${bar("Daftar Order", esc(A.snap.lokasi.nama), '<button id="kembali">Kembali</button>')}
-    <div class="wrap"><p class="small muted">Pesanan yang disimpan untuk dibayar nanti. Hanya ada di HP ini sampai dibayar.</p>
+  tampil(`<div class="kasir">${appbarKasir()}
+    <div class="isi-kasir">${catatanTempat()}${tabKasir("order")}
       <div class="chips">${[["semua", "Semua"], ["belum", "Belum Bayar"], ["sebagian", "Bayar Sebagian"]].map(([k, n]) => `<button data-saring="${k}" class="${k === saring ? "on" : ""}">${n}</button>`).join("")}</div>
-      <div class="daftar">${daftar.map((o) => { const v = nilaiOrder(o); return `<button data-o="${o.id}"><span class="isi"><b>${esc(o.no)}</b>${A.ord.order === o.id ? ' <span class="tag ok">dibuka</span>' : ""}
-        <br><span class="small muted">${jam(o.waktu)} · ${v.n} barang${o.ord?.pelanggan ? " · " + esc(o.ord.pelanggan.nama) : ""}</span></span>
-        <span><b>${rp(v.sub)}</b>${v.sudah ? `<br><span class="tag warn">dibayar ${rp(v.sudah)}</span>` : ""}</span></button>`; }).join("") || '<p class="muted">Tidak ada pesanan.</p>'}</div></div>`, "order");
+      <div class="order-daftar">${daftar.map((o) => { const v = nilaiOrder(o); const isi = o.keranjang.map((i) => { const x = A.snap.varian[i.sku]; return x ? `${namaBarang(x)} ×${i.qty}` : null; }).filter(Boolean).join(", ");
+        return `<button data-o="${o.id}"><span class="od-atas"><span><span class="od-no">${esc(o.no)}</span><span class="od-jenis">${v.n} barang${o.ord?.pelanggan ? " · " + esc(o.ord.pelanggan.nama) : ""}</span></span>
+          ${A.ord.order === o.id ? '<span class="lencana-status dibuka">Dibuka</span>' : v.sudah ? `<span class="lencana-status sebagian">Dibayar ${rp(v.sudah)}</span>` : '<span class="lencana-status">Belum Bayar</span>'}</span>
+          <span class="od-isi">${esc(isi)}</span><span class="od-bawah"><span>${jam(o.waktu)}</span><b>${rp(v.sub)}</b></span></button>`; }).join("")
+        || '<div class="kosong"><div class="ki">🧾</div><b>Tidak ada pesanan.</b>Pesanan yang disimpan untuk dibayar nanti muncul di sini. Hanya ada di HP ini sampai dibayar.</div>'}</div>
+    </div></div>`, "order");
+  pasangAppbar();
   $("#kembali").onclick = gambarKasir;
   $$("[data-saring]").forEach((b) => (b.onclick = () => layarOrder(b.dataset.saring)));
   $$("[data-o]").forEach((b) => (b.onclick = () => {
     const o = A.orderDaftar.find((x) => x.id === b.dataset.o);
     if (o.bayar.length) return bukaOrder(o);
-    bukaLembar(`<h2>${esc(o.no)}</h2><button class="btn primary" id="bukaO">Buka di keranjang</button><button class="btn danger" id="hapusO">Hapus pesanan</button>`);
+    bukaLembar(`<h2>${esc(o.no)}</h2><div class="sub">${jam(o.waktu)} · ${nilaiOrder(o).n} barang · ${rp(nilaiOrder(o).sub)}</div><button class="btn primary" id="bukaO">Buka di keranjang</button><button class="btn danger" id="hapusO">Hapus pesanan</button>`);
     $("#lembar").onclick = async (e) => {
       if (e.target.id === "bukaO") bukaOrder(o);
       if (e.target.id === "hapusO" && confirm(`Hapus pesanan ${o.no}?`)) {
@@ -369,11 +374,16 @@ async function bayarSebagian(t, bayar) {
   await simpanDaftarOrder();
   await simpanSesi();
   const kembali = bayar.metode === "Tunai" ? bayar.diterima - bayar.jumlah : 0;
-  tampil(`${bar("Pembayaran sebagian", esc(o.no))}
-    <div class="wrap"><div class="ok center"><b>Diterima ${rp(bayar.jumlah)}</b>${kembali > 0 ? `<br>Kembalian ${rp(kembali)}` : ""}</div>
-      <div class="card" style="margin-top:12px">${rincianTagihan(tagihan())}</div>
-      <button class="btn primary" id="lanjutBayar">Bayar sisa sekarang</button>
-      <button class="btn" id="keKasir">Simpan, bayar nanti</button></div>`, "sebagian");
+  const sisa = tagihan().sisa;
+  tampil(`<div class="sukses">
+      <div class="cincin"><svg viewBox="0 0 24 24" fill="none" stroke="#02194F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg></div>
+      <h1>Pembayaran ${o.bayar.length} berhasil</h1>
+      <div class="sub"><b>Diterima ${rp(bayar.jumlah)}</b>${kembali > 0 ? `<br>Kembalian ${rp(kembali)}` : ""}<br>${esc(bayar.metode)} · pesanan ${esc(o.no)}</div>
+      <div class="sisa-kotak"><span>Sisa tagihan</span><b>${rp(sisa)}</b></div>
+      <div class="card" style="align-self:stretch;text-align:left;margin-top:10px">${rincianTagihan(tagihan())}</div>
+      <button class="btn primary" id="lanjutBayar">Lanjut bayar sisa ${rp(sisa)}</button>
+      <button class="btn" id="keKasir">Simpan, bayar nanti</button>
+      <p class="small muted" style="margin-top:8px">Kalau disimpan, sisanya bisa dilunasi nanti dari Daftar Order.</p></div>`, "sebagian");
   $("#lanjutBayar").onclick = () => layarBayar();
   $("#keKasir").onclick = () => { kosongkanKeranjang(); gambarKasir(); };
 }

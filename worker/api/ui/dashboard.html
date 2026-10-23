@@ -6,10 +6,10 @@
 <title>Hikayat Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@400;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <style>
 /* Warna, ukuran, dan bentuk mengikuti prototipe (prototipe/dashboard.html). */
-:root{--accent:#FF6100;--accent-dark:#E5570A;--accent-bg:#FFF0E5;--accent-text:#E5570A;--bg:#F4F5F3;--card:#fff;--border:#E7E8E4;--border-strong:#D6D8D1;--text:#1E2321;--text-2:#5B615C;--text-mut:#93988F;--danger-bg:#FDECEA;--danger-text:#C0392B;--success-bg:#E4F7EF;--success-text:#00734E;--warn-bg:#FDF2DD;--warn-text:#B7791F;--info-bg:#E8F0FE;--info-text:#1F57C3}
+:root{--accent:#02194F;--accent-dark:#0A2C6B;--accent-bg:#E7ECF6;--accent-text:#02194F;--bg:#F4F5F3;--card:#fff;--border:#E7E8E4;--border-strong:#D6D8D1;--text:#1E2321;--text-2:#5B615C;--text-mut:#93988F;--danger-bg:#FDECEA;--danger-text:#C0392B;--success-bg:#E4F7EF;--success-text:#00734E;--warn-bg:#FDF2DD;--warn-text:#B7791F;--info-bg:#E8F0FE;--info-text:#1F57C3}
 *{box-sizing:border-box}
 body{margin:0;font:13px/normal Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text)}
 button,input,select,textarea{font-family:inherit;font-size:13px}
@@ -60,7 +60,8 @@ input[type=checkbox].sakelar:focus{box-shadow:0 0 0 3px var(--accent-bg)}
 
 /* Bilah atas */
 .top{display:flex;align-items:center;gap:16px;padding:0 18px;height:56px;background:#fff;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20}
-.logo{display:flex;flex-direction:column;line-height:1.15;color:var(--accent);font-size:13px;width:291px;flex:none}.logo span{font-weight:500}.logo b{font-weight:800;font-size:14px}
+/* Logo tulisan: 2Mimbar reguler di atas, Merchandise tebal di bawah, huruf Poppins. */
+.logo{display:flex;flex-direction:column;line-height:1.15;color:var(--accent);font-family:Poppins,Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;font-size:14px;width:291px;flex:none}.logo span{font-weight:400}.logo b{font-weight:700;font-size:15px}
 .area{display:flex;gap:4px;flex:1}
 .area button{padding:7px 14px;border-radius:8px;border:0;background:none;color:var(--text-2);font-weight:500;cursor:pointer}
 .area button.on{background:var(--accent);color:#fff;font-weight:700}
@@ -122,7 +123,8 @@ th{color:var(--text-mut);font-weight:700;font-size:11px;text-transform:uppercase
 th.num{text-align:right}
 .tablewrap tbody tr:last-child td{border-bottom:0}
 tr.total td{border-top:1px solid var(--border);background:#FAFAF8}
-tr.klik{cursor:pointer}tr.klik:hover td{background:#FFF8F2}
+tr.klik{cursor:pointer}tr.klik:hover td{background:#F3F6FB}
+tr.redup td:not(:first-child){opacity:.45}
 tfoot td{font-weight:700;background:#FAFAF8}
 td input,td select{padding:7px 9px}
 .tag{display:inline-block;padding:3px 10px;border-radius:8px;font-size:11px;font-weight:700;margin:1px 4px 1px 0;background:#EEEFEC;color:var(--text-2);white-space:nowrap}
@@ -259,7 +261,7 @@ td input,td select{padding:7px 9px}
 
 <div id="layarApp" hidden>
   <header class="top">
-    <div class="logo"><span>Hikayat</span><b>Merchandise</b></div>
+    <div class="logo"><span>2Mimbar</span><b>Merchandise</b></div>
     <div class="area" id="area"><button data-area="penjualan">Penjualan</button><button data-area="karyawan">Karyawan</button></div>
     <div class="akun">
       <button id="akunBtn" aria-label="Akun"><span class="avatar" id="akunInisial"></span><span class="who"><b id="akunNama"></b><span id="akunRole"></span></span><span class="kebab" aria-hidden="true">⋮</span></button>
@@ -320,8 +322,10 @@ let tab = null;
 
 // Simpanan GET di memori: menu yang pernah dibuka langsung tampil, lalu data terbaru diambil di belakang.
 // Kalau datanya berubah dan pengguna belum menyentuh halaman, halaman digambar ulang. Setiap simpan/ubah/hapus mengosongkan simpanan.
-const simpanGet = new Map(); // path -> { waktu, janji: Promise<string> }
-const UMUR_SIMPAN = 5 * 60_000, JEDA_SEGAR = 2000; // data hasil penyegaran tidak disegarkan lagi selama 2 detik
+const simpanGet = new Map(); // path -> { waktu, janji: Promise<string>, gen }
+// Data hasil penyegaran tidak disegarkan lagi sampai pengguna mengeklik atau mengetik (gen sama dengan generasi),
+// supaya gambar ulang tidak memicu penyegaran berulang. Data awal saat membuka dashboard memakai jeda 2 detik.
+const UMUR_SIMPAN = 5 * 60_000, JEDA_SEGAR = 2000;
 let generasi = 0; // naik setiap pindah halaman atau setiap klik/ketik; gambar ulang hanya kalau belum berubah
 for (const ev of ["click", "input", "keydown"]) document.addEventListener(ev, () => generasi++, true);
 
@@ -329,13 +333,14 @@ async function api(method, path, body) {
   if (method !== "GET") { const r = await panggil(method, path, body); simpanGet.clear(); return r; }
   const ada = simpanGet.get(path), umur = ada ? Date.now() - ada.waktu : Infinity;
   if (ada && umur < UMUR_SIMPAN) {
-    if (ada.selesai && !(ada.dariSegar && umur < JEDA_SEGAR)) segarkanDiBelakang(path, ada);
+    const baruDisegarkan = ada.dariSegar && (ada.gen === undefined ? umur < JEDA_SEGAR : ada.gen === generasi);
+    if (ada.selesai && !baruDisegarkan) segarkanDiBelakang(path, ada);
     return JSON.parse(await ada.janji);
   }
   return JSON.parse(await ambilSimpan(path));
 }
 function ambilSimpan(path, dariSegar = false) {
-  const isi = { waktu: Date.now(), dariSegar, selesai: false };
+  const isi = { waktu: Date.now(), dariSegar, gen: dariSegar ? generasi : undefined, selesai: false };
   const janji = panggil("GET", path).then((d) => { isi.selesai = true; return JSON.stringify(d); });
   isi.janji = janji;
   simpanGet.set(path, isi);

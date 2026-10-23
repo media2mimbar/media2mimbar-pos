@@ -84,7 +84,7 @@ try {
   await hp.locator("#pillPelanggan", { hasText: "Fajar Ramadhan" }).waitFor();
   await hp.locator("#btnSimpan").click();
   await tunggu("#totalBelanja", "Rp 0");
-  assert.match(await hp.locator("#btnOrder").textContent(), /\(1\)/);
+  assert.equal(await hp.locator("#nOrder").textContent(), "1");
   await hp.locator("#btnOrder").click();
   await hp.locator("[data-o]").click();
   await hp.locator("#bukaO").click();
@@ -95,21 +95,26 @@ try {
   await hp.locator("#pisah").click();
   await hp.locator("#nominalPisah").fill("50000");
   await hp.locator("#lanjutPisah").click();
+  await hp.locator('.metode [data-m="tunai"]').click();
+  await hp.locator("#lanjutPembayaran").click();
   await hp.locator("#uang").fill("50000");
   await hp.locator("#lunas").click();
   await hp.getByText("Diterima Rp 50.000").waitFor();
   assert.match(await hp.locator(".rinci").textContent(), /Sisa tagihan\s*Rp 40\.000/);
   await hp.locator("#lanjutBayar").click();
   await hp.locator('.metode [data-m="transfer"]').click();
+  await hp.locator("#lanjutPembayaran").click();
   await hp.locator("#lunas").click();
   await hp.getByText("Lunas Rp 90.000").waitFor();
   await hp.screenshot({ path: SHOTS + "l1-sukses-pisah.png" });
   await hp.locator("#baru").click();
-  assert.doesNotMatch(await hp.locator("#btnOrder").textContent(), /\(/);
+  assert.equal(await hp.locator("#nOrder").textContent(), "0");
 
   // 4. Transaksi kedua untuk void.
   await hp.locator(".kartu", { hasText: "Totebag" }).click();
   await hp.locator("#btnBayar").click();
+  await hp.locator('.metode [data-m="tunai"]').click();
+  await hp.locator("#lanjutPembayaran").click();
   await hp.getByRole("button", { name: "Uang pas" }).click();
   await hp.locator("#lunas").click();
   await hp.locator("#baru").click();
@@ -175,6 +180,8 @@ try {
   await hp.locator("#cariPel").fill("Fajar");
   await hp.locator("[data-pel]").first().click();
   await hp.locator("#btnBayar").click();
+  await hp.locator('.metode [data-m="tunai"]').click();
+  await hp.locator("#lanjutPembayaran").click();
   await hp.getByRole("button", { name: "Uang pas" }).click();
   await hp.locator("#lunas").click();
   await hp.getByText("PRE-SALE · QR PENGAMBILAN").waitFor();
@@ -197,6 +204,8 @@ try {
   await hp.locator("#fPel button").click();
   await kTot.click();
   await hp.locator("#btnBayar").click();
+  await hp.locator('.metode [data-m="tunai"]').click();
+  await hp.locator("#lanjutPembayaran").click();
   await hp.getByRole("button", { name: "Uang pas" }).click();
   await hp.locator("#lunas").click();
   await hp.locator("#baru").click();

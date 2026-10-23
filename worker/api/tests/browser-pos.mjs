@@ -63,7 +63,7 @@ try {
   // Katalog Gudang Pusat memakai harga gudang.
   const kartuTot = hp.locator(".kartu", { hasText: "Totebag" });
   await kartuTot.waitFor();
-  assert.match(await kartuTot.textContent(), /sisa 10.*Rp 42\.000.*harga khusus/s);
+  assert.match(await kartuTot.textContent(), /Rp 42\.000.*Sisa 10.*harga khusus/s);
   await kartuTot.click();
   await kartuTot.click();
   await hp.locator(".kartu", { hasText: "Kaos Burtuqol" }).click();
@@ -77,6 +77,8 @@ try {
   await hp.screenshot({ path: SHOTS + "p1-kasir.png" });
 
   await hp.locator("#btnBayar").click();
+  await hp.locator('.metode [data-m="tunai"]').click();
+  await hp.locator("#lanjutPembayaran").click();
   await hp.getByRole("button", { name: "Rp 310.000" }).click();
   assert.equal(await hp.locator("#kembalian").textContent(), "Kembalian Rp 6.000");
   await hp.screenshot({ path: SHOTS + "p2-bayar.png" });
@@ -94,21 +96,21 @@ try {
   await kartuTot.click();
   await hp.locator("#btnBayar").click();
   await hp.locator('.metode button[data-m="qris"]').click();
+  await hp.locator("#lanjutPembayaran").click();
   await hp.locator(".qris img").waitFor();
-  assert.equal(await hp.locator("#lunas").isDisabled(), true);
-  await hp.locator("#ref").fill("4821");
-  await hp.screenshot({ path: SHOTS + "p4-qris.png", fullPage: true });
+  await hp.waitForTimeout(400); // tunggu animasi sheet selesai
+  await hp.screenshot({ path: SHOTS + "p4-qris.png" });
   await hp.locator("#lunas").click();
   await hp.getByText("Tersimpan di HP").waitFor();
   await hp.getByRole("button", { name: "Transaksi baru" }).click();
-  assert.match(await kartuTot.textContent(), /sisa 7/);
+  assert.match(await kartuTot.textContent(), /Sisa 7/);
   await hp.getByText("1 belum terkirim").waitFor();
   assert.match(await hp.locator(".bar").textContent(), /Offline/);
 
   // Aplikasi tetap terbuka saat dimuat ulang tanpa sinyal.
   await hp.reload();
   await kartuTot.waitFor();
-  assert.match(await kartuTot.textContent(), /sisa 7/);
+  assert.match(await kartuTot.textContent(), /Sisa 7/);
   assert.equal(sql("SELECT COUNT(*) AS n FROM trx")[0].n, 1);
 
   // Sinyal kembali: antrean terkirim sendiri.
@@ -116,7 +118,7 @@ try {
   await hp.evaluate(() => dispatchEvent(new Event("online")));
   for (let i = 0; i < 80 && sql("SELECT COUNT(*) AS n FROM trx")[0].n < 2; i++) await hp.waitForTimeout(100);
   const q = sql("SELECT t.offline, b.ref FROM trx t JOIN trx_bayar b ON b.trx_id = t.id WHERE b.metode = 'QRIS'");
-  assert.deepEqual(q, [{ offline: 1, ref: "4821" }]);
+  assert.deepEqual(q, [{ offline: 1, ref: null }]); // QRIS tidak perlu 4 digit referensi lagi
 
   // Kunci layar manual, buka dengan PIN.
   await hp.locator("#btnKunci").click();

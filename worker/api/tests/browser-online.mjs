@@ -65,16 +65,16 @@ try {
   await d.locator("#fPopup button.primary").click();
   await d.locator("td", { hasText: "6.5%" }).waitFor();
 
-  // 2. Harga marketplace di form produk: Kaos S Rp130.000 di Shopee, M ikut harga jual.
+  // 2. Harga marketplace di form produk (tombol Ubah, satu tombol Simpan): Kaos S Rp130.000 di Shopee, M ikut harga jual.
   await d.locator('#nav [data-tab="produk"]').click();
-  await d.locator("tr", { hasText: "Kaos Burtuqol" }).click();
+  await d.locator("tr", { hasText: "Kaos Burtuqol" }).getByRole("button", { name: "Ubah" }).click();
   await d.locator('[data-mp="shopee"]').check();
   await d.locator('[data-harga="shopee"][data-sku="KB-S"]').fill("130000");
-  await d.locator("#fMp button.primary").click();
-  await d.getByText("Tersimpan").waitFor();
-  assert.deepEqual(sql("SELECT sku, harga FROM saluran_varian ORDER BY sku"), [{ sku: "KB-M", harga: null }, { sku: "KB-S", harga: 130000 }]);
-  await d.locator("#kembali").click();
+  await d.screenshot({ path: SHOTS + "o0-form-produk-marketplace.png", fullPage: true });
+  assert.equal(await d.locator("#isi button.primary").count(), 1);
+  await d.locator("#fP button.primary").click();
   await d.locator("tr", { hasText: "Kaos Burtuqol" }).locator(".tag", { hasText: "Shopee" }).waitFor();
+  assert.deepEqual(sql("SELECT sku, harga FROM saluran_varian ORDER BY sku"), [{ sku: "KB-M", harga: null }, { sku: "KB-S", harga: 130000 }]);
 
   // 3. Input manual Shopee: harga terisi dari harga marketplace, potongan dari perkiraan.
   await d.locator('#nav [data-tab="online"]').click();

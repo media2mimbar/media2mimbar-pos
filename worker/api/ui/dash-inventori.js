@@ -240,6 +240,7 @@ function formPemasok(p, selesai) {
 
 // ---------- Daftar Stok ----------
 
+const bukaStok = new Set();
 async function daftarStok() {
   $("#isi").innerHTML = '<main><p class="muted">Memuat…</p></main>';
   const [{ lokasi, stok }, { kategori }] = await Promise.all([api("GET", "/api/stok"), api("GET", "/api/kategori")]);
@@ -252,20 +253,46 @@ async function daftarStok() {
 
   if (filterStok.tab === "gerak") return pergerakanStok(stok, namaBaris);
 
+  // Varian nonaktif yang stoknya nol tidak ditampilkan lagi.
+  const tampil = stok.filter((s) => (s.aktif && s.varian_aktif) || s.total);
   const saring = () => {
     const q = filterStok.cari.toLowerCase();
-    return stok.filter((s) => (s.aktif || s.total) && (!q || (namaBaris(s) + " " + s.sku).toLowerCase().includes(q))
+    return tampil.filter((s) => (!q || (namaBaris(s) + " " + s.sku).toLowerCase().includes(q))
       && (!filterStok.kategori || s.kategori_id === filterStok.kategori) && (!filterStok.minimum || s.status !== "Aman"));
   };
+  const tagStatus = (st) => (st === "Aman" ? '<span class="tag aktif">Aman</span>' : st === "Habis" ? '<span class="tag off">Habis</span>' : '<span class="tag warn">Di bawah minimum</span>');
+  const sel = (r) => `${lokasi.map((l) => `<td class="num">${r.per_lokasi[l.id] ?? 0}</td>`).join("")}<td class="num">${r.transit}</td><td class="num"><b>${r.total}</b></td>`;
+  // Satu baris per produk berisi total semua variannya. Rincian varian dibuka lewat tombol ▸.
   const gambar = () => {
-    const rows = saring();
-    const jumlah = (f) => rows.reduce((a, s) => a + f(s), 0);
-    $("#tbStok").innerHTML = rows.length ? rows.map((s) => `<tr><td><b>${esc(namaBaris(s))}</b><div class="small muted">${esc(s.sku)} · ${esc(s.kategori || "")}</div></td>
-      ${lokasi.map((l) => `<td class="num">${s.per_lokasi[l.id] ?? 0}</td>`).join("")}<td class="num">${s.transit}</td><td class="num"><b>${s.total}</b></td>
-      <td class="num">${s.stok_min}</td><td>${s.status === "Aman" ? '<span class="tag aktif">Aman</span>' : s.status === "Habis" ? '<span class="tag off">Habis</span>' : '<span class="tag warn">Di bawah minimum</span>'}</td></tr>`).join("")
-      : `<tr><td colspan="${lokasi.length + 5}" class="muted">Tidak ada barang.</td></tr>`;
-    $("#tfStok").innerHTML = `<tr><td>Total</td>${lokasi.map((l) => `<td class="num">${jumlah((s) => s.per_lokasi[l.id] ?? 0)}</td>`).join("")}
-      <td class="num">${jumlah((s) => s.transit)}</td><td class="num">${jumlah((s) => s.total)}</td><td colspan="2" class="num">Nilai ${rp(jumlah((s) => s.nilai))}</td></tr>`;
+    const cocok = saring();
+    const produk = [...new Set(cocok.map((s) => s.produk_id))].map((id) => {
+      const semua = tampil.filter((s) => s.produk_id === id);
+      const jumlah = (f) => semua.reduce((a, s) => a + f(s), 0);
+      const per_lokasi = Object.fromEntries(lokasi.map((l) => [l.id, jumlah((s) => s.per_lokasi[l.id] ?? 0)]));
+      const kurang = semua.filter((s) => s.status !== "Aman").length;
+      return { id, nama: semua[0].produk, kategori: semua[0].kategori, stok_min: semua[0].stok_min, bervarian: semua.some((s) => s.varian),
+        varian: cocok.filter((s) => s.produk_id === id), semua, per_lokasi, transit: jumlah((s) => s.transit), total: jumlah((s) => s.total), nilai: jumlah((s) => s.nilai), kurang };
+    });
+    const otomatis = !!(filterStok.cari || filterStok.minimum);
+    $("#tbStok").innerHTML = produk.length ? produk.map((p) => {
+      const buka = p.bervarian && (otomatis || bukaStok.has(p.id));
+      const status = !p.bervarian ? p.semua[0].status : p.total <= 0 ? "Habis" : p.kurang ? "kurang" : "Aman";
+      return `<tr class="${p.bervarian ? "klik" : ""}" data-produk="${p.id}"><td>${p.bervarian ? `<button class="btn small" data-buka="${p.id}" title="Lihat varian" style="padding:0 6px;margin-right:6px">${buka ? "▾" : "▸"}</button>` : ""}<b>${esc(p.nama)}</b>
+          <div class="small muted">${p.bervarian ? `${p.semua.length} varian` : esc(p.semua[0].sku)} · ${esc(p.kategori || "")}</div></td>
+        ${sel(p)}<td class="num">${p.stok_min}</td>
+        <td>${status === "kurang" ? `<span class="tag warn">${p.kurang} varian di bawah minimum</span>` : tagStatus(status)}</td></tr>
+        ${buka ? p.varian.map((v) => `<tr class="small" data-sku="${esc(v.sku)}"><td style="padding-left:40px">${esc(v.varian)} <span class="muted">${esc(v.sku)}${v.varian_aktif ? "" : " · nonaktif"}</span></td>
+          ${sel(v)}<td class="num">${v.stok_min}</td><td>${tagStatus(v.status)}</td></tr>`).join("") : ""}`;
+    }).join("") : `<tr><td colspan="${lokasi.length + 5}" class="muted">Tidak ada barang.</td></tr>`;
+    const jumlah = (f) => produk.reduce((a, p) => a + f(p), 0);
+    $("#tfStok").innerHTML = `<tr><td>Total</td>${lokasi.map((l) => `<td class="num">${jumlah((p) => p.per_lokasi[l.id])}</td>`).join("")}
+      <td class="num">${jumlah((p) => p.transit)}</td><td class="num">${jumlah((p) => p.total)}</td><td colspan="2" class="num">Nilai ${rp(jumlah((p) => p.nilai))}</td></tr>`;
+    $("#tbStok").querySelectorAll("tr.klik").forEach((tr) => (tr.onclick = () => {
+      const id = tr.dataset.produk;
+      if (otomatis) return;
+      bukaStok.has(id) ? bukaStok.delete(id) : bukaStok.add(id);
+      gambar();
+    }));
   };
   $("#isiStok").innerHTML = `<div class="filters">
       <input type="search" id="cariStok" placeholder="Cari nama atau SKU" value="${esc(filterStok.cari)}">
