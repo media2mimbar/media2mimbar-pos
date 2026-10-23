@@ -375,7 +375,7 @@ async function bayarSebagian(t, bayar) {
   await simpanSesi();
   const kembali = bayar.metode === "Tunai" ? bayar.diterima - bayar.jumlah : 0;
   tampil(`<div class="sukses">
-      <div class="cincin"><svg viewBox="0 0 24 24" fill="none" stroke="#FF6100" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg></div>
+      <div class="cincin"><svg viewBox="0 0 24 24" fill="none" stroke="#02194F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg></div>
       <h1>Pembayaran sebagian</h1>
       <div class="sub"><b>Diterima ${rp(bayar.jumlah)}</b>${kembali > 0 ? `<br>Kembalian ${rp(kembali)}` : ""}<br>Sisanya tetap di Daftar Order ${esc(o.no)} sampai lunas.</div>
       <div class="card" style="align-self:stretch;text-align:left;margin-top:10px">${rincianTagihan(tagihan())}</div>

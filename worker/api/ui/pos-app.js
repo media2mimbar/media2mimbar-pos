@@ -34,7 +34,7 @@ function bar(judul, sub, kanan = "") {
 const barMerek = (sub, kanan = "") => `<div class="bar merek"><div class="logo">HK</div><div class="judul"><b>Hikayat Merchandise</b><span>${sub}</span></div>${kanan ? `<div class="kanan">${kanan}</div>` : ""}</div>`;
 
 // Gambar produk: belum ada foto di katalog, jadi pakai ikon dan warna lembut yang tetap per produk.
-const WARNA_THUMB = ["#DCE9FD", "#FDE8DC", "#FBDDE4", "#E1F0EA", "#EFE1D6", "#DDEEFB", "#ECE4F7", "#FFF0E5"];
+const WARNA_THUMB = ["#DCE9FD", "#FDE8DC", "#FBDDE4", "#E1F0EA", "#EFE1D6", "#DDEEFB", "#ECE4F7", "#E7ECF6"];
 function thumb(p = {}) {
   const n = ((p.nama ?? "") + " " + (A.snap?.kategori ?? []).find((k) => k.id === p.kategori_id)?.nama).toLowerCase();
   const ikon = /kaos|jersey|kemeja|hoodie|baju|jaket|polo|sweater|shirt|gamis|koko/.test(n) ? "👕" : /topi|cap\b|kupluk|peci|bucket/.test(n) ? "🧢"
@@ -792,7 +792,7 @@ async function bagikanStruk(t, nomor) {
 
 function layarSukses(t) {
   tampil(`<div class="sukses">
-      <div class="cincin"><svg viewBox="0 0 24 24" fill="none" stroke="#FF6100" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg></div>
+      <div class="cincin"><svg viewBox="0 0 24 24" fill="none" stroke="#02194F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.2 4.2L19 7"/></svg></div>
       <h1>Transaksi Berhasil</h1>
       <div class="sub"><b>Lunas ${rp(t.total)}</b>${t.kembalian ? `<br>Kembalian ${rp(t.kembalian)}` : ""}<br>Pesanan sudah tercatat. Struk siap dibagikan ke pelanggan.</div>
       ${t.offline ? '<div class="warn">Tersimpan di HP. Dikirim ke server saat ada sinyal.</div>' : ""}
