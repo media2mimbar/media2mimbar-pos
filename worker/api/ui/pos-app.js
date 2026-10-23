@@ -45,7 +45,9 @@ function thumb(p = {}) {
   return `<span class="thumb" style="background:${WARNA_THUMB[h % WARNA_THUMB.length]}">${ikon}</span>`;
 }
 const statusSinyal = () => `<span class="titik-on ${S.online ? "" : "off"}"></span>${S.online ? "Online" : "Offline"}`;
-function bukaLembar(html) {
+// kelas "penuh": sheet memenuhi layar (dipakai layar QRIS).
+function bukaLembar(html, kelas = "") {
+  $("#lembar").className = "lembar " + kelas;
   $("#lembar").innerHTML = html;
   $("#lapis").hidden = false;
 }
@@ -722,16 +724,26 @@ async function lembarBayar(metode, t, tagih, bagian, p) {
     // QR berisi nominal dibuat dari QRIS statis yang diunggah Admin. Kalau QRIS-nya tidak terbaca, QR statis tetap dipakai.
     const teks = await teksQris();
     const qrNominal = teks && HkQris.buat(teks, tagih);
-    bukaLembar(`${kepala("QRIS", qrNominal ? "Minta pembeli memindai QR ini. Nominal sudah ada di QR, pembeli tinggal membayar." : "Minta pembeli memindai QRIS ini dan mengetik nominal di bawah.")}
-      <div class="panel qris">
-        ${qrNominal ? `<div class="qr-nominal" id="qrNominal">${svgQr(qrNominal, 5)}</div>`
-          : qris ? `<img src="${URL.createObjectURL(qris.blob)}" alt="QRIS">` : '<span class="contoh"><img src="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27240%27 height=%27240%27%3E%3Crect width=%27240%27 height=%27240%27 fill=%27%23eee%27/%3E%3C/svg%3E" alt=""></span><div class="err">Gambar QRIS belum diunggah. Minta Admin mengunggahnya di Dashboard › Pengaturan POS.</div>'}
-        <div class="small" style="margin-top:6px"><b>${esc(p.qris?.nama ?? "")}</b>${p.qris?.nmid ? ` · NMID ${esc(p.qris.nmid)}` : ""}</div>
-        <div class="nominal-besar">${rp(tagih)}</div><div class="small muted">${qrNominal ? "Nominal sudah terkunci di QR." : "Pembeli mengetik nominal ini sendiri di aplikasinya."}</div>
+    const kode = (k) => (teks && HkQris.pecah(teks).find(([x]) => x === k)?.[1]) || "";
+    const nama = p.qris?.nama || kode("59");
+    const kota = kode("60").toLowerCase().replace(/(^|\s)\S/g, (h) => h.toUpperCase());
+    const gambarQr = qrNominal ? `<div class="qr" id="qrNominal">${svgQr(qrNominal, 5)}</div>`
+      : qris ? `<div class="qr"><img src="${URL.createObjectURL(qris.blob)}" alt="QRIS"></div>`
+      : '<div class="qr contoh"><img src="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27240%27 height=%27240%27%3E%3Crect width=%27240%27 height=%27240%27 fill=%27%23eee%27/%3E%3C/svg%3E" alt=""></div>';
+    bukaLembar(`<div class="qris-kepala"><button id="tutupQris" aria-label="Tutup"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg></button><b>QRIS</b></div>
+      <div class="qris-isi qris">
+        ${nama || p.qris?.nmid ? `<div class="qris-merchant">${nama ? `<b>${esc(nama)}</b>` : ""}${kota ? `<div class="kota">${esc(kota)}</div>` : ""}${p.qris?.nmid ? `<div class="nmid">NMID: ${esc(p.qris.nmid)}</div>` : ""}</div>` : ""}
+        <div class="qris-kartu">
+          <svg class="qris-logo" viewBox="0 0 100 40" role="img" aria-label="QRIS"><path d="M2 12V2h10M98 28v10H88" fill="none" stroke="currentColor" stroke-width="3"/><text x="50" y="30" text-anchor="middle" font-size="27" font-weight="900" letter-spacing="1.5" fill="currentColor">QRIS</text></svg>
+          <div class="qris-nominal"><small>Rp</small>${tagih.toLocaleString("id-ID")}</div>
+          <div class="qr-bingkai">${gambarQr}</div>
+          ${qris ? "" : '<div class="err">Gambar QRIS belum diunggah. Minta Admin mengunggahnya di Dashboard › Pengaturan POS.</div>'}
+          <p class="qris-ket">${bagian ? "Pembayaran sebagian, sisanya dibayar setelah ini.<br>" : ""}${qrNominal ? "Nominal sudah ada di QR. Pembeli tinggal memindai dan membayar." : `Pembeli mengetik nominal <b>${rp(tagih)}</b> sendiri di aplikasinya.`}</p>
+          <p class="qris-ket">Tekan <b>Dana Sudah Masuk</b> setelah notifikasi muncul di aplikasi merchant.</p>
+        </div>
       </div>
-      <p class="small muted">Tekan Dana Sudah Masuk setelah notifikasi pembayaran muncul di aplikasi merchant.</p>
-      ${tombol("Dana Sudah Masuk")}`);
-    $("#lunas").disabled = false;
+      <div class="qris-aksi"><button class="btn garis" id="gantiMetode">Ganti metode</button><button class="btn primary" id="lunas">Dana Sudah Masuk</button></div>`, "penuh");
+    $("#tutupQris").onclick = tutupLembar;
   } else {
     bukaLembar(`${kepala("Transfer", "Pembeli mentransfer ke rekening ini. Cek mutasi rekening sebelum menekan Dana Sudah Masuk.")}
       <div class="panel">

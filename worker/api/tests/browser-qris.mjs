@@ -88,6 +88,7 @@ try {
   await hp.locator("#qrNominal svg").waitFor();
   assert.equal(await hp.locator("#ref").count(), 0); // tidak ada isian 4 digit
   assert.equal(await hp.locator("#lunas").isDisabled(), false);
+  await hp.waitForTimeout(400); // tunggu animasi sheet selesai
   await hp.screenshot({ path: SHOTS + "q1-qris-nominal.png" });
 
   // Pindai balik QR di layar: isinya QRIS yang sama dengan nominal Rp 70.000.

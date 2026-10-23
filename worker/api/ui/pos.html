@@ -266,8 +266,35 @@ input.kode{font:700 24px ui-monospace,Menlo,monospace;letter-spacing:4px;text-al
 .rek b{display:block;font-size:14px;color:var(--text);letter-spacing:.3px}
 .nominal-besar{text-align:center;font-size:22px;font-weight:800;color:var(--accent-dark);margin:8px 0 2px}
 .qris{text-align:center}
-.qr-nominal{display:inline-block;background:#fff;border:1px solid var(--border);border-radius:12px;padding:6px;line-height:0}
-.qr-nominal svg{width:232px;max-width:100%;height:auto}
+/* Layar QRIS penuh, mengikuti tampilan QRIS di aplikasi merchant */
+.lembar.penuh{height:100%;max-height:none;border-radius:0;background:var(--bg);padding:0;display:flex;flex-direction:column}
+.lembar.penuh::before{display:none}
+.qris-kepala{display:flex;align-items:center;gap:12px;padding:calc(10px + env(safe-area-inset-top)) 14px 6px}
+.qris-kepala button{border:0;background:none;color:var(--text);padding:6px;line-height:0}
+.qris-kepala b{font-size:19px}
+.qris-isi{flex:1;overflow-y:auto;padding:6px 16px 14px}
+.qris-merchant{background:var(--card);border-radius:20px;padding:16px;text-align:center}
+.qris-merchant b{display:block;font-size:16.5px}
+.qris-merchant .kota{font-size:12.5px;color:var(--text-mut);margin-top:6px}
+.qris-merchant .nmid{font-size:13.5px;font-weight:600;margin-top:6px}
+.qris-kartu{background:var(--card);border-radius:20px;padding:18px 16px 16px;margin-top:12px;text-align:center}
+.qris-logo{display:block;width:96px;height:auto;margin:0 auto;color:#111}
+.qris-nominal{font-size:30px;font-weight:700;margin:6px 0 16px;letter-spacing:-.3px}
+.qris-nominal small{font-size:14px;font-weight:600;color:var(--text-2);margin-right:4px;vertical-align:8px}
+.qr-bingkai{position:relative;display:inline-block;background:#fff;border-radius:24px;padding:24px;box-shadow:0 4px 18px rgba(2,25,79,.12);overflow:hidden;line-height:0}
+.qr-bingkai::before,.qr-bingkai::after{content:"";position:absolute;background:var(--accent)}
+.qr-bingkai::before{left:0;top:7%;width:22px;height:60%;clip-path:polygon(0 0,100% 22px,100% calc(100% - 22px),0 100%)}
+.qr-bingkai::after{right:0;bottom:0;width:64%;height:64%;clip-path:polygon(0 100%,22px calc(100% - 22px),calc(100% - 22px) calc(100% - 22px),calc(100% - 22px) 22px,100% 0,100% 100%)}
+.qr-bingkai .qr{position:relative;z-index:1;background:#fff;padding:6px;border-radius:6px}
+.qr-bingkai svg{display:block;width:236px;max-width:100%;height:auto}
+.qris-kartu .qr-bingkai img{display:block;width:236px;max-width:100%;border:0;border-radius:0}
+.qris-ket{font-size:12.5px;color:var(--text-2);line-height:1.5;margin:14px 0 0}
+.qris-ket b{color:var(--text)}
+.qris-kartu .err{margin-top:12px}
+.qris-aksi{display:flex;gap:12px;padding:10px 16px calc(14px + env(safe-area-inset-bottom));background:var(--bg)}
+.qris-aksi .btn{flex:1;margin:0;border-radius:99px;padding:14px 10px;font-size:14.5px}
+.qris-aksi .btn.primary{background:linear-gradient(180deg,#0A2C6B,#02194F)}
+.btn.garis{background:var(--card);border:1.5px solid var(--accent);color:var(--accent)}
 .qris img{max-width:220px;width:100%;border:1px solid var(--border);border-radius:12px;background:#fff}
 .contoh{position:relative;display:inline-block}
 .contoh:after{content:"CONTOH";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--danger);font-weight:800;font-size:34px;transform:rotate(-20deg)}

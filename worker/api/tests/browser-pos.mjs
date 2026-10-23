@@ -98,7 +98,8 @@ try {
   await hp.locator('.metode button[data-m="qris"]').click();
   await hp.locator("#lanjutPembayaran").click();
   await hp.locator(".qris img").waitFor();
-  await hp.screenshot({ path: SHOTS + "p4-qris.png", fullPage: true });
+  await hp.waitForTimeout(400); // tunggu animasi sheet selesai
+  await hp.screenshot({ path: SHOTS + "p4-qris.png" });
   await hp.locator("#lunas").click();
   await hp.getByText("Tersimpan di HP").waitFor();
   await hp.getByRole("button", { name: "Transaksi baru" }).click();
