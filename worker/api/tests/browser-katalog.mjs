@@ -107,6 +107,12 @@ try {
   // Daftar stok: kembali ke stok awal 9.
   await hal.getByRole("button", { name: "← Kembali" }).click();
   await hal.locator('#nav [data-nav="inventori/stok"]').click();
+  // Satu baris per produk dengan total semua varian; rincian varian dibuka lewat tombol ▸.
+  const barisKaos = hal.locator("#tbStok tr", { hasText: "Kaos Burtuqol" });
+  await barisKaos.waitFor();
+  assert.match(await barisKaos.textContent(), /3 varian.*9.*9.*2 varian di bawah minimum/s);
+  assert.equal(await hal.locator("#tbStok tr", { hasText: "KB-S" }).count(), 0);
+  await barisKaos.locator("[data-buka]").click();
   await hal.locator("#tbStok tr", { hasText: "KB-S" }).waitFor();
   assert.match(await hal.locator("#tbStok tr", { hasText: "KB-S" }).textContent(), /9.*9.*Aman/s);
   assert.match(await hal.locator("#tbStok tr", { hasText: "KB-M" }).textContent(), /Habis/);
