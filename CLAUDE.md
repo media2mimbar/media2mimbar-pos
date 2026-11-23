@@ -23,7 +23,7 @@ node tests/browser-*.mjs         # uji tampilan per tahap, butuh Playwright dan 
 python3 deploy.py                # deploy, butuh CLOUDFLARE_ACCOUNT_ID dan CLOUDFLARE_API_TOKEN
 ```
 
-Jangan deploy tanpa diminta.
+Jangan deploy tanpa diminta. Deploy biasanya dijalankan Owner dari GitHub: Actions › Deploy › Run workflow (`.github/workflows/deploy.yml`, secret `CLOUDFLARE_DEPLOY_TOKEN`). Token backup `CLOUDFLARE_API_TOKEN` sengaja hanya punya izin D1.
 
 ## Aturan kode
 

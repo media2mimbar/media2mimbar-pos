@@ -1,0 +1,40 @@
+# Deploy Worker hikayat-api ke Cloudflare. Hanya jalan saat Owner menekan Run workflow, tidak pernah otomatis.
+# Butuh secret repositori: CLOUDFLARE_DEPLOY_TOKEN (izin Account › Workers Scripts › Edit, D1 › Edit,
+# Workers R2 Storage › Edit) dan CLOUDFLARE_ACCOUNT_ID. Token backup CLOUDFLARE_API_TOKEN tetap hanya untuk D1.
+# Uji API dijalankan dulu. Kalau ada yang gagal, deploy dibatalkan.
+name: Deploy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: worker/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pasang TypeScript
+        run: npm install -g typescript@6.0.2
+      - name: Build dan uji
+        run: npm test
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_DEPLOY_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "Secret CLOUDFLARE_DEPLOY_TOKEN belum diisi"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "Secret CLOUDFLARE_ACCOUNT_ID belum diisi"; exit 1; }
+          python3 deploy.py

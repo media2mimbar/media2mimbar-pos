@@ -123,6 +123,10 @@ def siapkan_secret(db_id):
         print("Secret PEPPER dibuat")
     belum_ada_akun = sql(db_id, "SELECT count(*) AS n FROM staff")[0]["results"][0]["n"] == 0
     if "SETUP_KODE" not in ada and belum_ada_akun:
+        # Log GitHub Actions di repositori publik bisa dibaca siapa saja, jadi kode setup tidak dibuat di sana.
+        if os.environ.get("GITHUB_ACTIONS") == "true":
+            print("Belum ada akun Owner. Jalankan deploy.py sekali dari laptop untuk membuat kode setup.")
+            return
         kode = secrets.token_hex(4).upper()
         req("PUT", f"/accounts/{ACCOUNT}/workers/scripts/{NAMA_WORKER}/secrets",
             {"name": "SETUP_KODE", "text": kode, "type": "secret_text"})

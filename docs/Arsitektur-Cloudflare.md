@@ -221,7 +221,7 @@ Diputuskan 23 November 2026. Foto produk dibuka pembeli jauh lebih sering daripa
 | Foto | Ikut ekspor malam karena ada di D1 | Sama dengan database |
 | Uji pemulihan | Sebulan sekali, impor ekspor terbaru ke database uji dan cocokkan jumlah transaksi | Wajib |
 
-Token API Cloudflare untuk GitHub Actions hanya diberi izin D1 baca.
+Token API Cloudflare untuk backup di GitHub Actions (`CLOUDFLARE_API_TOKEN`) hanya diberi izin D1. Deploy lewat GitHub Actions memakai token terpisah (`CLOUDFLARE_DEPLOY_TOKEN`) dengan izin Workers Scripts, D1, dan Workers R2 Storage, dan hanya jalan saat ditekan manual. Lihat `docs/Panduan-Siap-Pakai.md` bagian 7.
 
 ---
 

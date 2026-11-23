@@ -135,3 +135,26 @@ Coba di satu event kecil dulu, dengan 1 HP kasir.
 | Setiap minggu | Laporan › Selisih & Kerugian: selesaikan yang belum |
 | Setiap bulan | Uji pemulihan (bagian 3), cek pemakaian kuota Cloudflare |
 | Setiap 3 bulan | Cek halaman harga Cloudflare, ganti kata sandi akun Owner |
+
+---
+
+## 7. Deploy lewat GitHub
+
+Deploy berjalan dari tab Actions dan hanya saat Anda menekan Run workflow. Workflow `Deploy` (`.github/workflows/deploy.yml`) menjalankan semua uji API dulu. Kalau ada uji yang gagal, deploy dibatalkan. Token deploy dibuat terpisah dari token backup, supaya token backup tetap hanya bisa membaca D1.
+
+Siapkan sekali:
+
+1. **Aktifkan R2.** Buka dash.cloudflare.com › R2 Object Storage, lalu aktifkan. Paket gratisnya cukup untuk foto produk. Bucket `hikayat-foto` dibuat otomatis saat deploy pertama.
+2. **Buat token deploy.** Buka My Profile › API Tokens › Create Token › Custom token.
+   - Permissions: `Account` › `Workers Scripts` › `Edit`, `Account` › `D1` › `Edit`, dan `Account` › `Workers R2 Storage` › `Edit`.
+   - Account Resources: hanya akun Media 2 Mimbar.
+   - Simpan tokennya. Token hanya tampil sekali.
+3. **Isi secret di GitHub.** Buka Settings › Secrets and variables › Actions › New repository secret. Nama `CLOUDFLARE_DEPLOY_TOKEN`, isinya token dari langkah 2. `CLOUDFLARE_ACCOUNT_ID` sudah ada dari bagian 1.
+
+Setiap kali deploy:
+
+1. Pastikan perubahan sudah di-merge ke `main`.
+2. Buka tab Actions › Deploy › Run workflow, pilih branch `main`, lalu tekan Run workflow.
+3. Tunggu sampai hijau, sekitar 2 menit. Di log langkah Deploy ada daftar migrasi yang dijalankan dan alamat Worker.
+
+Tombol Run workflow baru muncul setelah file workflow ada di branch `main`. Kalau database masih kosong (belum ada akun Owner), workflow tidak membuat kode setup karena log repositori publik bisa dibaca siapa saja. Untuk database kosong, jalankan `python3 deploy.py` sekali dari laptop.

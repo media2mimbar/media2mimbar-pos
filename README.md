@@ -69,6 +69,8 @@ python3 deploy.py                  # deploy ke Cloudflare (butuh CLOUDFLARE_ACCO
 
 Sejak tahap 9, foto produk disimpan di bucket R2 `hikayat-foto`. Sebelum deploy pertama setelah tahap 9, aktifkan R2 sekali di dashboard Cloudflare (R2 Object Storage), lalu beri token deploy izin `Workers R2 Storage: Edit`. `deploy.py` membuat bucket-nya sendiri kalau belum ada.
 
+Deploy juga bisa dijalankan dari GitHub: tab Actions › Deploy › Run workflow. Workflow menjalankan `npm test` dulu, lalu `deploy.py` dengan secret `CLOUDFLARE_DEPLOY_TOKEN`. Cara menyiapkannya ada di `docs/Panduan-Siap-Pakai.md` bagian 7.
+
 Deploy ulang demo prototipe:
 
 ```

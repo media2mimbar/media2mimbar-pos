@@ -542,7 +542,7 @@ Server tidak bergantung pada jadwal untuk keamanan. Jam buka dan tutup link, bat
 
 ### Rahasia dan binding baru
 
-`deploy.py` sudah membuat bucket R2 `hikayat-foto` dengan binding `FOTO` sejak tahap 9. Berikutnya ditambah binding `send_email`, penangan email masuk, jadwal baru, dan secret `MIDTRANS_SERVER_KEY`, `BITESHIP_API_KEY`, `WA_GATEWAY_KEY`, `WA_WEBHOOK_SECRET`, `GOOGLE_CLIENT_ID`, dan `GOOGLE_CLIENT_SECRET`. Nilai secret tidak pernah dicetak, sama seperti `PEPPER`.
+`deploy.py` sudah membuat bucket R2 `hikayat-foto` dengan binding `FOTO` sejak tahap 9, dan deploy dijalankan dari workflow GitHub Actions `Deploy` dengan secret `CLOUDFLARE_DEPLOY_TOKEN`. Berikutnya ditambah binding `send_email`, penangan email masuk, jadwal baru, dan secret `MIDTRANS_SERVER_KEY`, `BITESHIP_API_KEY`, `WA_GATEWAY_KEY`, `WA_WEBHOOK_SECRET`, `GOOGLE_CLIENT_ID`, dan `GOOGLE_CLIENT_SECRET`. Nilai secret tidak pernah dicetak, sama seperti `PEPPER`.
 
 ## Keamanan dan privasi
 
