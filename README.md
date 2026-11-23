@@ -13,6 +13,8 @@ Status:
 |---|---|
 | `docs/PRD-Hikayat-Merchandise.md` | Kebutuhan produk, alur, aturan bisnis, model data, dan keputusan yang sudah diambil |
 | `docs/Arsitektur-Cloudflare.md` | Rancangan versi produksi di Cloudflare paket gratis (Pages, Workers, D1) |
+| `docs/PRD-Web-Store.md` | Kebutuhan web store 2mimbar.store: toko umum, link event, perubahan POS dan dashboard, urutan pembangunan tahap 9 sampai 17 |
+| `docs/gambar/web-store/` | Gambar alur web store yang menjadi acuan tampilan |
 | `prototipe/out/` | Hasil build siap buka: `dashboard.html` (laptop) dan `pos.html` (HP) |
 | `prototipe/src/` | Kode tambahan prototipe: `shared.js` (data dan aturan bersama), `addon.js`, `inventori.js`, `keuangan.js` (dashboard), `pos-bridge.js` (POS) |
 | `prototipe/dashboard.html`, `prototipe/kasir-asli.html` | Kerangka tampilan awal yang ditempeli kode di `src/` saat build |
