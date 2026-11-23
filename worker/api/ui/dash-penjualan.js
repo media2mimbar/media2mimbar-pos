@@ -118,6 +118,49 @@ async function unggah(blob, jenis) {
   return d;
 }
 
+// Periksa gambar QRIS: bisa dibuat QR sesuai nominal atau tidak. Hasilnya bisa dicoba dengan nominal kecil tanpa mencatat penjualan.
+// Memakai pemindai dan pembuat QR yang sama dengan POS (pos-jsqr.js, pos-qrcode.js, pos-qris.js).
+const muatSkrip = (src) => (document.querySelector(`script[src="${src}"]`) ? Promise.resolve()
+  : new Promise((ok, gagal) => { const el = document.createElement("script"); el.src = src; el.onload = ok; el.onerror = () => gagal(new Error("Gagal memuat " + src)); document.head.appendChild(el); }));
+let teksQrisDash = { id: null, teks: null };
+async function cekQrisDash(id, el) {
+  el.innerHTML = '<p class="small muted">Memeriksa gambar QRIS…</p>';
+  try {
+    await Promise.all(["/pos-jsqr.js", "/pos-qrcode.js", "/pos-qris.js"].map(muatSkrip));
+    if (teksQrisDash.id !== id) {
+      const img = await createImageBitmap(await (await fetch(`/api/berkas/${id}`, { credentials: "same-origin" })).blob());
+      const c = document.createElement("canvas");
+      c.width = img.width; c.height = img.height;
+      const g = c.getContext("2d", { willReadFrequently: true });
+      g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0);
+      teksQrisDash = { id, teks: jsQR(g.getImageData(0, 0, c.width, c.height).data, c.width, c.height)?.data ?? null };
+    }
+    const teks = teksQrisDash.teks, alasan = teks ? HkQris.periksa(teks) : "QR di gambar tidak terbaca";
+    if (alasan) {
+      el.innerHTML = `<p class="small warn">${esc(alasan)}. POS tetap menampilkan QR statis dan pembeli mengetik nominal sendiri. Unggah gambar QRIS asli dari aplikasi merchant.</p>`;
+      return;
+    }
+    el.innerHTML = `<p class="small" style="color:var(--success-text);font-weight:600;margin-top:12px">✓ QR bisa dibuat sesuai nominal. Di POS, pembeli tinggal memindai tanpa mengetik nominal.</p>
+      <label>Coba QRIS (tidak tercatat sebagai penjualan)</label>
+      <div style="display:flex;gap:8px;align-items:center"><input type="number" id="cobaNominal" min="1" value="1000" style="max-width:160px"><button type="button" class="btn small" id="cobaQris">Tampilkan QR</button></div>
+      <div id="hasilCoba"></div>`;
+    $("#cobaQris").onclick = () => {
+      const n = Math.round(Number($("#cobaNominal").value || 0));
+      const q = n > 0 ? HkQris.buat(teks, n) : null;
+      if (!q) { $("#hasilCoba").innerHTML = '<p class="small muted">Isi nominal lebih dari 0.</p>'; return; }
+      const qr = qrcode(0, "M");
+      qr.addData(q);
+      qr.make();
+      $("#hasilCoba").innerHTML = `<div style="margin-top:10px;display:inline-block;background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px;line-height:0">${qr.createSvgTag(4, 8)}</div>
+        <p class="small muted">Pindai dengan aplikasi pembayaran. Nominal ${rp(n)} harus muncul sendiri, dan uangnya masuk ke akun merchant.</p>`;
+    };
+    // Enter di isian nominal menampilkan QR, bukan menyimpan formulir.
+    $("#cobaNominal").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); $("#cobaQris").click(); } };
+  } catch (x) {
+    el.innerHTML = `<p class="small muted" style="margin-top:12px">Gambar QRIS belum bisa diperiksa: ${esc(x.message)}</p>`;
+  }
+}
+
 async function halPengaturan() {
   $("#isi").innerHTML = '<main><p class="muted">Memuat…</p></main>';
   const { pengaturan: p } = await api("GET", "/api/pengaturan/pos");
@@ -130,7 +173,7 @@ async function halPengaturan() {
       <div class="card"><h2>Metode Pembayaran</h2>
       <div class="checks">${["tunai", "qris", "transfer"].map((m) => `<label><input type="checkbox" class="sakelar" name="m_${m}" ${p.metode[m] ? "checked" : ""}> ${{ tunai: "Tunai", qris: "QRIS", transfer: "Transfer" }[m]}</label>`).join("")}</div>
       <label>Nominal uang cepat (pisahkan dengan koma)</label><input type="text" name="nominal" value="${p.nominal_cepat.join(", ")}">
-      </div><div class="card"><h2>QRIS Statis</h2>
+      </div><div class="card"><h2>QRIS</h2>
       <div class="grid2"><div><label>Nama merchant</label><input type="text" name="q_nama" value="${esc(p.qris.nama)}"></div>
         <div><label>NMID</label><input type="text" name="q_nmid" value="${esc(p.qris.nmid)}"></div></div>
       <label>Gambar QRIS</label>
@@ -139,6 +182,7 @@ async function halPengaturan() {
         <input type="file" id="fileQris" accept="image/png,image/jpeg,image/webp" style="width:auto">
         ${qrisId ? '<button type="button" class="btn small danger" id="hapusQris">Hapus gambar</button>' : ""}
       </div>
+      <div id="cekQris"></div>
       </div><div class="card"><h2>Rekening Transfer</h2>
       <div class="tablewrap"><table><thead><tr><th>Bank</th><th>Nomor</th><th>Atas nama</th><th></th></tr></thead><tbody>
         ${rek.map((r, i) => `<tr><td><input type="text" data-r="${i}" data-k="bank" value="${esc(r.bank)}"></td><td><input type="text" data-r="${i}" data-k="no" value="${esc(r.no)}"></td>
@@ -192,8 +236,11 @@ async function halPengaturan() {
     // Simpan otomatis: setiap perubahan dikirim setelah jeda singkat.
     let tunda;
     const simpanOtomatis = () => { clearTimeout(tunda); tunda = setTimeout(() => f.requestSubmit(), 800); };
-    f.addEventListener("input", (e) => { pratinjau(); if (e.target.type !== "file") simpanOtomatis(); });
-    f.addEventListener("change", (e) => { pratinjau(); if (e.target.type !== "file") simpanOtomatis(); });
+    // Isian "Coba QRIS" hanya untuk mencoba, tidak ikut disimpan.
+    const ikutSimpan = (e) => e.target.type !== "file" && !e.target.closest("#cekQris");
+    f.addEventListener("input", (e) => { pratinjau(); if (ikutSimpan(e)) simpanOtomatis(); });
+    f.addEventListener("change", (e) => { pratinjau(); if (ikutSimpan(e)) simpanOtomatis(); });
+    if (qrisId) cekQrisDash(qrisId, $("#cekQris"));
     formKirim(f, async (d) => {
       $("#tersimpan").hidden = true;
       const nilai = {

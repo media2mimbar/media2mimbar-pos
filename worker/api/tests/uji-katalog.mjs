@@ -217,3 +217,41 @@ test("log aktivitas mencatat faktur dan harga", async () => {
   const aksi = sql("SELECT aksi FROM log_aktivitas").map((x) => x.aksi);
   for (const a of ["Tambah produk", "Ubah produk dan harga", "Catat faktur", "Bayar faktur", "Batal faktur"]) assert.ok(aksi.includes(a), a);
 });
+
+test("harga marketplace dan varian nonaktif ikut tersimpan bersama produk", async () => {
+  const r = ok(await api("POST", "/api/produk", {
+    nama: "Jersey", sku: "JR", kategori_id: kaos, hpp: 80000, marketplace: ["shopee", "tokopedia"],
+    varian: [
+      { nama: "M", harga_jual: 175000, harga_marketplace: { shopee: 185000, tokopedia: "" } },
+      { nama: "L", harga_jual: 175000, aktif: false, harga_marketplace: { shopee: 190000 } },
+    ],
+  }), 201);
+  const d = ok(await api("GET", `/api/produk/${r.id}`));
+  assert.deepEqual(d.produk.varian.map((v) => [v.sku, v.aktif]), [["JR-M", true], ["JR-L", false]]);
+  assert.deepEqual(d.marketplace.map((s) => [s.id, s.dijual, s.harga]), [
+    ["shopee", true, { "JR-M": 185000, "JR-L": 190000 }], ["tokopedia", true, { "JR-M": null, "JR-L": null }], ["tiktok", false, {}],
+  ]);
+
+  // Ubah: Tokopedia dimatikan, L dinyalakan lagi, varian baru XL langsung punya harga Shopee.
+  const ubah = (marketplace) => api("PATCH", `/api/produk/${r.id}`, {
+    nama: "Jersey", kategori_id: kaos, hpp: 80000, ...(marketplace ? { marketplace } : {}),
+    varian: [
+      { sku: "JR-M", nama: "M", harga_jual: 175000, harga_marketplace: { shopee: 180000 } },
+      { sku: "JR-L", nama: "L", harga_jual: 175000, aktif: true },
+      { ...(marketplace ? {} : { sku: "JR-XL" }), nama: "XL", harga_jual: 185000, harga_marketplace: { shopee: 195000 } },
+    ],
+  });
+  ok(await ubah(["shopee"]));
+  const hasil = () => api("GET", `/api/produk/${r.id}`).then((x) => ok(x).marketplace.map((s) => [s.id, s.harga]));
+  const harapan = [["shopee", { "JR-M": 180000, "JR-L": null, "JR-XL": 195000 }], ["tokopedia", {}], ["tiktok", {}]];
+  assert.deepEqual(await hasil(), harapan);
+  // Tanpa daftar marketplace di isian (XL sekarang sudah punya SKU): harga marketplace tidak disentuh.
+  ok(await ubah(null));
+  assert.deepEqual(await hasil(), harapan);
+
+  // Produk tanpa varian.
+  const t = ok(await api("POST", "/api/produk", { nama: "Topi", sku: "TP", kategori_id: kaos, hpp: 15000, harga_jual: 35000, marketplace: ["tiktok"], harga_marketplace: { tiktok: 39000 } }), 201);
+  assert.deepEqual(ok(await api("GET", `/api/produk/${t.id}`)).marketplace.find((s) => s.id === "tiktok").harga, { TP: 39000 });
+  assert.equal((await api("POST", "/api/produk", { nama: "X", sku: "XX", kategori_id: kaos, hpp: 1, harga_jual: 2, marketplace: ["lazada"] })).status, 400);
+  assert.equal((await api("POST", "/api/produk", { nama: "X", sku: "XX", kategori_id: kaos, hpp: 1, harga_jual: 2, marketplace: "shopee" })).status, 400);
+});

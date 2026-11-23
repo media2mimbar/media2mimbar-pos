@@ -333,7 +333,8 @@ async function prosesTrx(env: Env, p: Perangkat, d: Obj): Promise<Hasil["status"
   const bayar = (d.pembayaran as Obj[]).map((x, i) => {
     if (!METODE.includes(x?.metode as string)) throw new Tolak(`Metode bayar ${i + 1} tidak dikenal`);
     const ref = cekTeks(x.ref, "Referensi QRIS", 4);
-    if (x.metode === "QRIS" && !/^\d{4}$/.test(ref ?? "")) throw new Tolak("QRIS wajib 4 digit referensi");
+    // Referensi QRIS tidak wajib lagi (QR sudah berisi nominal); kalau diisi, harus 4 digit.
+    if (x.metode === "QRIS" && ref !== null && !/^\d{4}$/.test(ref)) throw new Tolak("Referensi QRIS harus 4 digit");
     return { metode: x.metode as string, jumlah: cekInt(x.jumlah, `Jumlah bayar ${i + 1}`, 1), ref };
   });
 

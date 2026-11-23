@@ -107,11 +107,13 @@ try {
   await hp.getByText("Sudah diterima").waitFor();
   await hp.locator("#kembali").click();
   const kartu = hp.locator(".kartu", { hasText: "Kaos Burtuqol" });
-  assert.match(await kartu.textContent(), /sisa 15.*Rp 99\.000\+.*harga event/s);
+  assert.match(await kartu.textContent(), /Rp 99\.000\+.*Sisa 15.*harga event/s);
   await kartu.click();
   await hp.locator('#lembar button[data-k="+"][data-sku="KB-S"]').click();
   await hp.locator("#selesaiVarian").click();
   await hp.locator("#btnBayar").click();
+  await hp.locator('.metode [data-m="tunai"]').click();
+  await hp.locator("#lanjutPembayaran").click();
   await hp.getByRole("button", { name: "Uang pas" }).click();
   await hp.locator("#lunas").click();
   await hp.getByText("Lunas Rp 99.000").waitFor();

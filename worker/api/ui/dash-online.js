@@ -441,29 +441,6 @@ async function biayaMarketplace() {
   }));
 }
 
-// ---------- Harga marketplace di form produk ----------
-
-async function bagianMarketplace(produkId, el) {
-  const d = await api("GET", `/api/produk/${produkId}/saluran`);
-  const gambar = () => {
-    el.innerHTML = `<div class="section"><h2>Harga Marketplace</h2><form class="card" id="fMp">
-      <p class="small muted">Aktifkan marketplace tempat produk ini dijual. Harga yang dikosongkan memakai harga jual.</p>
-      ${d.saluran.map((s) => `<div style="margin-top:12px"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" class="sakelar" data-mp="${s.id}" ${s.dijual ? "checked" : ""}> ${esc(s.nama)}${s.toko_aktif ? "" : ' <span class="tag off">Toko nonaktif</span>'}</label>
-        ${s.dijual ? `<table>${d.varian.map((v) => `<tr><td>${esc(v.nama || v.sku)} <span class="small muted">${esc(v.sku)} · harga jual ${rp(v.harga_jual)}</span></td>
-          <td style="width:160px"><input inputmode="numeric" data-harga="${s.id}" data-sku="${esc(v.sku)}" value="${s.harga[v.sku] ?? ""}" placeholder="${v.harga_jual}"></td></tr>`).join("")}</table>` : ""}</div>`).join("")}
-      <div class="err" hidden></div><div class="actions"><button class="btn primary">Simpan harga marketplace</button><span class="muted small" id="mpOk"></span></div></form></div>`;
-    const f = $("#fMp", el);
-    f.querySelectorAll("[data-mp]").forEach((c) => (c.onchange = () => { d.saluran.find((s) => s.id === c.dataset.mp).dijual = c.checked; gambar(); }));
-    f.querySelectorAll("[data-harga]").forEach((i) => (i.oninput = () => { d.saluran.find((s) => s.id === i.dataset.harga).harga[i.dataset.sku] = i.value; }));
-    formKirim(f, async () => {
-      const saluran = Object.fromEntries(d.saluran.map((s) => [s.id, { dijual: s.dijual, harga: Object.fromEntries(d.varian.map((v) => [v.sku, angka(s.harga[v.sku] ?? "")])) }]));
-      await api("PUT", `/api/produk/${produkId}/saluran`, { saluran });
-      $("#mpOk", el).textContent = "Tersimpan";
-    });
-  };
-  gambar();
-}
-
 // ---------- Pelanggan ----------
 
 let cariPelanggan = "";

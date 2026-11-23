@@ -2,6 +2,7 @@
 // riwayat impor. Pesanan online mengurangi stok Gudang Pusat; pesanan yang dibatalkan mengembalikannya.
 
 import { kenaPenjaga, penjaga } from "./inventori.js";
+import { HargaMp, marketplaceProduk, tulisHargaMp } from "./katalog.js";
 import { gerakStok } from "./kasir.js";
 import { logAktivitas, sesiSiap } from "./sesi.js";
 import { bacaJson, bulat, daftar, Gagal, json, Obj, sekarang, teks, ulid, wajibBulat, wajibTeks } from "./util.js";
@@ -71,19 +72,12 @@ export const perkiraanPotongan = (s: Pick<Saluran, "biaya_admin_bp" | "biaya_lay
 
 export async function hargaMarketplaceProduk(req: Request, env: Env, id: string) {
   await sesiSiap(env.DB, req, "owner", "admin");
-  const [saluran, varian, harga] = await Promise.all([
-    env.DB.prepare("SELECT id, nama, aktif FROM saluran WHERE marketplace = 1 ORDER BY urutan").all<{ id: string; nama: string; aktif: number }>(),
+  const [varian, saluran] = await Promise.all([
     env.DB.prepare("SELECT sku, nama, harga_jual, aktif FROM varian WHERE produk_id = ? ORDER BY urutan").bind(id).all<{ sku: string }>(),
-    env.DB.prepare("SELECT x.saluran_id, x.sku, x.harga FROM saluran_varian x JOIN varian v ON v.sku = x.sku WHERE v.produk_id = ?").bind(id).all<{ saluran_id: string; sku: string; harga: number | null }>(),
+    marketplaceProduk(env.DB, id),
   ]);
   if (!varian.results.length) throw new Gagal(404, "Produk tidak ditemukan");
-  return json({
-    varian: varian.results,
-    saluran: saluran.results.map((s) => {
-      const h = harga.results.filter((x) => x.saluran_id === s.id);
-      return { id: s.id, nama: s.nama, toko_aktif: s.aktif === 1, dijual: h.length > 0, harga: Object.fromEntries(h.map((x) => [x.sku, x.harga])) };
-    }),
-  });
+  return json({ varian: varian.results, saluran });
 }
 
 // { saluran: { shopee: { dijual: true, harga: { SKU: 125000 | null } } } }. Dimatikan = produk dihapus dari daftar marketplace itu.
@@ -97,25 +91,24 @@ export async function simpanHargaMarketplace(req: Request, env: Env, id: string)
     env.DB.prepare("SELECT sku FROM varian WHERE produk_id = ?").bind(id).all<{ sku: string }>(),
   ]);
   if (!varian.length) throw new Gagal(404, "Produk tidak ditemukan");
-  const t = sekarang();
-  const tulis: D1PreparedStatement[] = [];
+  const pilih: { id: string; dijual: boolean }[] = [];
+  const harga: Record<string, HargaMp> = Object.fromEntries(varian.map((v) => [v.sku, {}]));
   const ringkas: string[] = [];
   for (const [sid, v] of Object.entries(isi)) {
     const s = saluran.find((x) => x.id === sid);
     if (!s) throw new Gagal(400, `Saluran ${sid} tidak dikenal`);
-    tulis.push(env.DB.prepare("DELETE FROM saluran_varian WHERE saluran_id = ? AND sku IN (SELECT sku FROM varian WHERE produk_id = ?)").bind(sid, id));
-    if (v?.dijual !== true) { ringkas.push(`${s.nama} mati`); continue; }
-    const harga = (v.harga ?? {}) as Obj;
-    for (const { sku } of varian) {
-      const h = bulat(harga, sku, `Harga ${s.nama} ${sku}`, { max: 100_000_000, wajib: false });
-      tulis.push(env.DB.prepare("INSERT INTO saluran_varian (saluran_id, sku, harga, diubah_pada) VALUES (?, ?, ?, ?)").bind(sid, sku, h, t));
-    }
-    ringkas.push(`${s.nama} aktif`);
+    const dijual = v?.dijual === true;
+    pilih.push({ id: sid, dijual });
+    ringkas.push(`${s.nama} ${dijual ? "aktif" : "mati"}`);
+    if (dijual) for (const { sku } of varian) harga[sku][sid] = bulat((v.harga ?? {}) as Obj, sku, `Harga ${s.nama} ${sku}`, { max: 100_000_000, wajib: false });
   }
-  if (!tulis.length) return json({ ok: true });
-  tulis.push(env.DB.prepare("UPDATE produk SET diubah_pada = ? WHERE id = ?").bind(t, id));
-  tulis.push(logAktivitas(env.DB, staff, "Ubah harga marketplace", { tabel: "produk", id, keterangan: ringkas.join(", ") }));
-  await env.DB.batch(tulis);
+  if (!pilih.length) return json({ ok: true });
+  const t = sekarang();
+  await env.DB.batch([
+    ...tulisHargaMp(env.DB, id, pilih, varian.map((v) => ({ sku: v.sku, harga: harga[v.sku] })), t),
+    env.DB.prepare("UPDATE produk SET diubah_pada = ? WHERE id = ?").bind(t, id),
+    logAktivitas(env.DB, staff, "Ubah harga marketplace", { tabel: "produk", id, keterangan: ringkas.join(", ") }),
+  ]);
   return json({ ok: true });
 }
 

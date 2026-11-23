@@ -6,6 +6,6 @@
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#F4F5F3",
-  "theme_color": "#FF6100",
+  "theme_color": "#02194F",
   "icons": [{ "src": "/pos-ikon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
 }
