@@ -14,6 +14,8 @@ Backup berjalan otomatis setiap pukul 01.00 WIB lewat GitHub Actions (`.github/w
 
 Repositori ini **publik**, jadi file backup dienkripsi dengan kata sandi sebelum disimpan. Tanpa kata sandi itu, file backup tidak bisa dibuka siapa pun.
 
+Foto produk untuk toko web disimpan di R2, bukan di database, jadi tidak ikut backup malam. Simpan file asli foto produk di laptop atau Google Drive supaya bisa diunggah ulang kalau perlu. Bukti biaya, bukti refund, dan gambar QRIS tetap di database dan ikut backup.
+
 Langkah:
 
 1. **Buat token Cloudflare.** Buka dash.cloudflare.com › My Profile › API Tokens › Create Token › Custom token.

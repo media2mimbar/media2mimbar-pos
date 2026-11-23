@@ -3,6 +3,7 @@ import * as biaya from "./biaya.js";
 import * as keuangan from "./keuangan.js";
 import * as laporan from "./laporan.js";
 import * as event from "./event.js";
+import * as foto from "./foto.js";
 import * as lengkap from "./kasir-lengkap.js";
 import * as presale from "./presale.js";
 import * as promosi from "./promosi.js";
@@ -53,6 +54,7 @@ const RUTE: [string, string, Handler][] = [
   ["POST", "/api/produk", katalog.tambahProduk],
   ["GET", "/api/produk/:id", katalog.detailProduk],
   ["PATCH", "/api/produk/:id", katalog.ubahProduk],
+  ["POST", "/api/foto", foto.unggahFoto],
 
   ["GET", "/api/pemasok", inventori.daftarPemasok],
   ["POST", "/api/pemasok", inventori.tambahPemasok],
@@ -194,6 +196,17 @@ export default {
     const url = new URL(req.url);
     const path = url.pathname.replace(/\/+$/, "") || "/";
 
+    // Foto publik untuk toko web dan link event: dibaca langsung dari R2, tanpa sesi dan tanpa D1.
+    if (path.startsWith("/foto/")) {
+      if (req.method !== "GET") return new Response("Metode tidak didukung", { status: 405 });
+      try {
+        return await foto.ambilFotoPublik(req, env, path);
+      } catch (e) {
+        console.error(e);
+        return new Response("Foto tidak bisa dibuka", { status: 500 });
+      }
+    }
+
     if (!path.startsWith("/api/")) {
       const html = HALAMAN[path];
       const jenis = path.endsWith(".js") ? "text/javascript; charset=utf-8"
@@ -220,8 +233,9 @@ export default {
     }
   },
 
-  // Cron 00:10 WIB: hitung ulang rekap harian 7 hari terakhir.
+  // Cron 00:10 WIB: hitung ulang rekap harian 7 hari terakhir, lalu hapus foto yang tidak dipakai lebih dari 24 jam.
   async scheduled(_c: unknown, env: Env, ctx: { waitUntil(p: Promise<unknown>): void }) {
     ctx.waitUntil(laporan.cronRekap(env));
+    ctx.waitUntil(foto.bersihkanFotoYatim(env));
   },
 };

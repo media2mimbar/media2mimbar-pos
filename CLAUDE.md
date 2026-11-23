@@ -34,6 +34,7 @@ Jangan deploy tanpa diminta.
 - Aturan yang dipakai server dan HP ada di `src/aturan.ts` dan `src/promo.ts`, supaya hasilnya selalu sama.
 - Hak akses selalu dicek di server. API pembeli web store dipisah dari API karyawan.
 - Halaman ada di `ui/` dan dilayani Worker yang sama.
+- Foto yang dibuka publik (produk, lalu banner dan penilaian) disimpan di R2 lewat `src/foto.ts`. Bukti biaya, bukti refund, QRIS, dan dokumen sensitif lain tetap di tabel `berkas` D1.
 - Setiap fitur baru mendapat uji di `tests/uji-*.mjs`, dan uji tampilan kalau ada layar baru.
 
 ## Gaya tulisan

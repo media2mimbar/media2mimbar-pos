@@ -62,9 +62,12 @@ node tests/browser-lengkap.mjs     # uji tahap 5 (promo, pelanggan, pisah bayar,
 node tests/browser-online.mjs      # uji tahap 6 (harga marketplace, input manual, impor CSV, pelanggan)
 node tests/browser-keuangan.mjs    # uji tahap 7 (dashboard, laporan, biaya, keuangan, hak akses Admin)
 node tests/browser-pos-lanjut.mjs  # uji menu POS tambahan (laporan, riwayat, opname, batal terima, tutup event dari HP, terlaris, mode SKU)
+node tests/browser-web-store.mjs   # uji tahap 9 (foto produk, Toko web 2Mimbar, harga toko web, berat, foto varian)
 node tests/server-lokal.mjs        # jalan di http://localhost:8787, kode setup SETUP-LOKAL
 python3 deploy.py                  # deploy ke Cloudflare (butuh CLOUDFLARE_ACCOUNT_ID dan CLOUDFLARE_API_TOKEN)
 ```
+
+Sejak tahap 9, foto produk disimpan di bucket R2 `hikayat-foto`. Sebelum deploy pertama setelah tahap 9, aktifkan R2 sekali di dashboard Cloudflare (R2 Object Storage), lalu beri token deploy izin `Workers R2 Storage: Edit`. `deploy.py` membuat bucket-nya sendiri kalau belum ada.
 
 Deploy ulang demo prototipe:
 

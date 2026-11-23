@@ -58,7 +58,7 @@ Halaman toko disimpan di `ui/toko/` dan dilayani Worker yang sama lewat domain 2
 
 | Bagian lama | Nasib | Perubahan |
 | --- | --- | --- |
-| Produk, varian, SKU, HPP | Tetap | Ditambah foto produk sampai 9, deskripsi, foto per varian, dan berat per varian |
+| Produk, varian, SKU, HPP | Tetap | Ditambah foto produk sampai 9, sakelar Toko web, foto per varian, dan berat per varian. Kolom deskripsi sudah ada dan kini tampil di halaman produk |
 | Harga per saluran `harga_saluran` | Tetap | Saluran baru `toko_web`, polanya sama dengan `gudang`. Harga kosong berarti harga jual |
 | Stok dan buku besar `stok_gerak` | Tetap | Jenis gerak baru untuk pesanan web, dan tabel tahan stok untuk QRIS yang sedang dibayar |
 | Event, `event_varian`, Kirim Stok, Tutup Event | Berubah | Pre-sale diganti bagian Link Web Order. Harga event berlaku di POS dan di link. Tutup event memperhitungkan barang pesanan web yang belum diambil |
@@ -70,7 +70,7 @@ Halaman toko disimpan di `ui/toko/` dan dilayani Worker yang sama lewat domain 2
 | Laporan dan `sqlFakta` | Berubah | Ditambah sumber baris dari toko web dan link event |
 | Keuangan › Biaya | Tetap, ditambah | Baris biaya Midtrans dibuat otomatis |
 | Login karyawan | Tetap | Akun pembeli terpisah dari `staff` dan tidak bisa masuk dashboard atau POS |
-| Foto di D1 tabel `berkas` | Perlu diputuskan | Foto produk dibuka publik dan sering, lihat Yang perlu dicek |
+| Foto di D1 tabel `berkas` | Tetap untuk foto internal | Foto produk, banner, dan foto penilaian disimpan di bucket R2 `hikayat-foto` dan dibuka lewat `/foto/`. Bukti biaya, bukti refund, QRIS, dan laporan payout tetap di `berkas` D1. Diputuskan 23 Nov 2026 |
 | Paket Cloudflare gratis | Berubah | Perlu Workers Paid untuk email dan beban webhook |
 | Rencana WA Business API resmi | Berubah | Versi pertama memakai gateway WA tidak resmi, hanya untuk pemberitahuan refund event batal |
 | QRIS statis di POS | Tetap | POS tetap memakai gambar QRIS di `berkas`. QRIS dinamis Midtrans hanya untuk web |
@@ -472,19 +472,20 @@ Perubahan masuk lewat migrasi baru mulai `0008_web_store.sql` dan mengikuti atur
 | `keranjang` | Keranjang toko umum | akun, sku, qty. Keranjang link event disimpan di browser |
 | `pesanan_web` | Pesanan toko dan event | no unik, jalur toko atau event, akun atau nama dan telp, event, lokasi stok, status, subtotal, potongan, promo, ongkir, subsidi ongkir, total, salinan alamat, kode pengambilan, token struk, waktu lunas, diambil oleh dan cara verifikasi, alasan batal |
 | `pesanan_web_item` | Barang per pesanan | sku, nama, qty, harga, hpp |
+| `foto` | Foto publik yang isinya di R2. Sudah dibuat di tahap 9 | jenis produk, banner, atau penilaian, mime, ukuran, pengunggah |
 | `stok_tahan` | Stok yang sedang dibayar | pesanan, sku, lokasi, qty, sampai |
 | `bayar_web` | Transaksi Midtrans | order id Midtrans, transaction id, status, nominal, biaya perkiraan, biaya asli, waktu payout, isi notifikasi terakhir |
 | `refund_web` | Refund otomatis dan manual | pesanan, cara, alasan, nominal, status, pengaju, penyetuju, bank, nomor rekening, nama pemilik, bukti di `berkas` |
 | `kiriman` | Order Biteship | pesanan, order id Biteship, kurir, layanan, resi, berat, ongkir, status, waktu resi terbit |
 | `kiriman_jejak` | Riwayat status paket | kiriman, status, catatan, waktu |
-| `penilaian` | Penilaian toko umum | pesanan, sku, akun, bintang, teks, foto, bagian yang tampil, diatur oleh, alasan |
+| `penilaian` | Penilaian toko umum | pesanan, sku, akun, bintang, teks, foto di tabel `foto`, bagian yang tampil, diatur oleh, alasan |
 | `promo_tempat` | Tempat berlaku voucher | promo, jenis tempat, event atau lokasi |
 | `promo_pakai` | Pemakaian dan kunci kuota voucher | promo, sumber pesanan web atau trx, akun atau telp, status dikunci, terpakai, atau dilepas |
 | `email_alamat` | Alamat di domain toko | alamat, nama tampilan, kegunaan, tujuan terusan |
 | `email_kebutuhan` | Kebutuhan email | kode, alamat pengirim, subjek, isi pembuka |
 | `email_log` | Riwayat kirim | kebutuhan, tujuan, status, percobaan, galat terakhir |
 | `halaman_toko` | Halaman kebijakan | slug, judul, isi, Draf atau Terbit, diterbitkan oleh |
-| `banner` | Banner beranda | gambar, judul, tujuan, mulai, selesai, urutan |
+| `banner` | Banner beranda | gambar di tabel `foto`, judul, tujuan, mulai, selesai, urutan |
 | `wa_kirim` | Antrean WA refund event batal | event, pesanan, status, waktu kirim, waktu balas |
 | `laporan_payout` | Laporan payout Midtrans | berkas, diterima, jumlah baris terbaca, galat |
 
@@ -493,14 +494,14 @@ Perubahan masuk lewat migrasi baru mulai `0008_web_store.sql` dan mengikuti atur
 | Tabel | Perubahan |
 | --- | --- |
 | `event` | Tambah `web_aktif`, `web_slug` unik, `web_buka`, `web_tutup`, `batas_offline` bawaan 2, `batal_pada`, `batal_oleh`, `batal_alasan`. Hapus `presale_aktif` dan `presale_mode` setelah pesanan pre-sale lama selesai |
-| `produk` | Tambah `deskripsi` dan sakelar `toko_web` |
-| `produk_foto`, tabel baru | produk, berkas, urutan, paling banyak 9 |
-| `varian` | Tambah `berat_gram` dan `foto_id` |
+| `produk` | Tambah sakelar `toko_web`. `deskripsi` sudah ada sejak tahap 2. Sudah dibuat di tahap 9 |
+| `produk_foto`, tabel baru | foto, produk, urutan 0 sampai 8. Urutan 0 adalah foto utama. Satu foto hanya milik satu produk. Sudah dibuat di tahap 9 |
+| `varian` | Tambah `berat_gram` (1 sampai 50.000) dan `foto_id` yang harus salah satu foto produknya. Sudah dibuat di tahap 9 |
 | `harga_saluran` | Baris dengan saluran `toko_web` untuk harga toko web |
 | `stok_gerak` | Jenis baru `web_jual`, `web_batal`, `web_refund`, `web_ganti` |
 | `promo` | Jenis baru `voucher` dan `subsidi_ongkir`. Tambah `kode` unik, `kuota`, `batas_per_pembeli`, `hanya_baru`, `tampil_di_daftar`, `subsidi_per_pcs`, `subsidi_maks` |
 | `trx` | Kolom pre-sale tidak dipakai lagi untuk transaksi baru. Data lama tetap untuk riwayat |
-| `berkas` | Jenis baru `produk`, `banner`, `penilaian`, `payout` |
+| `berkas` | Jenis baru `payout`. Foto produk, banner, dan penilaian tidak masuk `berkas` karena disimpan di R2 |
 | `pengaturan` | Kunci baru `toko_web` untuk Info Toko, pengumuman, dan batas saldo Biteship |
 
 ## API, webhook, dan jadwal
@@ -541,7 +542,7 @@ Server tidak bergantung pada jadwal untuk keamanan. Jam buka dan tutup link, bat
 
 ### Rahasia dan binding baru
 
-`deploy.py` ditambah binding `send_email`, penangan email masuk, jadwal baru, dan secret `MIDTRANS_SERVER_KEY`, `BITESHIP_API_KEY`, `WA_GATEWAY_KEY`, `WA_WEBHOOK_SECRET`, `GOOGLE_CLIENT_ID`, dan `GOOGLE_CLIENT_SECRET`. Nilai secret tidak pernah dicetak, sama seperti `PEPPER`.
+`deploy.py` sudah membuat bucket R2 `hikayat-foto` dengan binding `FOTO` sejak tahap 9. Berikutnya ditambah binding `send_email`, penangan email masuk, jadwal baru, dan secret `MIDTRANS_SERVER_KEY`, `BITESHIP_API_KEY`, `WA_GATEWAY_KEY`, `WA_WEBHOOK_SECRET`, `GOOGLE_CLIENT_ID`, dan `GOOGLE_CLIENT_SECRET`. Nilai secret tidak pernah dicetak, sama seperti `PEPPER`.
 
 ## Keamanan dan privasi
 
@@ -587,6 +588,7 @@ Web store mengubah prinsip paket gratis Rp0 di Arsitektur-Cloudflare.md. Biaya t
 | --- | --- | --- | --- |
 | Cloudflare Workers Paid | 5 dolar AS per bulan | 10 juta permintaan dan 30 juta milidetik CPU per bulan | Wajib untuk Email Service. Batas CPU per permintaan jauh lebih longgar dari paket gratis, penting untuk webhook dan membaca laporan payout |
 | Cloudflare D1 di Workers Paid | Ikut paket | 25 miliar baris dibaca, 50 juta baris ditulis, dan 5 GB per bulan | Kelebihan penyimpanan 0,75 dolar AS per GB per bulan |
+| Cloudflare R2 | Gratis sampai batas | 10 GB per bulan, 1 juta operasi tulis dan 10 juta operasi baca per bulan, tanpa biaya keluar data | Kelebihan 0,015 dolar AS per GB per bulan. Dipakai untuk foto produk, banner, dan foto penilaian |
 | Cloudflare Email Service | Ikut paket | 3.000 email keluar per bulan, lalu 0,35 dolar AS per 1.000 email | Email masuk lewat Email Routing tidak dibatasi. Fitur kirim masih beta |
 | Domain 2mimbar.store | Sekitar 42 dolar AS per tahun untuk perpanjangan |  | Cloudflare Registrar menjual sesuai harga registry tanpa tambahan. Harga pasti dicek saat membeli |
 | Midtrans QRIS | 0% sampai Rp100.000 dan 0,7% di atasnya per transaksi, atau 0% sampai Rp500.000 dan 0,3% di atasnya untuk usaha mikro |  | Tanpa biaya bulanan. Angka asli dibaca dari laporan payout |
@@ -595,13 +597,13 @@ Web store mengubah prinsip paket gratis Rp0 di Arsitektur-Cloudflare.md. Biaya t
 | Google Sign-In | Gratis |  | Butuh proyek Google Cloud dan layar persetujuan OAuth |
 | Cloudflare Turnstile | Gratis |  |  |
 
-Sumber harga Cloudflare: [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/), [Email Service pricing](https://developers.cloudflare.com/email-service/platform/pricing/), [perkiraan harga .store di Cloudflare](https://domainoffer.net/tld/store/cloudflare). Diperiksa 23 Nov 2026.
+Sumber harga Cloudflare: [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/), [R2 pricing](https://developers.cloudflare.com/r2/pricing/), [Email Service pricing](https://developers.cloudflare.com/email-service/platform/pricing/), [perkiraan harga .store di Cloudflare](https://domainoffer.net/tld/store/cloudflare). Diperiksa 23 Nov 2026.
 
 ### Perkiraan pemakaian
 
 - **Email.** Satu pesanan toko memakai sekitar 5 email, yaitu bukti bayar, dikemas, dikirim, sampai, dan pengingat penilaian. Jatah 3.000 email cukup untuk sekitar 500 pesanan toko per bulan ditambah OTP.
 - **Permintaan Worker.** Arsitektur lama memperkirakan sekitar 5.000 permintaan per hari dari POS dan dashboard. Satu pembeli web yang melihat-lihat sampai membayar diperkirakan memakai puluhan permintaan, ditambah tanya status bayar setiap beberapa detik. Event besar dengan ribuan pengunjung link tetap jauh di bawah 10 juta per bulan.
-- **Foto produk.** Foto dibuka jauh lebih sering daripada bukti biaya. Kalau tetap di D1, setiap foto harus disimpan di cache Cloudflare supaya tidak dibaca dari database setiap kali tampil.
+- **Foto produk.** Foto disimpan di R2 dalam dua ukuran, besar 1200 px dan kecil 400 px, sekitar 150 KB sampai 400 KB per foto. 200 produk dengan 9 foto masih di bawah 1 GB. Alamat foto tidak pernah berubah, jadi browser menyimpannya setahun dan D1 tidak ikut terbebani.
 - **Bitepoints.** Biaya cek tarif dipotong setiap pembeli membuka ongkir, jadi tarif disimpan sebentar per alamat dan berat.
 
 ## Daftar gambar
@@ -616,7 +618,7 @@ Sebelas papan PNG menjadi acuan tampilan. Kalau gambar dan dokumen ini berbeda, 
 | [alur-web-order-pos-2](gambar/web-store/alur-web-order-pos-2.webp) | Stok yang mendahulukan web, saat offline, bentrok stok, ganti barang, refund dengan PIN penanggung jawab |  |
 | [alur-refund-event-batal](gambar/web-store/alur-refund-event-batal.webp) | Batalkan event, WA refund, form rekening, transfer manual, hasil refund Midtrans |  |
 | [alur-form-event](gambar/web-store/alur-form-event.webp) | Form event dengan Link Web Order, event terjadwal dengan stok kosong, event dibuka, poster QR, status link |  |
-| [alur-dashboard-web-1](gambar/web-store/alur-dashboard-web-1.webp) | Form produk dengan foto, berat, dan harga toko web, daftar produk, Pesanan Toko, rincian, batal |  |
+| [alur-dashboard-web-1](gambar/web-store/alur-dashboard-web-1.webp) | Form produk dengan foto, berat, dan harga toko web, daftar produk, Pesanan Toko, rincian, batal | Catatan teknis menyebut toko web masuk tabel `saluran` seperti marketplace. Yang dibangun mengikuti PRD: sakelar `produk.toko_web` dan harga di `harga_saluran` dengan saluran `toko_web`, jadi toko web tidak muncul di menu Penjualan Online |
 | [alur-dashboard-web-2](gambar/web-store/alur-dashboard-web-2.webp) | Daftar promosi, jenis promosi, form voucher, penilaian, atur tampilan penilaian |  |
 | [alur-pengaturan-toko](gambar/web-store/alur-pengaturan-toko.webp) | Info Toko, Tampilan Beranda, Email, Ubah isi email, Halaman Kebijakan, Sambungan, biaya Midtrans otomatis |  |
 | [alur-pengiriman](gambar/web-store/alur-pengiriman.webp) | Kemas dan buat resi, konfirmasi saldo, label A6, Siap Diantar, Dikirim, subsidi ongkir, Sambungan Biteship |  |
@@ -652,15 +654,17 @@ Keputusan berikut sudah disepakati selama pembahasan gambar di November 2026 dan
 | 20 | Subsidi ongkir | Per pcs untuk produk terpilih dengan batas per pesanan, hanya di toko web. Pembeli memakai subsidi atau voucher |
 | 21 | Penilaian | Bintang selalu tampil. Admin memilih apakah teks dan foto ikut tampil |
 | 22 | Info toko | Alamat kantor dan WA admin diisi di dashboard dan wajib sebelum toko web dibuka |
+| 23 | Foto publik | Foto produk, banner, dan foto penilaian di R2. Bukti biaya, bukti refund, QRIS, dan laporan payout tetap di D1. Diputuskan 23 Nov 2026 |
+| 24 | Sakelar Toko web | Hanya bisa menyala kalau produk punya minimal satu foto dan semua varian aktif punya berat. Server yang memeriksa |
 
 ## Yang perlu dicek dan risiko
 
-Enam belas hal perlu dicek atau diputuskan sebelum pembangunan berjalan jauh. Yang paling menentukan adalah Workers Paid, tempat foto produk, dan akun Midtrans yang sudah terverifikasi dengan fitur refund aktif.
+Enam belas hal perlu dicek atau diputuskan sebelum pembangunan berjalan jauh. Dua sudah selesai di tahap 9. Yang paling menentukan adalah Workers Paid, tempat foto produk, dan akun Midtrans yang sudah terverifikasi dengan fitur refund aktif.
 
 ### Perlu dicek atau diputuskan
 
 - [ ] Setujui pindah ke Workers Paid, yang mengubah prinsip paket gratis Rp0.
-- [ ] Putuskan tempat foto produk. Usulannya bucket R2 publik untuk foto produk, banner, dan foto penilaian, sementara bukti biaya dan bukti refund tetap di `berkas` D1. Pilihan lain adalah tetap di D1 dengan cache Cloudflare.
+- [x] Putuskan tempat foto produk. Diputuskan 23 Nov 2026: bucket R2 `hikayat-foto` untuk foto produk, banner, dan foto penilaian. Bukti biaya dan bukti refund tetap di `berkas` D1. Sebelum deploy, aktifkan R2 di dashboard Cloudflare dan beri token deploy izin Workers R2 Storage: Edit.
 - [ ] Beli domain 2mimbar.store di Cloudflare, lalu aktifkan Email Routing, Email Sending, SPF, DKIM, dan DMARC.
 - [ ] Daftarkan akun Midtrans dan selesaikan verifikasi setelah halaman kebijakan terbit. Pastikan kategori usaha, karena usaha mikro mendapat biaya QRIS yang berbeda.
 - [ ] Aktifkan fitur refund QRIS di Midtrans dan pastikan cara refund serta batas waktunya untuk akun Anda.
@@ -673,7 +677,7 @@ Enam belas hal perlu dicek atau diputuskan sebelum pembangunan berjalan jauh. Ya
 - [ ] Setujui kebijakan retur, yaitu klaim lewat WA paling lambat 2 x 24 jam dengan video membuka paket, hanya untuk salah kirim, cacat, atau rusak.
 - [ ] Setujui arti pembeli baru di tiap jalur seperti di bagian Aturan bisnis.
 - [ ] Selesaikan semua pesanan pre-sale lama sebelum fitur pre-sale dihapus.
-- [ ] Push perubahan repo setelah 20 Okt 2026 kalau ada, supaya migrasi baru tidak bentrok.
+- [x] Push perubahan repo setelah 20 Okt 2026 kalau ada, supaya migrasi baru tidak bentrok. Sudah dicek 23 Nov 2026: PR #4 berisi perubahan setelah 20 Okt tanpa migrasi baru, dan tahap 9 dibangun di atasnya. PR #4 perlu di-merge lebih dulu.
 - [ ] Perbarui keterangan dua gambar seperti di Daftar gambar.
 
 ### Risiko
@@ -697,6 +701,7 @@ Pembangunan melanjutkan tahap 1 sampai 8 di Arsitektur-Cloudflare.md. Link event
 
 1. **Tahap 9, fondasi.** Workers Paid, domain 2mimbar.store diarahkan ke Worker, migrasi `0008_web_store.sql`, tempat foto produk, perubahan form produk, Info Toko, dan Halaman Kebijakan. Halaman kebijakan dibuat di sini supaya verifikasi Midtrans berjalan sambil membangun tahap berikutnya.
    - Selesai kalau produk bisa diisi foto, berat, dan harga toko web, dan halaman kebijakan sudah terbit.
+   - Status 23 Nov 2026: migrasi `0008_web_store.sql`, foto produk di R2, dan perubahan form serta daftar produk sudah dibangun dan diuji. Belum: Info Toko, Halaman Kebijakan, Workers Paid, dan domain.
 2. **Tahap 10, link event dan Midtrans.** Bagian Link Web Order di form event, halaman event, checkout, QRIS Midtrans dengan notifikasi, tahanan stok, struk digital, Struk Saya, Temukan struk, dan Pesanan Event di dashboard.
    - Selesai kalau pesanan di sandbox Midtrans bisa lunas, batal karena waktu habis, dan stoknya benar di dashboard.
 3. **Tahap 11, POS Web Order.** Tab Web Order, jalur QR dan no HP, tombol geser, stok yang mendahulukan web, batas aman offline, bentrok stok dengan ganti barang dan refund ber-PIN, serta pengambilan di POS Gudang Pusat.

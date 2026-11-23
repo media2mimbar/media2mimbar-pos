@@ -14,6 +14,7 @@ Per Oktober 2026.
 | Server | Workers | 100.000 permintaan per hari, 10 ms CPU per permintaan | Login, cek PIN, semua aturan bisnis, laporan |
 | Database | D1 (SQLite) | 5 GB, 5 juta baris dibaca dan 100.000 baris ditulis per hari | Semua data |
 | Foto | D1 (tabel `berkas`) | Ikut kuota D1 di atas | Bukti biaya, foto barang terbuang dan retur, gambar QRIS |
+| Foto publik (mulai tahap 9) | R2 (bucket `hikayat-foto`) | 10 GB, 1 juta operasi tulis dan 10 juta operasi baca per bulan, tanpa biaya keluar data | Foto produk untuk toko web dan link event, lalu banner dan foto penilaian |
 | Pemulihan data | D1 Time Travel | Kembali ke menit mana pun dalam 7 hari terakhir | Salah hapus atau salah impor |
 | Jadwal | Workers Cron Triggers | Termasuk paket gratis | Rekap harian, bersih-bersih sesi |
 | Backup jangka panjang | GitHub Actions (artifact) | Kuota menit dan penyimpanan GitHub | Salinan database setiap malam, disimpan 30 hari |
@@ -177,7 +178,7 @@ Kalau kuota harian D1 habis, server menolak tulis sampai pukul 00.00 UTC (07.00 
 
 ## 6. Foto di D1
 
-R2 tidak dipakai (keputusan Oktober 2026). Foto disimpan di D1 sebagai BLOB di tabel `berkas`: id, jenis, mime, ukuran, isi, ref_tabel, ref_id, dibuat_pada, dibuat_oleh.
+Foto yang hanya dibuka karyawan disimpan di D1 sebagai BLOB di tabel `berkas`: id, jenis, mime, ukuran, isi, ref_tabel, ref_id, dibuat_pada, dibuat_oleh. Keputusan Oktober 2026 untuk tidak memakai R2 tetap berlaku untuk foto ini. Foto yang dibuka publik di web store memakai R2 sejak tahap 9, lihat bagian di bawah.
 
 
 - Foto dikecilkan di perangkat sebelum diunggah: sisi terpanjang 1280 px, JPEG kualitas 0,7, rata-rata 100 KB sampai 200 KB.
@@ -187,6 +188,19 @@ R2 tidak dipakai (keputusan Oktober 2026). Foto disimpan di D1 sebagai BLOB di t
 - Daftar dan laporan tidak pernah memilih kolom `isi`. Isi foto hanya dibaca oleh `GET /api/berkas/:id`.
 - Foto ikut masuk ekspor malam, jadi ukuran backup bertambah seiring jumlah foto.
 - Kalau database mendekati 5 GB, pindahkan foto ke R2. Kolom `id` tetap, jadi alamat `/api/berkas/:id` tidak berubah.
+
+### Foto publik di R2 (tahap 9)
+
+Diputuskan 23 November 2026. Foto produk dibuka pembeli jauh lebih sering daripada bukti biaya, dan D1 juga melayani sinkron POS, jadi foto publik dipindah ke R2.
+
+- Bucket `hikayat-foto` dengan binding `FOTO`, dibuat `deploy.py` kalau belum ada. R2 harus diaktifkan sekali di dashboard Cloudflare, dan token deploy butuh izin `Workers R2 Storage: Edit`.
+- Dashboard mengecilkan foto di browser menjadi dua JPEG: besar (sisi terpanjang 1200 px, untuk halaman produk) dan kecil (400 px, untuk daftar dan grid). Bagian transparan PNG diberi latar putih. Pengguna memilih JPG atau PNG paling besar 5 MB.
+- Unggah lewat `POST /api/foto?jenis=produk` (Owner dan Admin), form multipart berisi `besar` dan `kecil`. Worker memeriksa isi file (JPEG atau WebP), batas 1,5 MB dan 300 KB, menyimpan ke R2 dengan kunci `produk/<id>/besar` dan `produk/<id>/kecil`, lalu mencatat baris di tabel `foto`.
+- Pembeli membuka foto lewat `GET /foto/produk/<id>/<besar|kecil>` tanpa sesi dan tanpa membaca D1. Isi foto tidak pernah berubah, jadi header `cache-control: public, max-age=31536000, immutable`. Hanya jenis yang terdaftar di `JENIS_PUBLIK` (`src/foto.ts`) yang bisa dibuka.
+- Foto terpasang ke produk lewat tabel `produk_foto` (paling banyak 9, urutan 0 adalah foto utama) saat form produk disimpan. Foto varian (`varian.foto_id`) harus salah satu foto produknya sendiri.
+- Foto yang tidak dipakai produk lebih dari 24 jam, misalnya dari form yang dibatalkan, dihapus cron harian. Baris D1 dihapus lebih dulu, lalu file R2.
+- Foto R2 tidak ikut ekspor malam D1. File asli foto produk disimpan sendiri oleh Admin.
+- Uji memakai R2 tiruan di `tests/r2-lokal.mjs`.
 
 ---
 

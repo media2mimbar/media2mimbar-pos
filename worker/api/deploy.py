@@ -7,10 +7,12 @@ Butuh CLOUDFLARE_ACCOUNT_ID dan CLOUDFLARE_API_TOKEN di environment.
 Langkah:
 1. Buat database D1 `hikayat` kalau belum ada.
 2. Jalankan file migrations/*.sql yang belum pernah dijalankan (dicatat di tabel _migrasi).
-3. Unggah semua modul dist/*.js sebagai Worker, dengan binding DB.
-4. Buat secret PEPPER kalau belum ada (nilainya tidak pernah dicetak), dan SETUP_KODE
+3. Buat bucket R2 `hikayat-foto` untuk foto publik kalau belum ada. R2 harus sudah diaktifkan sekali di
+   dashboard Cloudflare, dan token butuh izin Workers R2 Storage: Edit.
+4. Unggah semua modul dist/*.js sebagai Worker, dengan binding DB dan FOTO.
+5. Buat secret PEPPER kalau belum ada (nilainya tidak pernah dicetak), dan SETUP_KODE
    selama belum ada akun sama sekali.
-5. Nyalakan alamat <nama>.<subdomain>.workers.dev.
+6. Nyalakan alamat <nama>.<subdomain>.workers.dev.
 """
 import json, os, secrets, sys, urllib.error, urllib.request, uuid
 
@@ -21,6 +23,8 @@ NAMA_WORKER = "hikayat-api"
 # Database di Asia-Pasifik supaya dekat dengan pengguna di Indonesia. "hikayat" (lama) ada di Amerika Utara.
 NAMA_DB = "hikayat-asia"
 LOKASI_DB = "apac"
+# Foto produk, banner, dan foto penilaian dibuka publik, jadi disimpan di R2, bukan di D1.
+NAMA_BUCKET = "hikayat-foto"
 TANGGAL_KOMPAT = "2026-09-01"
 DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -67,6 +71,25 @@ def siapkan_db():
     return db_id
 
 
+def siapkan_bucket():
+    r = urllib.request.Request(f"{API}/accounts/{ACCOUNT}/r2/buckets?name_contains={NAMA_BUCKET}")
+    r.add_header("Authorization", f"Bearer {TOKEN}")
+    try:
+        with urllib.request.urlopen(r) as res:
+            out = json.loads(res.read())
+    except urllib.error.HTTPError as e:
+        isi = e.read().decode()[:500]
+        if "10042" in isi:
+            sys.exit("R2 belum aktif. Buka dashboard Cloudflare > R2 Object Storage, aktifkan sekali, lalu jalankan deploy lagi.")
+        sys.exit(f"Gagal membaca bucket R2: {e.code} {isi}")
+    hasil = out.get("result") or {}
+    daftar = hasil.get("buckets", []) if isinstance(hasil, dict) else hasil
+    ada = [b for b in daftar if b.get("name") == NAMA_BUCKET]
+    if not ada:
+        req("POST", f"/accounts/{ACCOUNT}/r2/buckets", {"name": NAMA_BUCKET, "locationHint": LOKASI_DB})
+        print(f"Bucket R2 '{NAMA_BUCKET}' dibuat")
+
+
 def unggah_worker(db_id):
     dist = os.path.join(DIR, "dist")
     modul = sorted(f for f in os.listdir(dist) if f.endswith(".js"))
@@ -75,7 +98,7 @@ def unggah_worker(db_id):
     meta = {
         "main_module": "index.js",
         "compatibility_date": TANGGAL_KOMPAT,
-        "bindings": [{"type": "d1", "name": "DB", "id": db_id}],
+        "bindings": [{"type": "d1", "name": "DB", "id": db_id}, {"type": "r2_bucket", "name": "FOTO", "bucket_name": NAMA_BUCKET}],
         "keep_bindings": ["secret_text"],
         "observability": {"enabled": True},
         # Jalankan Worker di dekat database (D1 hikayat-asia dilayani dari Osaka), bukan di pusat data tempat
@@ -120,6 +143,7 @@ def nyalakan_alamat():
 
 if __name__ == "__main__":
     db_id = siapkan_db()
+    siapkan_bucket()
     unggah_worker(db_id)
     siapkan_secret(db_id)
     pasang_cron()

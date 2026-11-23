@@ -2,9 +2,10 @@
 import assert from "node:assert/strict";
 import worker from "../dist/index.js";
 import { d1Lokal } from "./d1-lokal.mjs";
+import { r2Lokal } from "./r2-lokal.mjs";
 
 export function lingkungan() {
-  const env = { DB: d1Lokal(), PEPPER: "pepper-uji", SETUP_KODE: "KODE" };
+  const env = { DB: d1Lokal(), FOTO: r2Lokal(), PEPPER: "pepper-uji", SETUP_KODE: "KODE" };
   const c = { cookie: null };
   async function api(method, path, body, opsi = {}) {
     const h = { "cf-connecting-ip": "10.0.0.1", ...(opsi.headers ?? {}) };

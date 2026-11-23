@@ -133,6 +133,36 @@ td input,td select{padding:7px 9px}
 .tag.warn{background:var(--warn-bg);color:var(--warn-text)}
 .tag.off{background:var(--danger-bg);color:var(--danger-text)}
 .tag.info{background:var(--info-bg);color:var(--info-text)}
+.teks-warn{color:var(--warn-text);font-weight:600}
+
+/* Produk: foto utama di daftar, foto produk dan foto varian di form */
+.produk-sel{display:flex;align-items:center;gap:10px}
+.thumb{width:40px;height:40px;border-radius:6px;object-fit:cover;border:1px solid var(--border);background:var(--bg);flex:none;display:block}
+.thumb.kosong{border-style:dashed}
+.foto-produk{display:flex;flex-wrap:wrap;gap:10px}
+.fp-kotak{position:relative;width:88px;height:88px;border-radius:8px;border:1px solid var(--border);background:var(--bg);overflow:hidden;flex:none}
+.fp-kotak[draggable=true]{cursor:grab}
+.fp-kotak.seret{opacity:.4}
+.fp-kotak img{width:100%;height:100%;object-fit:cover;display:block}
+.fp-hapus{position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:14px;line-height:22px;padding:0;cursor:pointer}
+.fp-utama{position:absolute;left:0;right:0;bottom:0;background:var(--accent);color:#fff;font-size:11px;font-weight:700;text-align:center;padding:3px 0}
+label.fp-tambah{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;margin:0;border:1.5px dashed var(--border-strong);background:#fff;color:var(--text-2);font-size:12px;cursor:pointer}
+.fp-tambah b{font-size:20px;line-height:1;color:var(--accent)}.fp-tambah span{color:var(--text-mut);font-size:11px}
+.fp-muat{display:flex;align-items:center;justify-content:center;color:var(--text-mut);font-size:11px}
+.pesan-foto{background:var(--danger-bg);color:var(--danger-text);padding:8px 10px;border-radius:8px;margin-top:8px;font-size:12.5px}
+.tabel-varian th,.tabel-varian td{padding-left:8px;padding-right:8px}
+.tabel-varian input[type=text]{min-width:80px}.tabel-varian input[type=number]{min-width:72px}
+.tabel-varian input[data-k=sku]{min-width:110px}.tabel-varian input[data-k=berat_gram]{min-width:64px}
+td.fv{position:relative}
+.fv-pilih{display:flex;align-items:center;gap:4px;padding:3px 6px;border:1px solid var(--border-strong);border-radius:8px;background:#fff;cursor:pointer;color:var(--text-2)}
+.fv-pilih:disabled{cursor:not-allowed;opacity:.5}
+.fv-pilih img,.fv-kosong{width:28px;height:28px;border-radius:4px;object-fit:cover;display:block}
+.fv-kosong{border:1px dashed var(--border-strong)}
+.fv-menu{position:absolute;z-index:20;top:100%;left:8px;display:flex;flex-wrap:wrap;gap:6px;width:200px;padding:8px;background:#fff;border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12)}
+.fv-menu button{border:1px solid var(--border);border-radius:6px;background:#fff;padding:0;cursor:pointer;width:52px;height:52px;overflow:hidden}
+.fv-menu button img{width:100%;height:100%;object-fit:cover;display:block}
+.fv-menu button.on{outline:2px solid var(--accent);outline-offset:1px}
+.fv-menu button.tanpa{width:100%;height:auto;padding:6px;font-size:12px;color:var(--text-2)}
 
 /* Tab pil (prototipe: .tabs) */
 .subtabs,.pil{display:flex;gap:4px;margin-bottom:12px;background:#fff;border:1px solid var(--border);border-radius:8px;padding:4px;width:fit-content;max-width:100%;overflow-x:auto}

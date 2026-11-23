@@ -3,8 +3,9 @@
 import { createServer } from "node:http";
 import worker from "../dist/index.js";
 import { d1Lokal } from "./d1-lokal.mjs";
+import { r2Lokal } from "./r2-lokal.mjs";
 
-export function jalankan(port, env = { DB: d1Lokal(), PEPPER: "pepper-lokal", SETUP_KODE: "SETUP-LOKAL" }) {
+export function jalankan(port, env = { DB: d1Lokal(), FOTO: r2Lokal(), PEPPER: "pepper-lokal", SETUP_KODE: "SETUP-LOKAL" }) {
   const server = createServer(async (req, res) => {
     const chunks = [];
     for await (const c of req) chunks.push(c);
